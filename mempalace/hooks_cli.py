@@ -1,9 +1,9 @@
 """
-Hook logic for MemPalace — Python implementation of stop and precompact hooks.
+Hook logic for MemPalace — Python implementation of session-start, stop, and precompact hooks.
 
 Reads JSON from stdin, outputs JSON to stdout.
-Supported hooks: stop, precompact
-Supported harnesses: claude-code (extensible to cursor, gemini, etc.)
+Supported hooks: session-start, stop, precompact
+Supported harnesses: claude-code, codex (extensible to cursor, gemini, etc.)
 """
 
 import json
@@ -105,10 +105,20 @@ def _parse_claude_code_input(data: dict) -> dict:
     }
 
 
+def _parse_codex_input(data: dict) -> dict:
+    """Parse stdin JSON for the codex harness."""
+    return {
+        "session_id": _sanitize_session_id(str(data.get("session_id", "unknown"))),
+        "stop_hook_active": data.get("stop_hook_active", False),
+        "transcript_path": str(data.get("transcript_path", "")),
+    }
+
+
 def _parse_harness_input(data: dict, harness: str) -> dict:
     """Parse stdin JSON according to the harness type."""
     parsers = {
         "claude-code": _parse_claude_code_input,
+        "codex": _parse_codex_input,
     }
     parser = parsers.get(harness)
     if parser is None:
@@ -163,6 +173,20 @@ def hook_stop(data: dict, harness: str):
         _output({})
 
 
+def hook_session_start(data: dict, harness: str):
+    """Session start hook: initialize session tracking state."""
+    parsed = _parse_harness_input(data, harness)
+    session_id = parsed["session_id"]
+
+    _log(f"SESSION START for session {session_id}")
+
+    # Initialize session state directory
+    STATE_DIR.mkdir(parents=True, exist_ok=True)
+
+    # Pass through — no blocking on session start
+    _output({})
+
+
 def hook_precompact(data: dict, harness: str):
     """Precompact hook: always block with comprehensive save instruction."""
     parsed = _parse_harness_input(data, harness)
@@ -196,6 +220,7 @@ def run_hook(hook_name: str, harness: str):
         data = {}
 
     hooks = {
+        "session-start": hook_session_start,
         "stop": hook_stop,
         "precompact": hook_precompact,
     }

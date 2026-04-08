@@ -475,13 +475,13 @@ def main():
     p_hook_run.add_argument(
         "--hook",
         required=True,
-        choices=["stop", "precompact"],
+        choices=["session-start", "stop", "precompact"],
         help="Hook name to run",
     )
     p_hook_run.add_argument(
         "--harness",
         required=True,
-        choices=["claude-code"],
+        choices=["claude-code", "codex"],
         help="Harness type (determines stdin JSON format)",
     )
 
