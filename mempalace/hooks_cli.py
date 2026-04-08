@@ -46,7 +46,7 @@ def _count_human_messages(transcript_path: str) -> int:
         return 0
     count = 0
     try:
-        with open(path) as f:
+        with open(path, encoding="utf-8", errors="replace") as f:
             for line in f:
                 try:
                     entry = json.loads(line)

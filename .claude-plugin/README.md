@@ -11,13 +11,8 @@ A Claude Code plugin that gives your AI a persistent memory system. Mine project
 ### Claude Code Marketplace
 
 ```bash
-claude plugin add mempalace
-```
-
-### Git
-
-```bash
-claude plugin add --git https://github.com/milla-jovovich/mempalace
+claude plugin marketplace add milla-jovovich/mempalace
+claude plugin install --scope user mempalace
 ```
 
 ### Local Clone
