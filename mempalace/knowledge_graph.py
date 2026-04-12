@@ -84,6 +84,13 @@ class KnowledgeGraph:
                 FOREIGN KEY (object) REFERENCES entities(id)
             );
 
+            CREATE TABLE IF NOT EXISTS rooms (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT UNIQUE NOT NULL,
+                centroid TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+
             CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
             CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
             CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate);
@@ -108,6 +115,16 @@ class KnowledgeGraph:
         return name.lower().replace(" ", "_").replace("'", "")
 
     # ── Write operations ──────────────────────────────────────────────────
+
+    def add_room(self, name: str, centroid: list[float]):
+        """Add a room and its mathematical centroid to the ontology."""
+        centroid_str = json.dumps(centroid)
+        conn = self._conn()
+        with conn:
+            conn.execute(
+                "INSERT INTO rooms (name, centroid) VALUES (?, ?) ON CONFLICT(name) DO UPDATE SET centroid=excluded.centroid",
+                (name, centroid_str),
+            )
 
     def add_entity(self, name: str, entity_type: str = "unknown", properties: dict = None):
         """Add or update an entity node."""
@@ -247,6 +264,19 @@ class KnowledgeGraph:
             )
 
     # ── Query operations ──────────────────────────────────────────────────
+
+    def get_all_rooms(self) -> list[dict]:
+        """Get all rooms and their centroids."""
+        conn = self._conn()
+        rooms = []
+        for row in conn.execute("SELECT id, name, centroid, created_at FROM rooms ORDER BY name"):
+            rooms.append({
+                "id": row["id"],
+                "name": row["name"],
+                "centroid": json.loads(row["centroid"]),
+                "created_at": row["created_at"],
+            })
+        return rooms
 
     def query_entity(self, name: str, as_of: str = None, direction: str = "outgoing"):
         """
