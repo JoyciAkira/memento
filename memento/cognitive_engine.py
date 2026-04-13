@@ -210,10 +210,11 @@ class CognitiveEngine:
             return f"[DRAFT_INSIGHT] Errore durante la sintesi: {str(e)}"
 
 
-    def check_goal_alignment(self, code_or_plan: str) -> str:
+    def check_goal_alignment(self, code_or_plan: str, context: str = "") -> str:
         logger.info("CognitiveEngine checking goal alignment...")
         try:
-            res_dict = self.provider.search("obiettivo goal", limit=5)
+            search_query = f"obiettivo goal per il contesto: {context}" if context else "obiettivo goal"
+            res_dict = self.provider.search(search_query, limit=5)
             results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
             
             if not results:

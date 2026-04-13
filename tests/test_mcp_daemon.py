@@ -73,6 +73,35 @@ async def test_universal_memento_tool(monkeypatch):
     assert len(result) > 0
     assert "Azione identificata: ADD" in result[0].text
 
+
+@pytest.mark.asyncio
+async def test_universal_memento_tool_with_focus_area(monkeypatch):
+    import memento.mcp_server as ms
+    from mcp.types import TextContent
+
+    def fake_parse(query):
+        return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
+
+    monkeypatch.setattr(ms.cognitive_engine, "parse_natural_language_intent", fake_parse)
+
+    def fake_extract(focus_area, workspace):
+        return focus_area
+
+    monkeypatch.setattr("memento.ontology.extract_logical_namespace", fake_extract)
+
+    def fake_search(query, user_id=None, filters=None):
+        assert filters == {"module": "frontend"}
+        return [{"memory": "Trovato bug nel frontend"}]
+
+    monkeypatch.setattr(ms.provider, "search", fake_search)
+    monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
+    
+    result = await ms.call_tool("memento", {"query": "cerca bug nel frontend"})
+    assert len(result) > 0
+    text = result[0].text
+    assert "Focus Context: frontend" in text
+    assert "Trovato bug nel frontend" in text
+
 def test_mcp_uses_neuro_provider():
     import memento.mcp_server as ms
     from memento.provider import NeuroGraphProvider

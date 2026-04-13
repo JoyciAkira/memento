@@ -576,27 +576,46 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         intent = cognitive_engine.parse_natural_language_intent(query)
         action = intent.get("action", "UNKNOWN")
         payload = intent.get("payload", {})
+        focus_area = intent.get("focus_area", "")
         
         response_text = f"🤖 [MEMENTO ROUTER] Azione identificata: {action}\n---\n"
+        if focus_area:
+            response_text += f"🔍 Focus Context: {focus_area}\n---\n"
         
         try:
             if action == "ADD":
                 if not access_manager.can_write():
                     raise PermissionError(f"Cannot add memory. Access state is: {access_manager.state}")
                 text = payload.get("text", query)
-                result = provider.add(text, user_id="default")
+                
+                metadata = {}
+                if focus_area:
+                    from memento.ontology import extract_logical_namespace
+                    namespace = extract_logical_namespace(focus_area, workspace)
+                    if namespace:
+                        metadata["module"] = namespace
+                        
+                result = provider.add(text, user_id="default", metadata=metadata if metadata else None)
                 response_text += f"Memoria salvata: {result}"
                 
             elif action == "SEARCH":
                 if not access_manager.can_read():
                     raise PermissionError(f"Cannot search memory. Access state is: {access_manager.state}")
                 search_query = payload.get("query", query)
-                res = provider.search(search_query, user_id="default")
+                
+                filters = {}
+                if focus_area:
+                    from memento.ontology import extract_logical_namespace
+                    namespace = extract_logical_namespace(focus_area, workspace)
+                    if namespace:
+                        filters["module"] = namespace
+                        
+                res = provider.search(search_query, user_id="default", filters=filters if filters else None)
                 if not res:
                     response_text += "Nessuna memoria trovata."
                 else:
                     formatted = json.dumps(res, indent=2, ensure_ascii=False)
-                    injection = get_active_goals() if ENFORCEMENT_CONFIG.get("level1") else ""
+                    injection = get_active_goals(context=focus_area) if ENFORCEMENT_CONFIG.get("level1") else ""
                     response_text += f"{injection}Risultati:\n{formatted}"
                     
             elif action == "LIST":
@@ -608,14 +627,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     response_text += f"Ultime 50 memorie:\n{formatted}"
                     
             elif action == "DREAM":
-                context = payload.get("context", "")
+                context = payload.get("context", focus_area)
                 insight = cognitive_engine.synthesize_dreams(context)
                 response_text += insight
                 
             elif action == "ALIGNMENT":
                 content_payload = payload.get("content", query)
                 if ENFORCEMENT_CONFIG.get("level2"):
-                    eval_result = cognitive_engine.check_goal_alignment(content_payload)
+                    eval_result = cognitive_engine.check_goal_alignment(content_payload, context=focus_area)
                     response_text += eval_result
                 else:
                     response_text += "Il Goal Enforcer (Level 2) è disabilitato. Usa memento_configure_enforcement per attivarlo."
