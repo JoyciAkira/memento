@@ -1,6 +1,5 @@
 import logging
 import asyncio
-from typing import Any, Dict, Optional, List
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -34,9 +33,10 @@ ENFORCEMENT_CONFIG = {
 }
 
 
-def get_active_goals(max_goals: int = 3) -> str:
+def get_active_goals(max_goals: int = 3, context: str = None) -> str:
     try:
-        res = provider.search("obiettivo goal", user_id="default")
+        search_query = f"obiettivo goal per il contesto: {context}" if context else "obiettivo goal"
+        res = provider.search(search_query, user_id="default")
         results = res.get("results", []) if isinstance(res, dict) else res
         if not isinstance(results, list):
             return ""
@@ -57,7 +57,7 @@ def get_active_goals(max_goals: int = 3) -> str:
 
 
 async def on_danger_detected(filepath: str, content: str):
-    warning = cognitive_engine.evaluate_raw_context(content)
+    warning = cognitive_engine.evaluate_raw_context(content, filepath=filepath)
     
     deviation = ""
     if ENFORCEMENT_CONFIG.get("level3"):
@@ -83,7 +83,7 @@ async def on_danger_detected(filepath: str, content: str):
             logger.error(f"Failed to send notification: {e}")
 
     # TASK 3: Proactive Feature Proposal
-    feature_proposal = cognitive_engine.detect_latent_features(content)
+    feature_proposal = cognitive_engine.detect_latent_features(content, filepath=filepath)
     if feature_proposal:
         logger.info(f"Pushing Feature Proposal Notification for {filepath}")
         from mcp.server import request_ctx
@@ -474,6 +474,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             raise PermissionError(f"Cannot search memory. Current access state is: {access_manager.state}")
             
         query = arguments.get("query")
+        active_context = arguments.get("active_context")
         if not query:
             raise ValueError("Query is required")
             
@@ -486,7 +487,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 return [TextContent(type="text", text="No memories found.")]
             
             formatted_results = json.dumps(res, indent=2, ensure_ascii=False)
-            injection = get_active_goals() if ENFORCEMENT_CONFIG.get("level1") else ""
+            injection = get_active_goals(context=active_context) if ENFORCEMENT_CONFIG.get("level1") else ""
             return [TextContent(type="text", text=f"{injection}Search results:\n{formatted_results}")]
         except Exception as e:
             logger.error(f"Error searching memory: {e}")

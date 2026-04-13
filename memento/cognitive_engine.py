@@ -1,7 +1,5 @@
 import logging
 import os
-import json
-from typing import List, Dict, Any, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +49,8 @@ class CognitiveEngine:
             negative_keywords = ["bug", "error", "problem", "fail", "issue", "time", "broken"]
             
             for r in results:
-                if not isinstance(r, dict): continue
+                if not isinstance(r, dict):
+                    continue
                 memory_text = r.get("memory", "").lower()
                 if any(kw in memory_text for kw in negative_keywords):
                     warnings.append(r.get("memory"))
@@ -78,9 +77,11 @@ class CognitiveEngine:
                 res_dict = self.provider.search(q)
                 results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
                 for r in results:
-                    if not isinstance(r, dict): continue
+                    if not isinstance(r, dict):
+                        continue
                     mem = r.get("memory")
-                    if mem: tasks.add(mem)
+                    if mem:
+                        tasks.add(mem)
                     
             if not tasks:
                 return "No latent tasks found in the subconsciuos memory."
@@ -100,21 +101,23 @@ class CognitiveEngine:
             logger.error(f"Error generating tasks: {e}")
             return f"Error generating tasks: {e}"
 
-    def evaluate_raw_context(self, raw_text: str) -> str:
+    def evaluate_raw_context(self, raw_text: str, filepath: str = None) -> str:
         """
         Takes raw text (e.g. from a file change) and checks if it closely matches
         any historical bugs or anti-patterns.
         """
-        logger.info("CognitiveEngine evaluating raw context from daemon...")
+        logger.info(f"CognitiveEngine evaluating raw context from daemon for file: {filepath}...")
         try:
-            res_dict = self.provider.search(raw_text)
+            query = f"Problemi noti o bug simili al seguente testo nel file {filepath}:\n{raw_text}" if filepath else raw_text
+            res_dict = self.provider.search(query)
             results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
             
             warnings = []
             negative_keywords = ["bug", "error", "problem", "fail", "issue", "time", "broken", "deprecated", "leak"]
             
             for r in results:
-                if not isinstance(r, dict): continue
+                if not isinstance(r, dict):
+                    continue
                 score = r.get("score", 0.0)
                 if score < 0.8:
                     continue
@@ -133,12 +136,12 @@ class CognitiveEngine:
             return ""
 
 
-    def detect_latent_features(self, context: str) -> str:
+    def detect_latent_features(self, context: str, filepath: str = None) -> str:
         """
         Analyzes the context (e.g., code changes) to proactively propose new features,
         abstractions, or improvements.
         """
-        logger.info("CognitiveEngine detecting latent features...")
+        logger.info(f"CognitiveEngine detecting latent features for file: {filepath}...")
         try:
             prompt = (
                 "Sei l'Assistente Architetturale Proattivo di Memento. Analizza il seguente codice o testo "
@@ -148,9 +151,11 @@ class CognitiveEngine:
                 "Altrimenti, descrivi la proposta in modo conciso e orientato all'azione."
             )
             
+            context_with_filepath = f"File: {filepath}\n\n{context}" if filepath else context
+            
             messages = [
                 {"role": "system", "content": prompt},
-                {"role": "user", "content": f"Contesto da analizzare:\n\n{context}"}
+                {"role": "user", "content": f"Contesto da analizzare:\n\n{context_with_filepath}"}
             ]
             
             llm_response = self._generate_response(messages)
@@ -175,7 +180,8 @@ class CognitiveEngine:
                 
             memory_list = []
             for r in results:
-                if not isinstance(r, dict): continue
+                if not isinstance(r, dict):
+                    continue
                 mem_id = r.get("id", "unknown")
                 mem_text = r.get("memory", "")
                 memory_list.append(f"- ID: {mem_id} | Fatto: {mem_text}")
