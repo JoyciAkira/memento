@@ -316,6 +316,10 @@ async def list_tools() -> list[Tool]:
                         "type": "object",
                         "description": "Optional metadata for the memory",
                         "additionalProperties": True
+                    },
+                    "active_context": {
+                        "type": "string",
+                        "description": "Optional active contextual metadata (e.g. current file, active task) to frame the memory."
                     }
                 },
                 "required": ["text"]
@@ -459,7 +463,16 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             raise ValueError("Text is required")
             
         metadata = arguments.get("metadata", {})
-        
+        if not isinstance(metadata, dict):
+            metadata = {}
+            
+        active_context = arguments.get("active_context")
+        if active_context:
+            from memento.ontology import extract_logical_namespace
+            namespace = extract_logical_namespace(active_context, workspace)
+            if namespace and "module" not in metadata:
+                metadata["module"] = namespace
+                
         try:
             # Assumes provider.add returns some result or raises on failure
             result = provider.add(text, user_id=metadata.get("user_id", "default"), metadata=metadata)
@@ -479,8 +492,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             raise ValueError("Query is required")
             
         try:
+            filters = {}
+            if active_context:
+                from memento.ontology import extract_logical_namespace
+                namespace = extract_logical_namespace(active_context, workspace)
+                if namespace:
+                    filters["module"] = namespace
+                    
             # Assumes provider.search returns a dict or list
-            res = provider.search(query, user_id="default")
+            res = provider.search(query, user_id="default", filters=filters)
             
             # Format results
             if not res:
