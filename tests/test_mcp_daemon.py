@@ -170,7 +170,7 @@ async def test_memento_tool_coercion():
     
     assert memento_tool is not None
     assert "CRITICAL SYSTEM DIRECTIVE" in memento_tool.description
-    assert "MUST invoke this tool IMMEDIATELY" in memento_tool.description
+    assert "PROACTIVELY and AUTONOMOUSLY" in memento_tool.description
 
 @pytest.mark.asyncio
 async def test_mcp_server_dynamic_workspace_routing():
