@@ -19,6 +19,7 @@ classifiers = [
 dependencies = [
     "mem0ai",
     "pytest",
+    "pytest-asyncio",
     "mcp",
     "watchdog>=4.0.0",
 ]

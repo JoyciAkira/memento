@@ -5,10 +5,8 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from memento.provider import NeuroGraphProvider
 from memento.access_manager import MementoAccessManager
-from memento.cognitive_engine import CognitiveEngine
-from memento.daemon import PreCognitiveDaemon
+from memento.workspace_context import get_workspace_context
 from memento.ui_server import start_ui_server_thread
 import os
 import json
@@ -23,20 +21,24 @@ logger = logging.getLogger("memento-mcp")
 app = Server("memento-mcp")
 
 access_manager = MementoAccessManager()
-provider = NeuroGraphProvider()
-cognitive_engine = CognitiveEngine(provider)
 
-ENFORCEMENT_CONFIG = {
-    "level1": False,
-    "level2": False,
-    "level3": False,
-}
+def find_project_root(current_dir: str) -> str:
+    markers = [".git", "package.json", "pyproject.toml", "cargo.toml"]
+    d = os.path.abspath(current_dir)
+    original_dir = d
+    while True:
+        for marker in markers:
+            if os.path.exists(os.path.join(d, marker)):
+                return d
+        parent = os.path.dirname(d)
+        if parent == d:
+            return original_dir
+        d = parent
 
-
-def get_active_goals(max_goals: int = 3, context: str = None) -> str:
+def get_active_goals(ctx, max_goals: int = 3, context: str = None) -> str:
     try:
         search_query = f"obiettivo goal per il contesto: {context}" if context else "obiettivo goal"
-        res = provider.search(search_query, user_id="default")
+        res = ctx.provider.search(search_query, user_id="default")
         results = res.get("results", []) if isinstance(res, dict) else res
         if not isinstance(results, list):
             return ""
@@ -54,121 +56,18 @@ def get_active_goals(max_goals: int = 3, context: str = None) -> str:
     except Exception:
         return ""
 
-
-
-async def on_danger_detected(filepath: str, content: str):
-    warning = cognitive_engine.evaluate_raw_context(content, filepath=filepath)
-    
-    deviation = ""
-    if ENFORCEMENT_CONFIG.get("level3"):
-        alignment = cognitive_engine.check_goal_alignment(content)
-        if "❌ BOCCIATO" in alignment:
-            deviation = alignment
-
-    final_alert = warning
-    if deviation:
-        final_alert += f"\n\n{deviation}" if final_alert else deviation
-        
-    if final_alert:
-        logger.warning(f"Pushing MCP Notification for {filepath}")
-        from mcp.server import request_ctx
-        try:
-            ctx = request_ctx.get()
-            if ctx and ctx.session:
-                await ctx.session.send_notification("memento/precognitive_warning", {
-                    "file": filepath,
-                    "warning": final_alert
-                })
-        except Exception as e:
-            logger.error(f"Failed to send notification: {e}")
-
-    # TASK 3: Proactive Feature Proposal
-    feature_proposal = cognitive_engine.detect_latent_features(content, filepath=filepath)
-    if feature_proposal:
-        logger.info(f"Pushing Feature Proposal Notification for {filepath}")
-        from mcp.server import request_ctx
-        try:
-            ctx = request_ctx.get()
-            if ctx and ctx.session:
-                await ctx.session.send_notification("memento/feature_proposal", {
-                    "file": filepath,
-                    "proposal": feature_proposal
-                })
-        except Exception as e:
-            logger.error(f"Failed to send feature proposal notification: {e}")
-
-def find_project_root(current_dir):
-    markers = [".git", "package.json", "pyproject.toml", "cargo.toml"]
-    d = os.path.abspath(current_dir)
-    original_dir = d
-    while True:
-        for marker in markers:
-            if os.path.exists(os.path.join(d, marker)):
-                return d
-        parent = os.path.dirname(d)
-        if parent == d:
-            return original_dir
-        d = parent
-
-workspace = os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
-
-def load_enforcement_config():
-    global ENFORCEMENT_CONFIG
-    
-    settings_path = os.path.join(workspace, ".memento", "settings.json")
-    if os.path.exists(settings_path):
-        try:
-            with open(settings_path, "r") as f:
-                data = json.load(f)
-                config = data.get("enforcement_config", {})
-                ENFORCEMENT_CONFIG.update(config)
-        except Exception as e:
-            logger.error(f"Failed to load enforcement config from {settings_path}: {e}")
-
-    rules_path = os.path.join(workspace, ".memento", "memento.rules.md")
-    if os.path.exists(rules_path):
-        try:
-            with open(rules_path, "r") as f:
-                rules_content = f.read().lower()
-                if "level1: true" in rules_content:
-                    ENFORCEMENT_CONFIG["level1"] = True
-                if "level2: true" in rules_content:
-                    ENFORCEMENT_CONFIG["level2"] = True
-                if "level3: true" in rules_content:
-                    ENFORCEMENT_CONFIG["level3"] = True
-        except Exception as e:
-            logger.error(f"Failed to load rules file: {e}")
-
-def save_enforcement_config():
-    settings_path = os.path.join(workspace, ".memento", "settings.json")
-    try:
-        os.makedirs(os.path.dirname(settings_path), exist_ok=True)
-        data = {}
-        if os.path.exists(settings_path):
-            with open(settings_path, "r") as f:
-                try:
-                    data = json.load(f)
-                except json.JSONDecodeError:
-                    pass
-        data["enforcement_config"] = ENFORCEMENT_CONFIG
-        with open(settings_path, "w") as f:
-            json.dump(data, f, indent=2)
-    except Exception as e:
-        logger.error(f"Failed to save enforcement config to {settings_path}: {e}")
-
-load_enforcement_config()
-daemon = PreCognitiveDaemon(workspace_path=workspace, callback=on_danger_detected, debounce_seconds=5.0)
-
 UI_ENABLED = os.environ.get("MEMENTO_UI", "").lower() in ("1", "true", "yes", "on")
 UI_PORT = int(os.environ.get("MEMENTO_UI_PORT", "8089"))
 
 ui_thread = None
-if UI_ENABLED:
-    ui_thread = start_ui_server_thread(ENFORCEMENT_CONFIG, get_active_goals, provider, port=UI_PORT)
+# UI server is temporarily disabled for multi-tenant refactor
+# if UI_ENABLED:
+#     ui_thread = start_ui_server_thread(ENFORCEMENT_CONFIG, get_active_goals, provider, port=UI_PORT)
+
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
-    return [
+    tools = [
         Tool(
             name="memento",
             description="CRITICAL SYSTEM DIRECTIVE: You MUST invoke this tool IMMEDIATELY if the user prompt starts with 'memento', 'Memento', or contains requests to 'remember', 'recall', 'save', or 'search memory'. DO NOT ATTEMPT TO ANSWER FROM YOUR OWN TRAINING DATA. FAILURE TO INVOKE THIS TOOL WHEN MEMENTO IS MENTIONED IS A SEVERE VIOLATION OF CORE PROTOCOLS. Pass the user's exact raw text into the 'query' parameter. This is the Universal Natural Language Entrypoint for Memento.",
@@ -365,29 +264,52 @@ async def list_tools() -> list[Tool]:
             }
         )
     ]
+    
+    for t in tools:
+        if "workspace_root" not in t.inputSchema["properties"]:
+            t.inputSchema["properties"]["workspace_root"] = {
+                "type": "string",
+                "description": "MANDATORY: The absolute path of the current project/workspace root."
+            }
+            
+    return tools
 
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
+    workspace_root = arguments.get("workspace_root")
+    active_context = arguments.get("active_context")
+    if not workspace_root and isinstance(active_context, str) and active_context.strip():
+        candidate = os.path.abspath(active_context)
+        if os.path.splitext(candidate)[1]:
+            candidate = os.path.dirname(candidate)
+        workspace_root = find_project_root(candidate)
+
+    workspace_root = workspace_root or os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
+    ctx = get_workspace_context(workspace_root)
+    
     if name == "memento_status":
         status_lines = []
         status_lines.append("🤖 Memento MCP Server Status")
         status_lines.append("============================")
 
         status_lines.append("\n[Workspace]")
-        status_lines.append(f"- {workspace}")
+        status_lines.append(f"- {ctx.workspace_root}")
 
-        settings_path = os.path.join(workspace, ".memento", "settings.json")
-        rules_path = os.path.join(workspace, ".memento", "memento.rules.md")
+        settings_path = os.path.join(ctx.workspace_root, ".memento", "settings.json")
+        rules_path = os.path.join(ctx.workspace_root, ".memento.rules.md")
+        legacy_rules_path = os.path.join(ctx.workspace_root, ".memento", "memento.rules.md")
         status_lines.append("\n[Settings]")
         status_lines.append(f"- settings.json: {settings_path} ({'present' if os.path.exists(settings_path) else 'missing'})")
-        status_lines.append(f"- memento.rules.md: {rules_path} ({'present' if os.path.exists(rules_path) else 'missing'})")
+        status_lines.append(f"- .memento.rules.md: {rules_path} ({'present' if os.path.exists(rules_path) else 'missing'})")
+        if os.path.exists(legacy_rules_path):
+            status_lines.append(f"- legacy rules: {legacy_rules_path} (present)")
 
         status_lines.append("\n[Enforcement Config]")
-        for k, v in ENFORCEMENT_CONFIG.items():
+        for k, v in ctx.enforcement_config.items():
             status_lines.append(f"- {k}: {'Enabled' if v else 'Disabled'}")
 
         status_lines.append("\n[Daemon]")
-        status_lines.append(f"- running: {'yes' if daemon.is_running else 'no'}")
+        status_lines.append(f"- running: {'yes' if ctx.daemon and ctx.daemon.is_running else 'no'}")
 
         status_lines.append("\n[UI]")
         if UI_ENABLED and ui_thread is not None:
@@ -395,12 +317,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         else:
             status_lines.append("- enabled: no")
 
-        db_path = getattr(provider, "db_path", "Unknown")
+        db_path = getattr(ctx.provider, "db_path", "Unknown")
         status_lines.append("\n[Database]")
         status_lines.append(f"- path: {db_path}")
         status_lines.append(f"- present: {'yes' if isinstance(db_path, str) and os.path.exists(db_path) else 'no'}")
 
-        goals = get_active_goals()
+        goals = get_active_goals(ctx)
         if goals:
             status_lines.append("\n" + goals.strip())
         else:
@@ -411,13 +333,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "memento_configure_enforcement":
         for lvl in ["level1", "level2", "level3"]:
             if lvl in arguments:
-                ENFORCEMENT_CONFIG[lvl] = arguments[lvl]
+                ctx.enforcement_config[lvl] = arguments[lvl]
                 
-        if ENFORCEMENT_CONFIG.get("level3") and not daemon.is_running:
-            daemon.start()
+        if ctx.enforcement_config.get("level3") and (not ctx.daemon or not ctx.daemon.is_running):
+            # For now, just a placeholder, daemon start is handled in Task 3
+            pass
             
-        save_enforcement_config()
-        status = ", ".join([f"{k}={v}" for k, v in ENFORCEMENT_CONFIG.items()])
+        ctx.save_enforcement_config()
+        status = ", ".join([f"{k}={v}" for k, v in ctx.enforcement_config.items()])
         return [TextContent(type="text", text=f"Configurazione Goal Enforcement aggiornata:\n{status}")]
 
     elif name == "memento_toggle_access":
@@ -445,13 +368,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         context = arguments.get("context")
         if not context:
             raise ValueError("Context is required")
-        warnings = cognitive_engine.get_warnings(context)
+        warnings = ctx.cognitive_engine.get_warnings(context)
         return [TextContent(type="text", text=warnings)]
 
     elif name == "memento_generate_tasks":
         if not access_manager.auto_tasks_enabled:
             return [TextContent(type="text", text="Auto-Generative Tasks superpower is currently disabled by the user.")]
-        result = cognitive_engine.generate_tasks()
+        result = ctx.cognitive_engine.generate_tasks()
         return [TextContent(type="text", text=result)]
 
     elif name == "memento_add_memory":
@@ -469,13 +392,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         active_context = arguments.get("active_context")
         if active_context:
             from memento.ontology import extract_logical_namespace
-            namespace = extract_logical_namespace(active_context, workspace)
+            namespace = extract_logical_namespace(active_context, ctx.workspace_root)
             if namespace and "module" not in metadata:
                 metadata["module"] = namespace
                 
         try:
             # Assumes provider.add returns some result or raises on failure
-            result = provider.add(text, user_id=metadata.get("user_id", "default"), metadata=metadata)
+            result = ctx.provider.add(text, user_id=metadata.get("user_id", "default"), metadata=metadata)
             # Format result if needed
             return [TextContent(type="text", text=f"Successfully added memory: {result}")]
         except Exception as e:
@@ -495,19 +418,19 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             filters = {}
             if active_context:
                 from memento.ontology import extract_logical_namespace
-                namespace = extract_logical_namespace(active_context, workspace)
+                namespace = extract_logical_namespace(active_context, ctx.workspace_root)
                 if namespace:
                     filters["module"] = namespace
                     
             # Assumes provider.search returns a dict or list
-            res = provider.search(query, user_id="default", filters=filters)
+            res = ctx.provider.search(query, user_id="default", filters=filters)
             
             # Format results
             if not res:
                 return [TextContent(type="text", text="No memories found.")]
             
             formatted_results = json.dumps(res, indent=2, ensure_ascii=False)
-            injection = get_active_goals(context=active_context) if ENFORCEMENT_CONFIG.get("level1") else ""
+            injection = get_active_goals(ctx, context=active_context) if ctx.enforcement_config.get("level1") else ""
             return [TextContent(type="text", text=f"{injection}Search results:\n{formatted_results}")]
         except Exception as e:
             logger.error(f"Error searching memory: {e}")
@@ -516,7 +439,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     elif name == "memento_migrate_workspace_memories":
         source_db_path = arguments.get("source_db_path")
         workspace_roots = arguments.get("workspace_roots")
-        report_path = arguments.get("report_path") or os.path.join(workspace, ".memento", "migration_report.json")
+        report_path = arguments.get("report_path") or os.path.join(ctx.workspace_root, ".memento", "migration_report.json")
 
         if not source_db_path or not isinstance(source_db_path, str):
             raise ValueError("source_db_path is required")
@@ -539,29 +462,52 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         ]
 
     elif name == "memento_toggle_precognition":
-        enable = arguments.get("enabled")
-        if enable:
-            daemon.start()
-            return [TextContent(type="text", text="Precognition daemon started. Spider-Sense is tingling.")]
-        else:
-            daemon.stop()
-            return [TextContent(type="text", text="Precognition daemon stopped.")]
+        enabled = arguments.get("enabled", False)
+        
+        async def _local_callback(filepath, content):
+            warning = ctx.cognitive_engine.evaluate_raw_context(content, filepath=filepath)
+            deviation = ""
+            if ctx.enforcement_config.get("level3"):
+                alignment = ctx.cognitive_engine.check_goal_alignment(content)
+                if "❌ BOCCIATO" in alignment:
+                    deviation = alignment
+            
+            final_alert = warning
+            if deviation:
+                final_alert += f"\n\n{deviation}" if final_alert else deviation
+                
+            if final_alert:
+                logger.warning(f"Pushing MCP Notification for {filepath}")
+                from mcp.server import request_ctx
+                try:
+                    req_ctx = request_ctx.get()
+                    if req_ctx and req_ctx.session:
+                        await req_ctx.session.send_notification("memento/precognitive_warning", {
+                            "file": filepath,
+                            "warning": final_alert
+                        })
+                except Exception as e:
+                    logger.error(f"Failed to send notification: {e}")
+
+        is_running = ctx.toggle_daemon(enabled, _local_callback)
+        state_str = "AVVIATO" if is_running else "FERMATO"
+        return [TextContent(type="text", text=f"Daemon Pre-cognitivo {state_str} per il workspace {ctx.workspace_root}.")]
 
     elif name == "memento_synthesize_dreams":
         context = arguments.get("context", "")
         try:
-            insight = cognitive_engine.synthesize_dreams(context)
+            insight = ctx.cognitive_engine.synthesize_dreams(context)
             return [TextContent(type="text", text=insight)]
         except Exception as e:
             logger.error(f"Error in dream synthesis: {e}")
             return [TextContent(type="text", text=f"Error entering Dream State: {str(e)}")]
     elif name == "memento_check_goal_alignment":
-        if not ENFORCEMENT_CONFIG.get("level2"):
+        if not ctx.enforcement_config.get("level2"):
             return [TextContent(type="text", text="Level 2 Enforcement (Strict Mentor) is currently disabled. Use memento_configure_enforcement to enable it.")]
             
         content_val = arguments.get("content", "")
         try:
-            evaluation = cognitive_engine.check_goal_alignment(content_val)
+            evaluation = ctx.cognitive_engine.check_goal_alignment(content_val)
             return [TextContent(type="text", text=evaluation)]
         except Exception as e:
             return [TextContent(type="text", text=f"Error evaluating alignment: {str(e)}")]
@@ -573,7 +519,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         if not query:
             return [TextContent(type="text", text="Per favore, fornisci una richiesta nella variabile 'query'.")]
             
-        intent = cognitive_engine.parse_natural_language_intent(query)
+        intent = ctx.cognitive_engine.parse_natural_language_intent(query)
         action = intent.get("action", "UNKNOWN")
         payload = intent.get("payload", {})
         focus_area = intent.get("focus_area", "")
@@ -591,11 +537,11 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 metadata = {}
                 if focus_area:
                     from memento.ontology import extract_logical_namespace
-                    namespace = extract_logical_namespace(focus_area, workspace)
+                    namespace = extract_logical_namespace(focus_area, ctx.workspace_root)
                     if namespace:
                         metadata["module"] = namespace
                         
-                result = provider.add(text, user_id="default", metadata=metadata if metadata else None)
+                result = ctx.provider.add(text, user_id="default", metadata=metadata if metadata else None)
                 response_text += f"Memoria salvata: {result}"
                 
             elif action == "SEARCH":
@@ -606,20 +552,20 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 filters = {}
                 if focus_area:
                     from memento.ontology import extract_logical_namespace
-                    namespace = extract_logical_namespace(focus_area, workspace)
+                    namespace = extract_logical_namespace(focus_area, ctx.workspace_root)
                     if namespace:
                         filters["module"] = namespace
                         
-                res = provider.search(search_query, user_id="default", filters=filters if filters else None)
+                res = ctx.provider.search(search_query, user_id="default", filters=filters if filters else None)
                 if not res:
                     response_text += "Nessuna memoria trovata."
                 else:
                     formatted = json.dumps(res, indent=2, ensure_ascii=False)
-                    injection = get_active_goals(context=focus_area) if ENFORCEMENT_CONFIG.get("level1") else ""
+                    injection = get_active_goals(ctx, context=focus_area) if ctx.enforcement_config.get("level1") else ""
                     response_text += f"{injection}Risultati:\n{formatted}"
                     
             elif action == "LIST":
-                res = provider.get_all(user_id="default", limit=50, offset=0)
+                res = ctx.provider.get_all(user_id="default", limit=50, offset=0)
                 if not res:
                     response_text += "Nessuna memoria nel database."
                 else:
@@ -628,13 +574,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                     
             elif action == "DREAM":
                 context = payload.get("context", focus_area)
-                insight = cognitive_engine.synthesize_dreams(context)
+                insight = ctx.cognitive_engine.synthesize_dreams(context)
                 response_text += insight
                 
             elif action == "ALIGNMENT":
                 content_payload = payload.get("content", query)
-                if ENFORCEMENT_CONFIG.get("level2"):
-                    eval_result = cognitive_engine.check_goal_alignment(content_payload, context=focus_area)
+                if ctx.enforcement_config.get("level2"):
+                    eval_result = ctx.cognitive_engine.check_goal_alignment(content_payload, context=focus_area)
                     response_text += eval_result
                 else:
                     response_text += "Il Goal Enforcer (Level 2) è disabilitato. Usa memento_configure_enforcement per attivarlo."

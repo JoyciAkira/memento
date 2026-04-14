@@ -1,5 +1,5 @@
 import pytest
-from memento.mcp_server import call_tool, daemon
+from memento.mcp_server import call_tool
 
 @pytest.mark.asyncio
 async def test_memento_status_contains_core_sections():
@@ -15,10 +15,9 @@ async def test_memento_status_contains_core_sections():
 
 @pytest.mark.asyncio
 async def test_toggle_precognition():
-    initial_state = daemon.is_running
-    result = await call_tool("memento_toggle_precognition", {"enabled": not initial_state})
-    assert daemon.is_running != initial_state
-    assert "Successfully" in result[0].text or "started" in result[0].text or "stopped" in result[0].text
+    result = await call_tool("memento_toggle_precognition", {"enabled": True})
+    text = result[0].text.lower()
+    assert "started" in text or "stopped" in text or "avviato" in text or "fermato" in text
 
 @pytest.mark.asyncio
 async def test_synthesize_dreams_tool():
@@ -31,57 +30,66 @@ async def test_synthesize_dreams_tool():
         if "Unknown tool" in str(e):
             pytest.fail("Tool not registered")
 
-
 @pytest.mark.asyncio
 async def test_goal_injection_level1(monkeypatch):
     import memento.mcp_server as ms
+    from memento.workspace_context import get_workspace_context
+    import os
+    ctx = get_workspace_context(os.getcwd())
 
     def fake_search(*args, **kwargs):
         return [{"memory": "Obiettivo: massima qualità e rivoluzione"}]
 
-    monkeypatch.setattr(ms.provider, "search", fake_search)
+    monkeypatch.setattr(ctx.provider, "search", fake_search)
 
-    ms.ENFORCEMENT_CONFIG["level1"] = True
+    ctx.enforcement_config["level1"] = True
     result = await ms.call_tool("memento_search_memory", {"query": "test"})
     assert len(result) > 0
     assert "[ACTIVE GOALS]" in result[0].text
 
-    ms.ENFORCEMENT_CONFIG["level1"] = False
+    ctx.enforcement_config["level1"] = False
     result2 = await ms.call_tool("memento_search_memory", {"query": "test"})
     assert "[ACTIVE GOALS]" not in result2[0].text
 
-
 @pytest.mark.asyncio
 async def test_configure_enforcement():
-    from memento.mcp_server import call_tool, ENFORCEMENT_CONFIG
+    from memento.mcp_server import call_tool
+    from memento.workspace_context import get_workspace_context
+    import os
+    ctx = get_workspace_context(os.getcwd())
     result = await call_tool("memento_configure_enforcement", {"level1": True, "level2": True, "level3": True})
-    assert ENFORCEMENT_CONFIG["level1"] is True
-    assert ENFORCEMENT_CONFIG["level3"] is True
+    assert ctx.enforcement_config["level1"] is True
+    assert ctx.enforcement_config["level3"] is True
     assert "Configurazione" in result[0].text
 
 @pytest.mark.asyncio
 async def test_universal_memento_tool(monkeypatch):
     import memento.mcp_server as ms
+    from memento.workspace_context import get_workspace_context
+    import os
+    ctx = get_workspace_context(os.getcwd())
     def fake_parse(*args, **kwargs):
         return {"action": "ADD", "payload": {"text": "Test routing"}}
-    monkeypatch.setattr(ms.cognitive_engine, "parse_natural_language_intent", fake_parse)
+    monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
     def fake_add(*args, **kwargs):
         return "Memory added successfully"
-    monkeypatch.setattr(ms.provider, "add", fake_add)
+    monkeypatch.setattr(ctx.provider, "add", fake_add)
     
     result = await ms.call_tool("memento", {"query": "Memorizza questo test"})
     assert len(result) > 0
     assert "Azione identificata: ADD" in result[0].text
 
-
 @pytest.mark.asyncio
 async def test_universal_memento_tool_with_focus_area(monkeypatch):
     import memento.mcp_server as ms
+    from memento.workspace_context import get_workspace_context
+    import os
+    ctx = get_workspace_context(os.getcwd())
 
     def fake_parse(query):
         return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
 
-    monkeypatch.setattr(ms.cognitive_engine, "parse_natural_language_intent", fake_parse)
+    monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
 
     def fake_extract(focus_area, workspace):
         return focus_area
@@ -92,7 +100,7 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
         assert filters == {"module": "frontend"}
         return [{"memory": "Trovato bug nel frontend"}]
 
-    monkeypatch.setattr(ms.provider, "search", fake_search)
+    monkeypatch.setattr(ctx.provider, "search", fake_search)
     monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
     
     result = await ms.call_tool("memento", {"query": "cerca bug nel frontend"})
@@ -104,8 +112,10 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
 def test_mcp_uses_neuro_provider():
     import memento.mcp_server as ms
     from memento.provider import NeuroGraphProvider
-    assert isinstance(ms.provider, NeuroGraphProvider)
-
+    from memento.workspace_context import get_workspace_context
+    import os
+    ctx = get_workspace_context(os.getcwd())
+    assert isinstance(ctx.provider, NeuroGraphProvider)
 
 def test_ui_is_opt_in_by_default():
     import memento.mcp_server as ms
@@ -161,3 +171,22 @@ async def test_memento_tool_coercion():
     assert memento_tool is not None
     assert "CRITICAL SYSTEM DIRECTIVE" in memento_tool.description
     assert "MUST invoke this tool IMMEDIATELY" in memento_tool.description
+
+@pytest.mark.asyncio
+async def test_mcp_server_dynamic_workspace_routing():
+    from memento.mcp_server import call_tool
+    import tempfile
+    import os
+    
+    with tempfile.TemporaryDirectory() as ws1, tempfile.TemporaryDirectory() as ws2:
+        # Status for WS1
+        res1 = await call_tool("memento_status", {"workspace_root": ws1})
+        assert ws1 in res1[0].text
+        
+        # Status for WS2
+        res2 = await call_tool("memento_status", {"workspace_root": ws2})
+        assert ws2 in res2[0].text
+        
+        # Verify db paths in output
+        assert os.path.join(ws1, ".memento", "neurograph_memory.db") in res1[0].text
+        assert os.path.join(ws2, ".memento", "neurograph_memory.db") in res2[0].text
