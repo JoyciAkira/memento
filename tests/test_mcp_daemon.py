@@ -77,7 +77,6 @@ async def test_universal_memento_tool(monkeypatch):
 @pytest.mark.asyncio
 async def test_universal_memento_tool_with_focus_area(monkeypatch):
     import memento.mcp_server as ms
-    from mcp.types import TextContent
 
     def fake_parse(query):
         return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}

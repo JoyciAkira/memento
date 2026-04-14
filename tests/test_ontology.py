@@ -2,9 +2,12 @@ from memento.ontology import OntologyManager
 
 class MockEmbedder:
     def embed(self, text):
-        if text == "auth system": return [1.0, 0.0]
-        if text == "login page": return [0.9, 0.1]
-        if text == "database tuning": return [0.0, 1.0]
+        if text == "auth system":
+            return [1.0, 0.0]
+        if text == "login page":
+            return [0.9, 0.1]
+        if text == "database tuning":
+            return [0.0, 1.0]
         return [0.0, 0.0]
 
 class MockKG:
@@ -55,7 +58,7 @@ def test_provider_integration():
     
     # Just ensure it doesn't crash
     try:
-        result = provider.add("Testing deterministic routing")
+        provider.add("Testing deterministic routing")
     except Exception:
         # Mem0 might fail with dummy key, we just want to ensure it passes through ontology
         pass
