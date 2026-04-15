@@ -3,14 +3,14 @@
   "version": "3.0.14",
   "description": "Autonomous Nervous System for AI Agents with RRF Search and Active Coercion",
   "author": "Daniele Corrao",
-  "license": "MIT",
+  "license": "AGPL-3.0",
   "commands": [],
   "mcpServers": {
-    "mempalace": {
-      "command": "python3",
+    "memento": {
+      "command": "uv",
       "args": [
-        "-m",
-        "mempalace.mcp_server"
+        "run",
+        "memento-mcp"
       ]
     }
   },

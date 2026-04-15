@@ -6,14 +6,15 @@ build-backend = "setuptools.build_meta"
 name = "memento-mcp"
 version = "0.1.0"
 authors = [
-  { name="Daniele Corrao", email="your.email@example.com" },
+  { name="Daniele Corrao" },
 ]
 description = "A local, PageRank-optimized SQLite graph provider for Mem0, powered by Memento architecture."
 readme = "README.md"
+license = { text = "AGPL-3.0" }
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -27,7 +28,7 @@ dependencies = [
 ]
 
 [project.urls]
-"Homepage" = "https://github.com/yourusername/memento"
+"Homepage" = "https://github.com/JoyciAkira/memento"
 
 [project.scripts]
 memento-mcp = "memento.mcp_server:main"

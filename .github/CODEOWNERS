@@ -1,13 +1,11 @@
 # Default owners for everything
-* @milla-jovovich @bensig @igorls
+* @JoyciAkira
 
 # Core library
-mempalace/ @milla-jovovich @bensig
+memento/ @JoyciAkira
 
 # CI and workflows
-.github/ @bensig
+.github/ @JoyciAkira
 
 # Plugins and integrations
-.claude-plugin/ @bensig
-.codex-plugin/ @bensig
-integrations/ @bensig
+.claude-plugin/ @JoyciAkira

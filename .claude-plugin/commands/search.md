@@ -1,7 +1,7 @@
 ---
-description: Search your memories across the MemPalace using semantic search with wing/room filtering.
-argument-hint: Search query, optionally with wing/room filters.
+description: Search your memories using Memento hybrid retrieval.
+argument-hint: Search query.
 allowed-tools: Bash, Read
 ---
 
-Invoke the generic mempalace skill (using the Skill tool) with the `search` command, then follow its instructions.
+Invoke the generic memento skill (using the Skill tool), then follow its instructions.

@@ -1,6 +1,6 @@
 ---
-description: Show the current state of your memory palace — wings, rooms, drawer counts, and suggestions.
+description: Show Memento server status and current configuration.
 allowed-tools: Bash, Read
 ---
 
-Invoke the generic mempalace skill (using the Skill tool) with the `status` command, then follow its instructions.
+Invoke the generic memento skill (using the Skill tool), then follow its instructions.
