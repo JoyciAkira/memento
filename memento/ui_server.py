@@ -1,5 +1,6 @@
 import threading
 import json
+import html
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
@@ -9,6 +10,46 @@ shared_state: dict[str, Any] = {
     "get_active_goals": None,
     "provider": None
 }
+
+def render_dashboard_html(enforcement_config: dict, goals: str, recent_memories: list[dict]) -> str:
+    config_json = html.escape(json.dumps(enforcement_config, indent=2, ensure_ascii=False))
+    goals_text = html.escape(goals) if goals else ""
+    memories_html = "".join(
+        [f"<li>{html.escape(str(m.get('memory', '')))}</li>" for m in (recent_memories or [])]
+    )
+    return f"""
+            <html>
+            <head>
+                <title>Memento Dashboard</title>
+                <style>
+                    body {{ font-family: Arial, sans-serif; margin: 2rem; background: #f4f4f9; color: #333; }}
+                    h1 {{ color: #2c3e50; }}
+                    .card {{ background: white; padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
+                    pre {{ background: #eee; padding: 1rem; border-radius: 4px; white-space: pre-wrap; }}
+                </style>
+            </head>
+            <body>
+                <h1>🧠 Memento Dashboard</h1>
+                
+                <div class="card">
+                    <h2>Enforcement Config</h2>
+                    <pre>{config_json}</pre>
+                </div>
+                
+                <div class="card">
+                    <h2>Active Goals</h2>
+                    <pre>{goals_text if goals_text else 'No active goals.'}</pre>
+                </div>
+                
+                <div class="card">
+                    <h2>Recent Memories</h2>
+                    <ul>
+                        {memories_html if memories_html else '<li>No memories found.</li>'}
+                    </ul>
+                </div>
+            </body>
+            </html>
+            """
 
 class MementoUIHandler(BaseHTTPRequestHandler):
     def do_GET(self):
@@ -30,43 +71,9 @@ class MementoUIHandler(BaseHTTPRequestHandler):
                     recent_memories = shared_state["provider"].get_all(user_id="default", limit=10)
                 except Exception:
                     pass
-            
-            memories_html = "".join([f"<li>{m.get('memory')}</li>" for m in recent_memories])
-            
-            html = f"""
-            <html>
-            <head>
-                <title>Memento Dashboard</title>
-                <style>
-                    body {{ font-family: Arial, sans-serif; margin: 2rem; background: #f4f4f9; color: #333; }}
-                    h1 {{ color: #2c3e50; }}
-                    .card {{ background: white; padding: 1.5rem; margin-bottom: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }}
-                    pre {{ background: #eee; padding: 1rem; border-radius: 4px; white-space: pre-wrap; }}
-                </style>
-            </head>
-            <body>
-                <h1>🧠 Memento Dashboard</h1>
-                
-                <div class="card">
-                    <h2>Enforcement Config</h2>
-                    <pre>{json.dumps(config, indent=2)}</pre>
-                </div>
-                
-                <div class="card">
-                    <h2>Active Goals</h2>
-                    <pre>{goals if goals else 'No active goals.'}</pre>
-                </div>
-                
-                <div class="card">
-                    <h2>Recent Memories</h2>
-                    <ul>
-                        {memories_html if memories_html else '<li>No memories found.</li>'}
-                    </ul>
-                </div>
-            </body>
-            </html>
-            """
-            self.wfile.write(html.encode("utf-8"))
+
+            page = render_dashboard_html(config, str(goals or ""), recent_memories)
+            self.wfile.write(page.encode("utf-8"))
         else:
             self.send_response(404)
             self.end_headers()
