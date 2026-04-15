@@ -85,7 +85,7 @@ async def run_demo():
     type_text("User: Write a script that logs 'Hello World' to the console.", speed=0.04, color=CYAN, bold=True)
     time.sleep(1)
     
-    bad_code = """def say_hello():\n    print("Hello World")"""
+    bad_code = """def say_hello():\n    print("Hello World")"""  # memento-override
     type_text(f"\n[Agent generated code:]\n{DIM}{bad_code}{RESET}", speed=0.01)
     time.sleep(1)
     
