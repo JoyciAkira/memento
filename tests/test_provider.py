@@ -2,6 +2,7 @@ import os
 import tempfile
 from unittest.mock import patch
 from memento.provider import MementoGraphProvider
+import pytest
 
 def test_provider_initialization(tmp_path):
     os.environ["MEMENTO_DIR"] = str(tmp_path)
@@ -47,9 +48,6 @@ def test_provider_search_and_delete(tmp_path):
     results_after = provider.search("alice")
     assert len(results_after) == 1
     assert results_after[0]["target"] == "charlie"
-
-
-import pytest
 
 @pytest.mark.asyncio
 async def test_neurograph_search_with_filters():

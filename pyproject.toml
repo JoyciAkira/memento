@@ -23,6 +23,10 @@ dependencies = [
     "watchdog>=4.0.0",
     "aiosqlite",
     "openai",
+    "tree-sitter",
+    "tree-sitter-python",
+    "tree-sitter-javascript",
+    "tree-sitter-typescript",
 ]
 
 [project.optional-dependencies]

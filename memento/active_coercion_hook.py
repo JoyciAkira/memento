@@ -60,15 +60,44 @@ def run_pre_commit(repo_root: str) -> int:
             else:
                 block_violations.append(v)
 
+    report_mode = os.environ.get("MEMENTO_COERCION_REPORT", "").lower()
+    if report_mode == "json":
+        payload = {
+            "warnings": [
+                {
+                    "rule_id": v.rule_id,
+                    "file": os.path.relpath(v.file, repo_root),
+                    "message": v.message,
+                    "line": v.line,
+                    "column": v.column,
+                }
+                for v in warn_violations
+            ],
+            "blocks": [
+                {
+                    "rule_id": v.rule_id,
+                    "file": os.path.relpath(v.file, repo_root),
+                    "message": v.message,
+                    "line": v.line,
+                    "column": v.column,
+                }
+                for v in block_violations
+            ],
+        }
+        sys.stdout.write(json.dumps(payload, ensure_ascii=False) + "\n")
+        return 1 if block_violations else 0
+
     if warn_violations:
         sys.stderr.write("\nMemento Active Coercion warnings:\n")
         for v in warn_violations:
-            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}: {v.message}\n")
+            loc = f":{v.line}:{v.column}" if v.line and v.column else ""
+            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n")
 
     if block_violations:
         sys.stderr.write("\nMemento Active Coercion BLOCKED commit:\n")
         for v in block_violations:
-            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}: {v.message}\n")
+            loc = f":{v.line}:{v.column}" if v.line and v.column else ""
+            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n")
         return 1
 
     return 0
@@ -81,4 +110,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

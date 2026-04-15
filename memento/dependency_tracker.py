@@ -5,7 +5,7 @@ import os
 import re
 import sys
 from pathlib import Path
-from typing import Set, Tuple, List, Dict, Any
+from typing import Any, Dict, Set, Tuple
 
 try:
     import tomllib

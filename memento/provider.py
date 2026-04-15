@@ -1,9 +1,9 @@
-import sqlite3
 import aiosqlite
 import uuid
 import json
 import math
 import asyncio
+import re
 from datetime import datetime
 from memento.redaction import redact_secrets
 import logging
@@ -188,11 +188,15 @@ class NeuroGraphProvider:
             return []
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
-        if not vec1 or not vec2: return 0.0
+        if not vec1 or not vec2:
+            return 0.0
+        if len(vec1) != len(vec2):
+            return 0.0
         dot_product = sum(a * b for a, b in zip(vec1, vec2))
         norm_a = math.sqrt(sum(a * a for a in vec1))
         norm_b = math.sqrt(sum(b * b for b in vec2))
-        if norm_a == 0 or norm_b == 0: return 0.0
+        if norm_a == 0 or norm_b == 0:
+            return 0.0
         return dot_product / (norm_a * norm_b)
 
     async def add(self, text: str, user_id: str = "default", metadata: dict = None) -> Dict[str, Any]:
@@ -244,21 +248,27 @@ class NeuroGraphProvider:
         
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
-            fts_query = " OR ".join([f"{word}*" for word in query.split() if len(word) > 2])
+            terms = re.findall(r"[A-Za-z0-9_]{3,}", query or "")
+            fts_query = " OR ".join([f"{t}*" for t in terms]) if terms else (query or "").strip()
             if not fts_query:
-                fts_query = f"{query}*"
-                
-            filter_sql = ""
-            filter_params = []
-            if filters:
+                fts_query = "*"
+
+            allowed_filter_keys = {"workspace_root", "workspace_name", "room", "module", "type"}
+            filter_clauses: list[str] = []
+            filter_params: list[Any] = []
+            if isinstance(filters, dict):
                 for k, v in filters.items():
-                    filter_sql += f" AND json_extract(metadata, '$.{k}') = ?"
-                    filter_params.append(v)
+                    if k not in allowed_filter_keys:
+                        continue
+                    filter_clauses.append("json_extract(metadata, ?) = ?")
+                    filter_params.extend([f"$.{k}", v])
+
+            filter_sql = f" AND {' AND '.join(filter_clauses)}" if filter_clauses else ""
                 
             # FTS5 search
             try:
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, rank as fts_score FROM memories WHERE user_id = ? AND text MATCH ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, bm25(memories) as fts_score FROM memories WHERE user_id = ? AND memories MATCH ? {filter_sql} LIMIT 200",
                     (user_id, fts_query, *filter_params)
                 )
                 fts_rows = await cursor.fetchall()
@@ -266,24 +276,41 @@ class NeuroGraphProvider:
                 logger.warning(f"FTS MATCH failed: {e}. Fallback to LIKE.")
                 # If FTS MATCH fails, fallback to LIKE
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, 0 as fts_score FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, 1000000 as fts_score FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT 200",
                     (user_id, f"%{query}%", *filter_params)
                 )
                 fts_rows = await cursor.fetchall()
 
-            # Retrieve embeddings for Vector search
             cursor = await db.execute(
-                f"SELECT m.id, m.text, m.created_at, e.embedding FROM memories m LEFT JOIN memory_embeddings e ON m.id = e.id WHERE m.user_id = ? {filter_sql}",
+                f"SELECT id, text, created_at FROM memories WHERE user_id = ? {filter_sql} ORDER BY created_at DESC LIMIT 200",
                 (user_id, *filter_params)
             )
-            all_rows = await cursor.fetchall()
+            recent_rows = await cursor.fetchall()
 
-        fts_results = {row["id"]: row for row in fts_rows}
-        
+            candidate_ids: list[str] = []
+            seen: set[str] = set()
+            for row in list(fts_rows) + list(recent_rows):
+                row_id = row["id"]
+                if row_id in seen:
+                    continue
+                seen.add(row_id)
+                candidate_ids.append(row_id)
+                if len(candidate_ids) >= 400:
+                    break
+
+            candidate_rows: list[aiosqlite.Row] = []
+            if candidate_ids:
+                placeholders = ",".join(["?"] * len(candidate_ids))
+                cursor = await db.execute(
+                    f"SELECT m.id, m.text, m.created_at, e.embedding FROM memories m LEFT JOIN memory_embeddings e ON m.id = e.id WHERE m.user_id = ? {filter_sql} AND m.id IN ({placeholders})",
+                    (user_id, *filter_params, *candidate_ids)
+                )
+                candidate_rows = await cursor.fetchall()
+
         # Calculate semantic scores
         semantic_scores = {}
         row_map = {}
-        for row in all_rows:
+        for row in candidate_rows:
             row_id = row["id"]
             row_map[row_id] = row
             emb_str = row["embedding"]
@@ -302,7 +329,7 @@ class NeuroGraphProvider:
         rrf_scores = {}
         
         # Rank FTS
-        fts_sorted = sorted(fts_rows, key=lambda x: x["fts_score"]) # fts_score is negative or lower is better in FTS5 rank usually, wait, fts5 rank is more negative for better matches.
+        fts_sorted = sorted(fts_rows, key=lambda x: x["fts_score"])
         for rank, row in enumerate(fts_sorted, 1):
             rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 1.0 / (k_rrf + rank)
             
@@ -310,6 +337,10 @@ class NeuroGraphProvider:
         semantic_sorted = sorted(semantic_scores.items(), key=lambda x: x[1], reverse=True)
         for rank, (row_id, score) in enumerate(semantic_sorted, 1):
             rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 1.0 / (k_rrf + rank)
+
+        recent_sorted = sorted(recent_rows, key=lambda x: x["created_at"], reverse=True)
+        for rank, row in enumerate(recent_sorted, 1):
+            rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 0.5 / (k_rrf + rank)
 
         # Sort by RRF score
         final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]

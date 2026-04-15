@@ -1,7 +1,6 @@
 import logging
 import asyncio
 import os
-import json
 
 from mcp.server import Server
 from mcp.server.stdio import stdio_server
@@ -12,7 +11,7 @@ from memento.workspace_context import get_workspace_context
 from memento.ui_server import start_ui_server_thread
 
 from memento.registry import registry
-import memento.tools  # Trigger tool registration
+import memento.tools as _memento_tools
 from memento.tools.utils import find_project_root, get_active_goals
 
 # Configure logger
@@ -26,6 +25,7 @@ app = Server("memento-mcp")
 
 access_manager = MementoAccessManager()
 _ui_thread = None
+_tool_registration = _memento_tools
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
