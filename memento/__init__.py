@@ -1,2 +1,2 @@
-"""Memento: The bridge between Mem0 and MemPalace."""
+"""Memento: The Autonomous Nervous System for AI Agents."""
 __version__ = "0.1.0"

@@ -1,5 +1,5 @@
 """
-knowledge_graph.py — Temporal Entity-Relationship Graph for MemPalace
+knowledge_graph.py — Temporal Entity-Relationship Graph for Memento
 =====================================================================
 
 Real knowledge graph with:
@@ -15,7 +15,7 @@ This is what competes with Zep's temporal knowledge graph.
 Zep uses Neo4j in the cloud ($25/mo+). We use SQLite locally (free).
 
 Usage:
-    from mempalace.knowledge_graph import KnowledgeGraph
+    from memento.knowledge_graph import KnowledgeGraph
 
     kg = KnowledgeGraph()
     kg.add_triple("Max", "child_of", "Alice", valid_from="2015-04-01")
@@ -49,8 +49,8 @@ def get_default_kg_path():
         return os.path.join(root, ".memento", "knowledge_graph.sqlite3")
     if "MEMENTO_CONFIG_DIR" in os.environ and os.environ["MEMENTO_CONFIG_DIR"].strip():
         return os.path.join(os.environ["MEMENTO_CONFIG_DIR"], "knowledge_graph.sqlite3")
-    if "MEMPALACE_CONFIG_DIR" in os.environ and os.environ["MEMPALACE_CONFIG_DIR"].strip():
-        return os.path.join(os.environ["MEMPALACE_CONFIG_DIR"], "knowledge_graph.sqlite3")
+    if "MEMENTO_CONFIG_DIR" in os.environ and os.environ["MEMENTO_CONFIG_DIR"].strip():
+        return os.path.join(os.environ["MEMENTO_CONFIG_DIR"], "knowledge_graph.sqlite3")
     return os.path.expanduser("~/.memento/knowledge_graph.sqlite3")
 
 

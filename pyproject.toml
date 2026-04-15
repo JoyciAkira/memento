@@ -36,7 +36,7 @@ memento-mcp = "memento.mcp_server:main"
 exclude = [
     ".memento",
     ".trae",
-    "_backup_mempalace",
+    "_backup_memento",
     "tmp_*.py",
     "tmp_*.md",
     "temp_*.py",

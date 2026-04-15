@@ -16,7 +16,7 @@ def test_provider_add_and_get_all(tmp_path):
     # Mem0 format: edges are dicts with source, target, relationship
     edges = [
         {"source": "user", "target": "python", "relationship": "loves"},
-        {"source": "user", "target": "mempalace", "relationship": "builds"}
+        {"source": "user", "target": "memento", "relationship": "builds"}
     ]
     
     provider.add(edges)
@@ -43,7 +43,7 @@ def test_provider_search_and_delete(tmp_path):
     # Delete specific edges
     provider.delete(edges=[edges[0]])
     
-    # Verify deletion (MemPalace invalidates, so it shouldn't show up in search)
+    # Verify deletion (Memento invalidates, so it shouldn't show up in search)
     results_after = provider.search("alice")
     assert len(results_after) == 1
     assert results_after[0]["target"] == "charlie"

@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class MementoGraphProvider:
     """
-    A GraphStore provider for mem0ai that uses MemPalace's local SQLite KnowledgeGraph.
+    A GraphStore provider for mem0ai that uses Memento's local SQLite KnowledgeGraph.
     This allows Mem0 to use a local, zero-cost, PageRank-optimized graph database.
     """
     def __init__(self, config: Optional[Dict[str, Any]] = None):
@@ -83,7 +83,7 @@ class MementoGraphProvider:
         return mem0_edges[:limit]
 
     def delete(self, edges: List[Dict[str, Any]], **kwargs) -> None:
-        """Delete specific edges (in MemPalace this means invalidating them)."""
+        """Delete specific edges (in Memento this means invalidating them)."""
         for edge in edges:
             source = edge.get("source")
             target = edge.get("target")

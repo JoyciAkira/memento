@@ -1,19 +1,22 @@
-# Contributing to MemPalace
+# Contributing to Memento
 
-Thanks for wanting to help. MemPalace is open source and we welcome contributions of all sizes — from typo fixes to new features.
+Thanks for wanting to help. Memento is open source and we welcome contributions of all sizes — from typo fixes to new features.
 
 ## Getting Started
 
+1. Fork the repo
+2. Clone your fork:
 ```bash
-git clone https://github.com/milla-jovovich/mempalace.git
-cd mempalace
-pip install -e ".[dev]"    # installs with dev dependencies (pytest, build, twine)
+git clone https://github.com/JoyciAkira/memento.git
+cd memento
+uv sync
 ```
 
 ## Running Tests
 
+We use `pytest`. To run the suite:
 ```bash
-pytest tests/ -v
+uv run pytest tests/ -v
 ```
 
 All tests must pass before submitting a PR. Tests should run without API keys or network access.
@@ -33,12 +36,9 @@ See [benchmarks/README.md](benchmarks/README.md) for data download instructions 
 ## Project Structure
 
 ```
-mempalace/          ← core package (see mempalace/README.md for module guide)
-benchmarks/         ← reproducible benchmark runners
-hooks/              ← Claude Code auto-save hooks
-examples/           ← usage examples
-tests/              ← test suite
-assets/             ← logo + brand
+memento/          ← core package
+tests/            ← unit tests
+.trae/specs/      ← design documents and specs
 ```
 
 ## PR Guidelines
@@ -62,9 +62,9 @@ assets/             ← logo + brand
 - **Type hints**: where they improve readability
 - **Dependencies**: minimize. ChromaDB + PyYAML only. Don't add new deps without discussion.
 
-## Good First Issues
+## Finding Things to Work On
 
-Check the [Issues](https://github.com/milla-jovovich/mempalace/issues) tab. Great starting points:
+Check the [Issues](https://github.com/JoyciAkira/memento/issues) tab. Great starting points:
 
 - **New chat formats**: Add import support for Cursor, Copilot, or other AI tool exports
 - **Room detection**: Improve pattern matching in `room_detector_local.py`
