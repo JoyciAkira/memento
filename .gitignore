@@ -31,5 +31,12 @@ coverage.xml
 .venv/
 venv/
 
+# Memento local workspace data
+.memento/
+*.db
+*.db-*
+*.sqlite3
+*.sqlite3-*
+
 # ChromaDB local data
 *.sqlite3-journal

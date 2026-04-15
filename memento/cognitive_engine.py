@@ -181,7 +181,7 @@ class CognitiveEngine:
                     continue
                 mem_id = r.get("id", "unknown")
                 mem_text = r.get("memory", "")
-                memory_list.append(f"- ID: {mem_id} | Fatto: {mem_text}")
+                memory_list.append(f"- ID: {mem_id} | Fact: {mem_text}")
                 
             memories_str = "\n".join(memory_list)
             
@@ -199,21 +199,21 @@ class CognitiveEngine:
             ]
             
             llm_response = await self._generate_response(messages)
-            return f"🌌 [DRAFT_INSIGHT] Sintesi Generata:\n\n{llm_response}\n\n*(Usa memento_add_memory per cristallizzare questa intuizione nel Knowledge Graph se la ritieni valida)*"
+            return f"🌌 [DRAFT_INSIGHT] Synthesis Generated:\n\n{llm_response}\n\n*(Use memento_add_memory to crystallize this insight in the Knowledge Graph if you deem it valid)*"
             
         except Exception as e:
             logger.error(f"Error during Dream State synthesis: {e}")
-            return f"[DRAFT_INSIGHT] Errore durante la sintesi: {str(e)}"
+            return f"[DRAFT_INSIGHT] Error during synthesis: {str(e)}"
 
     async def check_goal_alignment(self, code_or_plan: str, context: str = "") -> str:
         logger.info("CognitiveEngine checking goal alignment...")
         try:
-            search_query = f"obiettivo goal per il contesto: {context}" if context else "obiettivo goal"
+            search_query = f"active goal for context: {context}" if context else "active goal"
             res_dict = await self.provider.search(search_query, limit=5)
             results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
             
             if not results:
-                return "[ALLINEAMENTO GOAL] Nessun obiettivo attivo trovato in memoria per il confronto."
+                return "[GOAL ALIGNMENT] No active goals found in memory for comparison."
                 
             goals = [r.get("memory") for r in results if isinstance(r, dict)]
             goals_str = "\n- ".join(goals)
@@ -232,10 +232,10 @@ class CognitiveEngine:
             ]
             
             llm_response = await self._generate_response(messages)
-            return f"🛡️ [ALLINEAMENTO GOAL]\n\n{llm_response}"
+            return f"🛡️ [GOAL ALIGNMENT]\n\n{llm_response}"
         except Exception as e:
             logger.error(f"Error checking alignment: {e}")
-            return f"[ALLINEAMENTO GOAL] Errore durante la validazione: {str(e)}"
+            return f"[GOAL ALIGNMENT] Error during validation: {str(e)}"
 
     async def parse_natural_language_intent(self, query: str) -> dict:
         """

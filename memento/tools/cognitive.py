@@ -63,7 +63,7 @@ async def memento_toggle_precognition(arguments: dict, ctx, access_manager) -> l
         deviation = ""
         if ctx.enforcement_config.get("level3"):
             alignment = await ctx.cognitive_engine.check_goal_alignment(content)
-            if "❌ BOCCIATO" in alignment:
+            if "❌ BOCCIATO" in alignment or "❌ REJECTED" in alignment:
                 deviation = alignment
         
         final_alert = warning
@@ -84,8 +84,8 @@ async def memento_toggle_precognition(arguments: dict, ctx, access_manager) -> l
                 logger.error(f"Failed to send notification: {e}")
 
     is_running = ctx.toggle_daemon(enabled, _local_callback)
-    state_str = "AVVIATO" if is_running else "FERMATO"
-    return [TextContent(type="text", text=f"Daemon Pre-cognitivo {state_str} per il workspace {ctx.workspace_root}.")]
+    state_str = "STARTED" if is_running else "STOPPED"
+    return [TextContent(type="text", text=f"Pre-cognitive daemon {state_str} for workspace {ctx.workspace_root}.")]
 
 @registry.register(Tool(
     name="memento_synthesize_dreams",

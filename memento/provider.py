@@ -182,7 +182,7 @@ class NeuroGraphProvider:
             )
             return response.data[0].embedding
         except Exception as e:
-            # Sopprimi log verbose se è l'errore del finto dummy token in test
+            # Suppress noisy logs for the dummy token error in tests
             if "sk-dummy" not in str(e):
                 logger.error(f"Error getting embedding: {e}")
             return []
@@ -199,7 +199,7 @@ class NeuroGraphProvider:
         if not self._initialized:
             await self.initialize()
             
-        # Redact secrets prima di inviare l'embedding
+        # Redact secrets before embedding
         redacted_text = redact_secrets(text)
         memory_id = str(uuid.uuid4())
         created_at = datetime.now().isoformat()

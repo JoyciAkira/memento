@@ -148,7 +148,7 @@ async def test_migrate_workspace_memories_tool(monkeypatch):
         )
         conn.execute(
             "INSERT INTO memories (id, user_id, text, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
-            ("id1", "default", "OBIETTIVO NEXUS-LM", "2026-01-01T00:00:00", "{}"),
+            ("id1", "default", "NEXUS-LM GOAL", "2026-01-01T00:00:00", "{}"),
         )
         conn.commit()
         conn.close()

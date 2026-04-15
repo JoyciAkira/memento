@@ -193,7 +193,7 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
                     metadata["module"] = namespace
                     
             result = await ctx.provider.add(text, user_id="default", metadata=metadata if metadata else None)
-            response_text += f"Memoria salvata: {result}"
+            response_text += f"Memory saved: {result}"
             
         elif action == "SEARCH":
             if not access_manager.can_read():
@@ -209,19 +209,19 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
                     
             res = await ctx.provider.search(search_query, user_id="default", filters=filters if filters else None)
             if not res:
-                response_text += "Nessuna memoria trovata."
+                response_text += "No memories found."
             else:
                 formatted = json.dumps(res, indent=2, ensure_ascii=False)
                 injection = await get_active_goals(ctx, context=focus_area) if ctx.enforcement_config.get("level1") else ""
-                response_text += f"{injection}Risultati:\n{formatted}"
+                response_text += f"{injection}Results:\n{formatted}"
                 
         elif action == "LIST":
             res = await ctx.provider.get_all(user_id="default", limit=50, offset=0)
             if not res:
-                response_text += "Nessuna memoria nel database."
+                response_text += "No memories in the database."
             else:
                 formatted = json.dumps(res, indent=2, ensure_ascii=False)
-                response_text += f"Ultime 50 memorie:\n{formatted}"
+                response_text += f"Latest 50 memories:\n{formatted}"
                 
         elif action == "DREAM":
             context = payload.get("context", focus_area)
@@ -234,25 +234,25 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
                 eval_result = await ctx.cognitive_engine.check_goal_alignment(content_payload, context=focus_area)
                 response_text += eval_result
             else:
-                response_text += "Il Goal Enforcer (Level 2) è disabilitato. Usa memento_configure_enforcement per attivarlo."
+                response_text += "Goal Enforcer (Level 2) is disabled. Use memento_configure_enforcement to enable it."
                 
         else:
-            response_text += "Non ho capito l'azione. Prova a essere più specifico (es. 'memorizza', 'cerca', 'lista', 'sogna')."
+            response_text += "I couldn't infer the action. Try being more explicit (e.g. 'remember', 'search', 'list', 'dream')."
             
         return [TextContent(type="text", text=response_text)]
         
     except Exception as e:
-        return [TextContent(type="text", text=f"Errore durante l'esecuzione dell'azione {action}: {str(e)}")]
+        return [TextContent(type="text", text=f"Error while executing action {action}: {str(e)}")]
 
 @registry.register(Tool(
     name="memento_toggle_dependency_tracker",
-    description="Attiva o disattiva il Dependency Tracker per monitorare le dipendenze orfane o fantasma.",
+    description="Enable or disable the Dependency Tracker to monitor orphan or ghost dependencies.",
     inputSchema={
         "type": "object",
         "properties": {
             "enabled": {
                 "type": "boolean",
-                "description": "Se true, abilita il Dependency Tracker; se false, lo disabilita."
+                "description": "If true, enables the Dependency Tracker; if false, disables it."
             }
         },
         "required": ["enabled"]
@@ -261,13 +261,13 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
 async def memento_toggle_dependency_tracker(arguments: dict, ctx, access_manager) -> list[TextContent]:
     enabled = arguments.get("enabled")
     if enabled is None:
-        raise ValueError("Il flag 'enabled' è obbligatorio.")
+        raise ValueError("The 'enabled' flag is required.")
     
     ctx.dependency_tracker["enabled"] = bool(enabled)
     ctx.save_dependency_tracker_config()
     
-    status = "abilitato" if enabled else "disabilitato"
-    return [TextContent(type="text", text=f"Dependency Tracker {status} con successo.")]
+    status = "enabled" if enabled else "disabled"
+    return [TextContent(type="text", text=f"Dependency Tracker {status} successfully.")]
 
 @registry.register(Tool(
     name="memento_audit_dependencies",
@@ -276,7 +276,7 @@ async def memento_toggle_dependency_tracker(arguments: dict, ctx, access_manager
 ))
 async def memento_audit_dependencies(arguments: dict, ctx, access_manager) -> list[TextContent]:
     if not ctx.dependency_tracker.get("enabled", False):
-        return [TextContent(type="text", text="Il Dependency Tracker è attualmente disabilitato. Abilitalo usando `memento_toggle_dependency_tracker` prima di eseguire un audit.")]
+        return [TextContent(type="text", text="Dependency Tracker is currently disabled. Enable it using `memento_toggle_dependency_tracker` before running an audit.")]
 
     from memento.dependency_tracker import analyze_dependencies
 
@@ -288,6 +288,5 @@ async def memento_audit_dependencies(arguments: dict, ctx, access_manager) -> li
         formatted_results = json.dumps(results, indent=2, ensure_ascii=False)
         return [TextContent(type="text", text=f"Dependency Audit Results:\n{formatted_results}")]
     except Exception as e:
-        logger.error(f"Errore durante l'audit delle dipendenze: {e}")
-        return [TextContent(type="text", text=f"Si è verificato un errore durante l'audit delle dipendenze: {e}")]
-
+        logger.error(f"Error during dependency audit: {e}")
+        return [TextContent(type="text", text=f"An error occurred during dependency audit: {e}")]
