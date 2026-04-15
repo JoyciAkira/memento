@@ -1,9 +1,9 @@
 {
-  "mempalace": {
-    "command": "python3",
+  "memento": {
+    "command": "uv",
     "args": [
-      "-m",
-      "mempalace.mcp_server"
+      "run",
+      "memento-mcp"
     ]
   }
 }

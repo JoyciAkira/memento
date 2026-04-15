@@ -1,10 +1,8 @@
 {
-  "name": "mempalace",
+  "name": "Memento",
   "version": "3.0.14",
-  "description": "Give your AI a memory — mine projects and conversations into a searchable palace. 19 MCP tools, auto-save hooks, and guided setup.",
-  "author": {
-    "name": "milla-jovovich"
-  },
+  "description": "Autonomous Nervous System for AI Agents with RRF Search and Active Coercion",
+  "author": "Daniele Corrao",
   "license": "MIT",
   "commands": [],
   "mcpServers": {
@@ -25,5 +23,5 @@
     "palace",
     "search"
   ],
-  "repository": "https://github.com/milla-jovovich/mempalace"
+  "repository": "https://github.com/JoyciAkira/memento"
 }
