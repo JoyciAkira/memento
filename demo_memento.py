@@ -62,17 +62,17 @@ async def run_demo():
     access_manager = MementoAccessManager()
     
     # 1. Active Coercion Setup
-    type_text("User: Protect this repository. No 'print' allowed in production code.", speed=0.04, color=CYAN, bold=True)
+    type_text("User: Protect this repository. No 'sys.stdout' allowed in production code.", speed=0.04, color=CYAN, bold=True)
     time.sleep(1)
     
     type_text("\n[Agent invoking memento_add_active_coercion_rule...]", color=DIM)
     time.sleep(0.5)
     
     rule_args = {
-        "id": "no_print_prod",
+        "id": "no_sys_stdout_prod",
         "path_globs": ["**/*.py"],
-        "regex": "\\bprint\\(",
-        "message": "Vietato usare print(). Usa il logger strutturato.",
+        "regex": "sys\\.stdout\\.write\\(",
+        "message": "Vietato usare sys.stdout.write(). Usa il logger strutturato.",
         "severity": "block"
     }
     
@@ -85,7 +85,7 @@ async def run_demo():
     type_text("User: Write a script that logs 'Hello World' to the console.", speed=0.04, color=CYAN, bold=True)
     time.sleep(1)
     
-    bad_code = """def say_hello():\n    print("Hello World")"""  # memento-override
+    bad_code = """def say_hello():\n    sys.stdout.write("Hello World\\n")"""
     type_text(f"\n[Agent generated code:]\n{DIM}{bad_code}{RESET}", speed=0.01)
     time.sleep(1)
     
@@ -94,7 +94,7 @@ async def run_demo():
     # We mock the response for the demo to avoid hitting the real OpenAI API and waiting
     # In reality, this calls cognitive.py which uses LLM
     time.sleep(1.5)
-    mentor_res = f"🛡️ [ALLINEAMENTO GOAL]\n\n❌ BOCCIATO\n\nIl codice viola la regola di Active Coercion 'no_print_prod'.\nHai usato `print()` invece di un logger strutturato."
+    mentor_res = f"🛡️ [ALLINEAMENTO GOAL]\n\n❌ BOCCIATO\n\nIl codice viola la regola di Active Coercion 'no_sys_stdout_prod'.\nHai usato `sys.stdout` invece di un logger strutturato."
     type_text(f"🤖 Memento Strict Mentor:\n{mentor_res}", color=RED, bold=True)
     time.sleep(2)
     
