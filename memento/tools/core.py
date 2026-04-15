@@ -42,6 +42,9 @@ async def memento_status(arguments: dict, ctx, access_manager) -> list[TextConte
     rules = ctx.active_coercion.get('rules', [])
     status_lines.append(f"- rules: {len(rules) if isinstance(rules, list) else 0}")
 
+    status_lines.append("\n[Dependency Tracker]")
+    status_lines.append(f"- enabled: {'yes' if ctx.dependency_tracker.get('enabled') else 'no'}")
+
     status_lines.append("\n[Daemon]")
     status_lines.append(f"- running: {'yes' if ctx.daemon and ctx.daemon.is_running else 'no'}")
 
@@ -240,3 +243,51 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
         
     except Exception as e:
         return [TextContent(type="text", text=f"Errore durante l'esecuzione dell'azione {action}: {str(e)}")]
+
+@registry.register(Tool(
+    name="memento_toggle_dependency_tracker",
+    description="Attiva o disattiva il Dependency Tracker per monitorare le dipendenze orfane o fantasma.",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "enabled": {
+                "type": "boolean",
+                "description": "Se true, abilita il Dependency Tracker; se false, lo disabilita."
+            }
+        },
+        "required": ["enabled"]
+    }
+))
+async def memento_toggle_dependency_tracker(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    enabled = arguments.get("enabled")
+    if enabled is None:
+        raise ValueError("Il flag 'enabled' è obbligatorio.")
+    
+    ctx.dependency_tracker["enabled"] = bool(enabled)
+    ctx.save_dependency_tracker_config()
+    
+    status = "abilitato" if enabled else "disabilitato"
+    return [TextContent(type="text", text=f"Dependency Tracker {status} con successo.")]
+
+@registry.register(Tool(
+    name="memento_audit_dependencies",
+    description="Audit the workspace dependencies to find orphans (declared but unused) and ghosts (used but not declared).",
+    inputSchema={"type": "object", "properties": {}}
+))
+async def memento_audit_dependencies(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    if not ctx.dependency_tracker.get("enabled", False):
+        return [TextContent(type="text", text="Il Dependency Tracker è attualmente disabilitato. Abilitalo usando `memento_toggle_dependency_tracker` prima di eseguire un audit.")]
+
+    from memento.dependency_tracker import analyze_dependencies
+
+    workspace_root = ctx.workspace_root
+    pyproject_path = os.path.join(workspace_root, "pyproject.toml")
+    
+    try:
+        results = await analyze_dependencies(workspace_root, pyproject_path)
+        formatted_results = json.dumps(results, indent=2, ensure_ascii=False)
+        return [TextContent(type="text", text=f"Dependency Audit Results:\n{formatted_results}")]
+    except Exception as e:
+        logger.error(f"Errore durante l'audit delle dipendenze: {e}")
+        return [TextContent(type="text", text=f"Si è verificato un errore durante l'audit delle dipendenze: {e}")]
+

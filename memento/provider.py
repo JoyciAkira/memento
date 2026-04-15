@@ -155,6 +155,7 @@ class NeuroGraphProvider:
         self._initialized = False
 
     async def initialize(self):
+        # Check if already initialized
         if self._initialized:
             return
         async with aiosqlite.connect(self.db_path) as db:
@@ -181,7 +182,9 @@ class NeuroGraphProvider:
             )
             return response.data[0].embedding
         except Exception as e:
-            logger.error(f"Error getting embedding: {e}")
+            # Sopprimi log verbose se è l'errore del finto dummy token in test
+            if "sk-dummy" not in str(e):
+                logger.error(f"Error getting embedding: {e}")
             return []
 
     def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
@@ -196,12 +199,13 @@ class NeuroGraphProvider:
         if not self._initialized:
             await self.initialize()
             
-        text = redact_secrets(text)
+        # Redact secrets prima di inviare l'embedding
+        redacted_text = redact_secrets(text)
         memory_id = str(uuid.uuid4())
         created_at = datetime.now().isoformat()
 
         meta = dict(metadata) if isinstance(metadata, dict) else {}
-        workspace_root = os.environ.get("MEMENTO_DIR")
+        workspace_root = os.environ.get("MEMENTO_DIR", os.getcwd())
         if isinstance(workspace_root, str) and workspace_root.strip():
             abs_root = os.path.abspath(workspace_root)
             meta.setdefault("workspace_root", abs_root)
@@ -209,13 +213,14 @@ class NeuroGraphProvider:
 
         meta_str = json.dumps(meta) if meta else "{}"
         
-        embedding = await self._get_embedding(text)
+        embedding = await self._get_embedding(redacted_text)
         emb_str = json.dumps(embedding) if embedding else "[]"
         
+        # Insert FTS5 and embedding data using redacted text
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
                 "INSERT INTO memories (id, user_id, text, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
-                (memory_id, user_id, text, created_at, meta_str)
+                (memory_id, user_id, redacted_text, created_at, meta_str)
             )
             await db.execute(
                 "INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)",
@@ -225,11 +230,11 @@ class NeuroGraphProvider:
             
         if self.kg:
             try:
-                await asyncio.to_thread(self.kg.add, text)
+                await asyncio.to_thread(self.kg.add, redacted_text)
             except Exception as e:
                 logger.warning(f"Failed to add to KG: {e}")
             
-        return {"id": memory_id, "memory": text, "event": "ADD"}
+        return {"id": memory_id, "memory": redacted_text, "event": "ADD"}
 
     async def search(self, query: str, user_id: str = "default", limit: int = 100, filters: dict = None) -> List[Dict[str, Any]]:
         if not self._initialized:
@@ -257,7 +262,9 @@ class NeuroGraphProvider:
                     (user_id, fts_query, *filter_params)
                 )
                 fts_rows = await cursor.fetchall()
-            except sqlite3.OperationalError:
+            except Exception as e:
+                logger.warning(f"FTS MATCH failed: {e}. Fallback to LIKE.")
+                # If FTS MATCH fails, fallback to LIKE
                 cursor = await db.execute(
                     f"SELECT id, text, created_at, 0 as fts_score FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT 200",
                     (user_id, f"%{query}%", *filter_params)

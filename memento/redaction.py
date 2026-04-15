@@ -12,7 +12,7 @@ def redact_secrets(text: Optional[str]) -> str:
     # Pattern per intercettare keyword generiche associate a secret in file JSON/YML/INI
     # Es: "password": "mypass", "api_key": "sk-1234"
     generic_secret_pattern = re.compile(
-        r'(?i)(password|passwd|pwd|secret|token|api_key|apikey|access_token|auth_token)\s*[:=]\s*([\'"]?)[^\'"\s,]+([\'"]?)'
+        r'(?i)\b(password|passwd|pwd|secret|token|api_key|apikey|access_token|auth_token)\b\s*(?:del\s+server\s+è\s+|is\s+|:\s*|=\s*)?([\'"]?)[^\'"\s,]+([\'"]?)'
     )
 
     # Regex per token comuni specifici (OpenAI, Anthropic, AWS, JWT, GitHub)
@@ -25,7 +25,7 @@ def redact_secrets(text: Optional[str]) -> str:
 
     redacted = text
     # Oscura i secret generici
-    redacted = generic_secret_pattern.sub(r'\1: \2[REDACTED]\3', redacted)
+    redacted = generic_secret_pattern.sub(r'\1 \2[REDACTED]\3', redacted)
     
     # Oscura i token specifici trovati nel testo
     for pattern in specific_patterns:

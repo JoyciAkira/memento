@@ -20,5 +20,8 @@
         "override_token": "memento-override"
       }
     ]
+  },
+  "dependency_tracker": {
+    "enabled": false
   }
 }

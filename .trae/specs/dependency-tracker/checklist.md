@@ -1,0 +1,9 @@
+- [x] `WorkspaceContext` ora include `self.dependency_tracker` con `enabled=False` di default.
+- [x] Il file `.memento/settings.json` persiste e carica correttamente `dependency_tracker.enabled` senza sovrascrivere o eliminare `active_coercion` o `enforcement_config`.
+- [x] Creato un tool MCP `memento_toggle_dependency_tracker` in `memento/tools/` per abilitare la scansione nel workspace.
+- [x] Implementato uno scanner AST asincrono in `memento/dependency_tracker.py` in grado di estrarre `import` da tutti i file `.py`, ignorando cartelle speciali (es. `.venv`, `.git`).
+- [x] Il sistema esclude accuratamente i built-in Python (come `sys`, `os`, `asyncio`) dal conteggio delle dipendenze.
+- [x] Sviluppata logica di mapping dei nomi dei pacchetti (es. risoluzione di `import yaml` in `PyYAML` usando `importlib.metadata` o mapping standard).
+- [x] `memento_audit_dependencies` incrocia i risultati AST con `pyproject.toml` per individuare con certezza dipendenze orfane (installate ma mai usate) e ghost (usate ma non dichiarate).
+- [x] I tool MCP restituiscono il report come un JSON strutturato e facilmente interpretabile dall'LLM.
+- [x] I test in `tests/test_dependency_tracker.py` validano con successo l'estrazione degli AST, l'esclusione delle cartelle, e la risoluzione dei nomi `orphans` / `ghosts`.

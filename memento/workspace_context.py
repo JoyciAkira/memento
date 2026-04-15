@@ -29,6 +29,9 @@ class WorkspaceContext:
             "enabled": False,
             "rules": [],
         }
+        self.dependency_tracker = {
+            "enabled": False,
+        }
         self.load_enforcement_config()
         self.daemon = None
 
@@ -80,6 +83,12 @@ class WorkspaceContext:
             if isinstance(rules, list):
                 self.active_coercion["rules"] = rules
 
+        dependency = data.get("dependency_tracker", {})
+        if isinstance(dependency, dict):
+            enabled = dependency.get("enabled", False)
+            if isinstance(enabled, bool):
+                self.dependency_tracker["enabled"] = enabled
+
         rules_path = os.path.join(self.workspace_root, ".memento.rules.md")
         if os.path.exists(rules_path):
             try:
@@ -109,6 +118,9 @@ class WorkspaceContext:
             if isinstance(self.active_coercion.get("rules", []), list)
             else [],
         }
+        data["dependency_tracker"] = {
+            "enabled": bool(self.dependency_tracker.get("enabled", False)),
+        }
         self._write_settings_json(data)
 
         rules_path = os.path.join(self.workspace_root, ".memento.rules.md")
@@ -125,11 +137,29 @@ class WorkspaceContext:
 
     def save_active_coercion_config(self) -> None:
         data = self._read_settings_json()
+        data["enforcement_config"] = self.enforcement_config
         data["active_coercion"] = {
             "enabled": bool(self.active_coercion.get("enabled", False)),
             "rules": self.active_coercion.get("rules", [])
             if isinstance(self.active_coercion.get("rules", []), list)
             else [],
+        }
+        data["dependency_tracker"] = {
+            "enabled": bool(self.dependency_tracker.get("enabled", False)),
+        }
+        self._write_settings_json(data)
+
+    def save_dependency_tracker_config(self) -> None:
+        data = self._read_settings_json()
+        data["enforcement_config"] = self.enforcement_config
+        data["active_coercion"] = {
+            "enabled": bool(self.active_coercion.get("enabled", False)),
+            "rules": self.active_coercion.get("rules", [])
+            if isinstance(self.active_coercion.get("rules", []), list)
+            else [],
+        }
+        data["dependency_tracker"] = {
+            "enabled": bool(self.dependency_tracker.get("enabled", False)),
         }
         self._write_settings_json(data)
 
