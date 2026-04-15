@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="assets/memento-logo.svg?v=2" alt="Memento Logo" width="100%">
+  <img src="assets/memento-logo.svg" alt="Memento Logo" width="100%">
 
   <h1>Memento</h1>
   <p><strong>The Autonomous Nervous System for AI Agents</strong></p>
