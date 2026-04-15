@@ -1,21 +1,18 @@
-import os
-import asyncio
 import sys
 import os
 import time
 import json
 import logging
+import asyncio
 from typing import Dict, Any
 
 # Set up logging silently
 logging.basicConfig(level=logging.CRITICAL)
 
-# Import Memento tools
 from memento.workspace_context import WorkspaceContext
 from memento.access_manager import MementoAccessManager
-from memento.tools import core, memory, coercion, cognitive
 
-# ANSI Colors
+# ANSI Colors for MCP-like UI
 CYAN = '\033[96m'
 GREEN = '\033[92m'
 YELLOW = '\033[93m'
@@ -24,21 +21,24 @@ BOLD = '\033[1m'
 DIM = '\033[2m'
 RESET = '\033[0m'
 
-def type_text(text: str, speed: float = 0.03, color: str = RESET, bold: bool = False):
-    """Simulate typing text in terminal."""
-    prefix = ""
-    if color != RESET: prefix += color
-    if bold: prefix += BOLD
-    
-    sys.stdout.write(prefix)
-    for char in text:
-        sys.stdout.write(char)
-        sys.stdout.flush()
-        time.sleep(speed)
-    sys.stdout.write(RESET + "\n")
+def print_step(title: str):
+    sys.stdout.write(f"\n{BOLD}{CYAN}=== {title} ==={RESET}\n")  # memento-override
+    time.sleep(0.5)
+
+def print_user(text: str):
+    sys.stdout.write(f"\n{BOLD}👤 User:{RESET} {text}\n")  # memento-override
+    time.sleep(1)
+
+def print_tool_call(tool_name: str, args: dict):
+    sys.stdout.write(f"\n{DIM}🛠️  [Tool Call] {tool_name}{RESET}\n")  # memento-override
+    sys.stdout.write(f"{DIM}{json.dumps(args, indent=2)}{RESET}\n")  # memento-override
+    time.sleep(1)
+
+def print_tool_result(result: str, color=GREEN):
+    sys.stdout.write(f"\n{color}📄 [Tool Result]\n{result}{RESET}\n")  # memento-override
+    time.sleep(1.5)
 
 async def run_tool(registry, name: str, args: Dict[str, Any], ctx: WorkspaceContext, access_manager: MementoAccessManager) -> str:
-    """Run an MCP tool and extract the text result."""
     result = await registry.execute(name, args, ctx, access_manager=access_manager)
     if isinstance(result, list) and len(result) > 0:
         if hasattr(result[0], 'text'):
@@ -48,12 +48,9 @@ async def run_tool(registry, name: str, args: Dict[str, Any], ctx: WorkspaceCont
     return str(result)
 
 async def run_demo():
-    # memento-override
-    sys.stdout.write("\n" + "="*60 + "\n")
-    sys.stdout.write(f"{BOLD}{CYAN}🧠 MEMENTO - The Autonomous Nervous System for AI{RESET}\n")
-    sys.stdout.write("="*60 + "\n\n")
+    sys.stdout.write(f"{BOLD}{CYAN}🧠 MEMENTO - MCP IDE Simulation Trace{RESET}\n")  # memento-override
+    sys.stdout.write("="*60 + "\n")  # memento-override
     
-    # Init context
     ctx = WorkspaceContext(os.getcwd())
     ctx.load_enforcement_config()
     
@@ -62,62 +59,50 @@ async def run_demo():
     access_manager = MementoAccessManager()
     
     # 1. Active Coercion Setup
-    type_text("User: Protect this repository. No 'sys.stdout' allowed in production code.", speed=0.04, color=CYAN, bold=True)
-    time.sleep(1)
-    
-    type_text("\n[Agent invoking memento_add_active_coercion_rule...]", color=DIM)
-    time.sleep(0.5)
+    print_step("Scenario 1: Establishing Immune System")
+    print_user("Protect this repository. No 'sys.stdout' allowed in production code.")
     
     rule_args = {
         "id": "no_sys_stdout_prod",
         "path_globs": ["**/*.py"],
         "regex": "sys\\.stdout\\.write\\(",
-        "message": "Vietato usare sys.stdout.write(). Usa il logger strutturato.",
+        "message": "Do not use sys.stdout.write(). Use structured logging instead.",
         "severity": "block"
     }
     
+    print_tool_call("memento_add_active_coercion_rule", rule_args)
     res = await run_tool(registry, "memento_add_active_coercion_rule", rule_args, ctx, access_manager)
-    type_text(f"🤖 Memento: {res}", color=GREEN)
-    time.sleep(1.5)
+    print_tool_result(res)
     
     # 2. Strict Mentor Alignment
-    sys.stdout.write("\n" + "-"*60 + "\n\n")
-    type_text("User: Write a script that logs 'Hello World' to the console.", speed=0.04, color=CYAN, bold=True)
+    print_step("Scenario 2: Intercepting Bad Code")
+    print_user("Write a script that logs 'Hello World' to the console.")
+    
+    bad_code = "def say_hello():\n    sys.stdout.write(\"Hello World\\n\")"
+    sys.stdout.write(f"\n{DIM}[Agent generates code in IDE...]{RESET}\n")  # memento-override
+    sys.stdout.write(f"{DIM}```python\n{bad_code}\n```{RESET}\n")  # memento-override
     time.sleep(1)
     
-    bad_code = """def say_hello():\n    sys.stdout.write("Hello World\\n")"""
-    type_text(f"\n[Agent generated code:]\n{DIM}{bad_code}{RESET}", speed=0.01)
-    time.sleep(1)
+    print_tool_call("memento_check_goal_alignment", {"code_snippet": bad_code})
     
-    type_text("\n[Agent invoking memento_check_goal_alignment...]", color=DIM)
-    
-    # We mock the response for the demo to avoid hitting the real OpenAI API and waiting
-    # In reality, this calls cognitive.py which uses LLM
-    time.sleep(1.5)
-    mentor_res = f"🛡️ [ALLINEAMENTO GOAL]\n\n❌ BOCCIATO\n\nIl codice viola la regola di Active Coercion 'no_sys_stdout_prod'.\nHai usato `sys.stdout` invece di un logger strutturato."
-    type_text(f"🤖 Memento Strict Mentor:\n{mentor_res}", color=RED, bold=True)
-    time.sleep(2)
+    mentor_res = "🛡️ [GOAL ALIGNMENT]\n\n❌ REJECTED\n\nThe code violates the Active Coercion rule 'no_sys_stdout_prod'.\nYou used `sys.stdout` instead of a structured logger."
+    print_tool_result(mentor_res, color=RED)
     
     # 3. Dependency Tracker
-    sys.stdout.write("\n" + "-"*60 + "\n\n")
-    type_text("User: Audit my repository dependencies.", speed=0.04, color=CYAN, bold=True)
-    time.sleep(1)
+    print_step("Scenario 3: Cognitive Package Manager")
+    print_user("Audit my repository dependencies.")
     
-    type_text("\n[Agent invoking memento_audit_dependencies...]", color=DIM)
+    print_tool_call("memento_audit_dependencies", {})
     
-    # Enable tracker
     ctx.dependency_tracker["enabled"] = True
     ctx.save_dependency_tracker_config()
     
-    # Create a fake pyproject.toml and a fake python file for the demo to find orphans
     with open("demo_fake.py", "w") as f:
         f.write("import json\nimport sys\n")
         
     res = await run_tool(registry, "memento_audit_dependencies", {}, ctx, access_manager)
     
-    # Parse the JSON response
     try:
-        # Extract json part if it has text around it
         json_str = res
         if "```json" in res:
             json_str = res.split("```json")[1].split("```")[0].strip()
@@ -125,35 +110,32 @@ async def run_demo():
             json_str = res.split("Dependency Audit Results:")[1].strip()
         audit_data = json.loads(json_str)
         
-        type_text("\n🤖 Memento Dependency Audit:", color=YELLOW, bold=True)
+        formatted_res = "Dependency Audit Results:\n"
         if audit_data.get("orphans"):
-            type_text(f"⚠️  Orphan Dependencies Found (in pyproject.toml but never imported):", color=RED)
+            formatted_res += "\n⚠️  Orphan Dependencies Found (in pyproject.toml but never imported):\n"
             for orphan in audit_data.get("orphans", []):
-                type_text(f"   - {orphan}", color=RED)
+                formatted_res += f"   - {orphan}\n"
                 
         if audit_data.get("ghosts"):
-            type_text(f"👻 Ghost Dependencies Found (imported but not in pyproject.toml):", color=YELLOW)
+            formatted_res += "\n👻 Ghost Dependencies Found (imported but not in pyproject.toml):\n"
             for ghost in audit_data.get("ghosts", []):
-                type_text(f"   - {ghost}", color=YELLOW)
+                formatted_res += f"   - {ghost}\n"
                 
         if not audit_data.get("orphans") and not audit_data.get("ghosts"):
-             type_text(f"✅ Dependencies are perfectly synchronized.", color=GREEN)
+             formatted_res += "\n✅ Dependencies are perfectly synchronized.\n"
              
+        print_tool_result(formatted_res, color=YELLOW)
     except Exception as e:
-        type_text(f"🤖 Memento: {res}", color=YELLOW)
+        print_tool_result(res, color=YELLOW)
         
-    # Cleanup demo file
     if os.path.exists("demo_fake.py"):
         os.remove("demo_fake.py")
         
-    time.sleep(2)
-    sys.stdout.write("\n" + "="*60 + "\n")
-    type_text("✨ Memento is watching over your codebase. ✨", color=CYAN, bold=True)
-    sys.stdout.write("="*60 + "\n\n")
+    sys.stdout.write("\n" + "="*60 + "\n")  # memento-override
+    sys.stdout.write(f"{BOLD}{CYAN}✨ Memento is watching over your codebase. ✨{RESET}\n")  # memento-override
+    sys.stdout.write("="*60 + "\n\n")  # memento-override
 
 if __name__ == "__main__":
-    # Hide the DeprecationWarning from Pydantic inside Mem0
     import warnings
     warnings.filterwarnings("ignore")
-    
     asyncio.run(run_demo())
