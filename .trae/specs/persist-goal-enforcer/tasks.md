@@ -1,0 +1,12 @@
+# Tasks
+- [x] Task 1: Creare il modulo per la gestione del file di regole markdown
+  - [x] SubTask 1.1: Implementare `extract_goal_enforcer_config_from_rules_md` in `memento/enforcement_rules.py`
+  - [x] SubTask 1.2: Implementare `upsert_goal_enforcer_block` in `memento/enforcement_rules.py` per aggiornare il blocco senza sovrascrivere il resto del file
+  - [x] SubTask 1.3: Scrivere i test unitari in `tests/test_enforcement_rules.py`
+- [x] Task 2: Integrare la persistenza ibrida in `mcp_server.py`
+  - [x] SubTask 2.1: Modificare `load_enforcement_config` per leggere prima da `.memento/settings.json` e poi da `.memento.rules.md` (sovrascrivendo con il markdown se presente)
+  - [x] SubTask 2.2: Modificare `save_enforcement_config` per scrivere sia su `.memento/settings.json` sia su `.memento.rules.md` (usando `upsert_goal_enforcer_block`)
+  - [x] SubTask 2.3: Aggiornare l'output del tool `memento_status` per indicare la presenza del file `.memento.rules.md`
+  - [x] SubTask 2.4: Scrivere test di integrazione in `tests/test_goal_enforcer_persistence.py`
+- [x] Task 3: Aggiornare la documentazione
+  - [x] SubTask 3.1: Documentare la persistenza del Goal Enforcer nel `README.md`

@@ -1,0 +1,7 @@
+- [x] Tutte le chiamate `sqlite3` sono state migrate a `aiosqlite` o avvolte in `asyncio.to_thread` per non bloccare l'event loop MCP.
+- [x] Il `CognitiveEngine` usa il client `AsyncOpenAI` per le chiamate API, migliorando le performance in scenari di rete concorrenti.
+- [x] Il `mcp_server.py` non contiene più l'istruzione `if/elif` per ogni singolo tool; usa un `ToolRegistry` per registrare dinamicamente e chiamare il metodo `execute()` delle singole classi tool.
+- [x] I prompt del `CognitiveEngine` (es. sogni sintetici, alignment check) sono letti dinamicamente da file esterni (es. YAML o txt) in `memento/prompts/`.
+- [x] Il `NeuroGraphProvider` esegue sia ricerca `FTS5` (match esatto) sia ricerca vettoriale semantica (cosine similarity) fondendo i punteggi tramite algoritmo RRF (Reciprocal Rank Fusion).
+- [x] Quando viene aggiunta una nuova memoria, il sistema calcola e salva l'embedding vettoriale associato nel DB SQLite.
+- [x] Tutti i test unitari continuano a passare (`pytest tests/ -v`).

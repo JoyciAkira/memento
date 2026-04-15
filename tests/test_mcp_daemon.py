@@ -37,7 +37,7 @@ async def test_goal_injection_level1(monkeypatch):
     import os
     ctx = get_workspace_context(os.getcwd())
 
-    def fake_search(*args, **kwargs):
+    async def fake_search(*args, **kwargs):
         return [{"memory": "Obiettivo: massima qualità e rivoluzione"}]
 
     monkeypatch.setattr(ctx.provider, "search", fake_search)
@@ -68,10 +68,10 @@ async def test_universal_memento_tool(monkeypatch):
     from memento.workspace_context import get_workspace_context
     import os
     ctx = get_workspace_context(os.getcwd())
-    def fake_parse(*args, **kwargs):
+    async def fake_parse(*args, **kwargs):
         return {"action": "ADD", "payload": {"text": "Test routing"}}
     monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
-    def fake_add(*args, **kwargs):
+    async def fake_add(*args, **kwargs):
         return "Memory added successfully"
     monkeypatch.setattr(ctx.provider, "add", fake_add)
     
@@ -86,7 +86,7 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
     import os
     ctx = get_workspace_context(os.getcwd())
 
-    def fake_parse(query):
+    async def fake_parse(query):
         return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
 
     monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
@@ -96,7 +96,7 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
 
     monkeypatch.setattr("memento.ontology.extract_logical_namespace", fake_extract)
 
-    def fake_search(query, user_id=None, filters=None):
+    async def fake_search(query, user_id=None, filters=None):
         assert filters == {"module": "frontend"}
         return [{"memory": "Trovato bug nel frontend"}]
 

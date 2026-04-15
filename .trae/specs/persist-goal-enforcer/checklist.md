@@ -1,0 +1,7 @@
+- [x] Il modulo `enforcement_rules.py` estrae correttamente i flag booleani da un blocco markdown
+- [x] Il modulo `enforcement_rules.py` aggiorna il blocco markdown preservando i commenti preesistenti dell'utente
+- [x] `mcp_server.py` carica correttamente i livelli all'avvio rispettando l'ordine di priorità (`.memento.rules.md` vince su `.memento/settings.json`)
+- [x] Il tool `memento_configure_enforcement` salva le modifiche in modo persistente in entrambi i file
+- [x] L'output di `memento_status` mostra la presenza o assenza del file di regole
+- [x] I test in `test_enforcement_rules.py` passano con successo
+- [x] I test in `test_goal_enforcer_persistence.py` passano con successo

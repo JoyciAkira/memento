@@ -49,34 +49,38 @@ def test_provider_search_and_delete(tmp_path):
     assert results_after[0]["target"] == "charlie"
 
 
-def test_neurograph_search_with_filters():
+import pytest
+
+@pytest.mark.asyncio
+async def test_neurograph_search_with_filters():
     from memento.provider import NeuroGraphProvider
     with tempfile.TemporaryDirectory() as ws:
         with patch.dict(os.environ, {"MEMENTO_DIR": ws}):
             p = NeuroGraphProvider()
-            p.add("Test memory 1", metadata={"module": "backend", "type": "config"})
-            p.add("Test memory 2", metadata={"module": "frontend"})
+            await p.add("Test memory 1", metadata={"module": "backend", "type": "config"})
+            await p.add("Test memory 2", metadata={"module": "frontend"})
             
             # Search without filters
-            res = p.search("Test")
+            res = await p.search("Test")
             assert len(res) == 2
             
             # Search with filters
-            res_backend = p.search("Test", filters={"module": "backend"})
+            res_backend = await p.search("Test", filters={"module": "backend"})
             assert len(res_backend) == 1
             assert "memory 1" in res_backend[0]["memory"]
             
-            res_frontend = p.search("Test", filters={"module": "frontend"})
+            res_frontend = await p.search("Test", filters={"module": "frontend"})
             assert len(res_frontend) == 1
             assert "memory 2" in res_frontend[0]["memory"]
 
-def test_neurograph_add_injects_workspace_metadata():
+@pytest.mark.asyncio
+async def test_neurograph_add_injects_workspace_metadata():
     from memento.provider import NeuroGraphProvider
 
     with tempfile.TemporaryDirectory() as ws:
         with patch.dict(os.environ, {"MEMENTO_DIR": ws}):
             p = NeuroGraphProvider()
-            p.add("hello", metadata={})
+            await p.add("hello", metadata={})
 
             import sqlite3
 

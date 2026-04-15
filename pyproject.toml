@@ -13,7 +13,7 @@ readme = "README.md"
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "License :: OSI Approved :: GNU Affero General Public License v3",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -22,6 +22,8 @@ dependencies = [
     "pytest-asyncio",
     "mcp",
     "watchdog>=4.0.0",
+    "aiosqlite",
+    "openai",
 ]
 
 [project.urls]

@@ -1,0 +1,44 @@
+{
+  "source_db_path": "/Users/danielecorrao/.memento/neurograph_memory.db",
+  "backup_path": "/Users/danielecorrao/.memento/backup/neurograph_memory.db.20260413143200.bak",
+  "workspaces": [
+    {
+      "root": "/Users/danielecorrao/intent/workspaces/vedere-se/socrateflow-nas",
+      "name": "socrateflow-nas",
+      "db_path": "/Users/danielecorrao/intent/workspaces/vedere-se/socrateflow-nas/.memento/neurograph_memory.db"
+    },
+    {
+      "root": "/Users/danielecorrao/GITHUB_REPOS/NEXUS-LM",
+      "name": "NEXUS-LM",
+      "db_path": "/Users/danielecorrao/GITHUB_REPOS/NEXUS-LM/.memento/neurograph_memory.db"
+    },
+    {
+      "root": "/Users/danielecorrao/Zeronode",
+      "name": "Zeronode",
+      "db_path": "/Users/danielecorrao/Zeronode/.memento/neurograph_memory.db"
+    }
+  ],
+  "per_workspace": {
+    "/Users/danielecorrao/intent/workspaces/vedere-se/socrateflow-nas": {
+      "copied": 0,
+      "skipped_existing": 0
+    },
+    "/Users/danielecorrao/GITHUB_REPOS/NEXUS-LM": {
+      "copied": 2,
+      "skipped_existing": 0
+    },
+    "/Users/danielecorrao/Zeronode": {
+      "copied": 1,
+      "skipped_existing": 0
+    }
+  },
+  "unassigned": [],
+  "ambiguous": [],
+  "summary": {
+    "seen_total": 3,
+    "copied_total": 3,
+    "unassigned_total": 0,
+    "ambiguous_total": 0
+  },
+  "generated_at": "2026-04-13T14:32:00.880803"
+}

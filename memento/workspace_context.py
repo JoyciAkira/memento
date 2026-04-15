@@ -1,7 +1,7 @@
 import os
 import json
 import logging
-from typing import Dict
+from typing import Any, Dict
 from memento.provider import NeuroGraphProvider
 from memento.cognitive_engine import CognitiveEngine
 from memento.enforcement_rules import extract_goal_enforcer_config_from_rules_md, upsert_goal_enforcer_block
@@ -25,8 +25,33 @@ class WorkspaceContext:
             "level2": False,
             "level3": False,
         }
+        self.active_coercion = {
+            "enabled": False,
+            "rules": [],
+        }
         self.load_enforcement_config()
         self.daemon = None
+
+    def _read_settings_json(self) -> dict[str, Any]:
+        settings_path = os.path.join(self.memento_dir, "settings.json")
+        if not os.path.exists(settings_path):
+            return {}
+        try:
+            with open(settings_path, "r") as f:
+                data = json.load(f)
+                if isinstance(data, dict):
+                    return data
+        except Exception as e:
+            logger.error(f"Failed to load config from {settings_path}: {e}")
+        return {}
+
+    def _write_settings_json(self, data: dict[str, Any]) -> None:
+        settings_path = os.path.join(self.memento_dir, "settings.json")
+        try:
+            with open(settings_path, "w") as f:
+                json.dump(data, f, indent=2)
+        except Exception as e:
+            logger.error(f"Failed to save config to {settings_path}: {e}")
 
     def toggle_daemon(self, enabled: bool, callback) -> bool:
         if enabled:
@@ -41,15 +66,19 @@ class WorkspaceContext:
             return False
 
     def load_enforcement_config(self):
-        settings_path = os.path.join(self.memento_dir, "settings.json")
-        if os.path.exists(settings_path):
-            try:
-                with open(settings_path, "r") as f:
-                    data = json.load(f)
-                    config = data.get("enforcement_config", {})
-                    self.enforcement_config.update(config)
-            except Exception as e:
-                logger.error(f"Failed to load config from {settings_path}: {e}")
+        data = self._read_settings_json()
+        config = data.get("enforcement_config", {})
+        if isinstance(config, dict):
+            self.enforcement_config.update(config)
+
+        active = data.get("active_coercion", {})
+        if isinstance(active, dict):
+            enabled = active.get("enabled", False)
+            rules = active.get("rules", [])
+            if isinstance(enabled, bool):
+                self.active_coercion["enabled"] = enabled
+            if isinstance(rules, list):
+                self.active_coercion["rules"] = rules
 
         rules_path = os.path.join(self.workspace_root, ".memento.rules.md")
         if os.path.exists(rules_path):
@@ -72,20 +101,15 @@ class WorkspaceContext:
                     logger.error(f"Failed to load legacy rules from {legacy_rules_path}: {e}")
 
     def save_enforcement_config(self):
-        settings_path = os.path.join(self.memento_dir, "settings.json")
-        try:
-            data = {}
-            if os.path.exists(settings_path):
-                with open(settings_path, "r") as f:
-                    try:
-                        data = json.load(f)
-                    except json.JSONDecodeError:
-                        pass
-            data["enforcement_config"] = self.enforcement_config
-            with open(settings_path, "w") as f:
-                json.dump(data, f, indent=2)
-        except Exception as e:
-            logger.error(f"Failed to save config to {settings_path}: {e}")
+        data = self._read_settings_json()
+        data["enforcement_config"] = self.enforcement_config
+        data["active_coercion"] = {
+            "enabled": bool(self.active_coercion.get("enabled", False)),
+            "rules": self.active_coercion.get("rules", [])
+            if isinstance(self.active_coercion.get("rules", []), list)
+            else [],
+        }
+        self._write_settings_json(data)
 
         rules_path = os.path.join(self.workspace_root, ".memento.rules.md")
         try:
@@ -98,6 +122,16 @@ class WorkspaceContext:
                 f.write(new_content)
         except Exception as e:
             logger.error(f"Failed to save rules to {rules_path}: {e}")
+
+    def save_active_coercion_config(self) -> None:
+        data = self._read_settings_json()
+        data["active_coercion"] = {
+            "enabled": bool(self.active_coercion.get("enabled", False)),
+            "rules": self.active_coercion.get("rules", [])
+            if isinstance(self.active_coercion.get("rules", []), list)
+            else [],
+        }
+        self._write_settings_json(data)
 
 _contexts: Dict[str, WorkspaceContext] = {}
 

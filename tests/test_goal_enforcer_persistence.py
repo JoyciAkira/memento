@@ -7,6 +7,43 @@ from memento.workspace_context import get_workspace_context
 def temp_workspace(tmp_path, monkeypatch):
     return str(tmp_path)
 
+def test_active_coercion_defaults_are_deterministic(temp_workspace):
+    ctx = get_workspace_context(temp_workspace)
+    assert ctx.active_coercion["enabled"] is False
+    assert ctx.active_coercion["rules"] == []
+
+def test_load_active_coercion_from_settings_json(temp_workspace):
+    ctx = get_workspace_context(temp_workspace)
+    settings_dir = os.path.join(temp_workspace, ".memento")
+    os.makedirs(settings_dir, exist_ok=True)
+    settings_path = os.path.join(settings_dir, "settings.json")
+    with open(settings_path, "w") as f:
+        json.dump(
+            {
+                "active_coercion": {
+                    "enabled": True,
+                    "rules": [{"id": "R1", "severity": "block"}],
+                }
+            },
+            f,
+        )
+
+    ctx.load_enforcement_config()
+    assert ctx.active_coercion["enabled"] is True
+    assert ctx.active_coercion["rules"] == [{"id": "R1", "severity": "block"}]
+
+def test_save_active_coercion_persists_settings_json(temp_workspace):
+    ctx = get_workspace_context(temp_workspace)
+    ctx.active_coercion["enabled"] = True
+    ctx.active_coercion["rules"] = [{"id": "R2", "severity": "warn"}]
+    ctx.save_active_coercion_config()
+
+    settings_path = os.path.join(temp_workspace, ".memento", "settings.json")
+    with open(settings_path, "r") as f:
+        data = json.load(f)
+    assert data["active_coercion"]["enabled"] is True
+    assert data["active_coercion"]["rules"] == [{"id": "R2", "severity": "warn"}]
+
 def test_load_enforcement_config_overrides(temp_workspace):
     ctx = get_workspace_context(temp_workspace)
     # Setup settings.json with level1=True, level2=False
@@ -50,6 +87,8 @@ def test_save_enforcement_config_writes_markdown(temp_workspace):
     with open(settings_path, "r") as f:
         data = json.load(f)
         assert data["enforcement_config"]["level1"] is True
+        assert data["active_coercion"]["enabled"] is False
+        assert data["active_coercion"]["rules"] == []
 
     # Check .memento.rules.md
     rules_path = os.path.join(temp_workspace, ".memento.rules.md")

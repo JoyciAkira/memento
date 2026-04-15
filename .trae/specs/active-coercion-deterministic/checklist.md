@@ -1,0 +1,7 @@
+- [x] `memento_toggle_active_coercion` abilita/disabilita l’enforcement e persiste in `/.memento/settings.json` del workspace corretto
+- [x] `memento_status` mostra chiaramente `active_coercion: enabled/disabled` per workspace
+- [x] Engine deterministico: path_globs + regex + override token produce risultati stabili e ripetibili
+- [x] Daemon: con `active_coercion.enabled=true` invia notifica `memento/active_coercion_block` quando rileva violazioni `severity=block`
+- [x] Hook: `memento_install_git_hooks` installa/aggiorna `.git/hooks/pre-commit` con permessi eseguibili
+- [x] Pre-commit hook blocca commit su violazioni `severity=block` e permette commit quando disabilitato o in override
+- [x] Test suite: nuovi test passano (`pytest tests/ -v --ignore=tests/benchmarks`)

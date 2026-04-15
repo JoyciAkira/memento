@@ -1,5 +1,9 @@
 import sqlite3
+import aiosqlite
 import uuid
+import json
+import math
+import asyncio
 from datetime import datetime
 from memento.redaction import redact_secrets
 import logging
@@ -8,6 +12,7 @@ from typing import List, Dict, Any, Optional
 from memento.knowledge_graph import KnowledgeGraph
 from mem0 import Memory
 from memento.ontology import OntologyManager
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -89,17 +94,10 @@ class MementoGraphProvider:
 
 class MementoProvider:
     def __init__(self, db_path: Optional[str] = None):
-        # We manually inject the MemPalace graph store into mem0.Memory
-        # because "custom" provider is not natively supported in mem0's pydantic config.
-        # Note: OPENAI_API_KEY must be set in environment for mem0 to work.
-        
-        # Check if API key is set to avoid crashing on init if not provided
-        # The user of this MCP should have OPENAI_API_KEY in their env.
+        # Mem0 provider requires OPENAI_API_KEY
         if not os.environ.get("OPENAI_API_KEY"):
-            # Set a dummy key to pass validation if not present, though add() will fail
-            os.environ["OPENAI_API_KEY"] = "sk-dummy"
             logger.warning("OPENAI_API_KEY not found in environment. Mem0 requires it for LLM operations.")
-            
+        
         self.memory = Memory()
         self.graph_provider = MementoGraphProvider({"db_path": db_path})
         self.memory.graph = self.graph_provider
@@ -148,30 +146,59 @@ class NeuroGraphProvider:
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
             
         self.db_path = db_path
-        self._init_db()
-        
         self.kg = MementoGraphProvider({"db_path": db_path})
+        
+        api_key = os.environ.get("OPENAI_API_KEY", "sk-dummy")
+        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+        self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "text-embedding-3-small")
+        self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        self._initialized = False
 
-    def _get_conn(self):
-        conn = sqlite3.connect(self.db_path, timeout=10.0)
-        conn.row_factory = sqlite3.Row
-        return conn
-
-    def _init_db(self):
-        with self._get_conn() as conn:
-            conn.execute("PRAGMA journal_mode=WAL;")
-            conn.execute("PRAGMA synchronous=NORMAL;")
-            conn.execute('''
+    async def initialize(self):
+        if self._initialized:
+            return
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute("PRAGMA journal_mode=WAL;")
+            await db.execute("PRAGMA synchronous=NORMAL;")
+            await db.execute('''
                 CREATE VIRTUAL TABLE IF NOT EXISTS memories 
                 USING fts5(id UNINDEXED, user_id UNINDEXED, text, created_at UNINDEXED, metadata UNINDEXED);
             ''')
-            conn.commit()
+            await db.execute('''
+                CREATE TABLE IF NOT EXISTS memory_embeddings (
+                    id TEXT PRIMARY KEY,
+                    embedding TEXT
+                );
+            ''')
+            await db.commit()
+        self._initialized = True
 
-    def add(self, text: str, user_id: str = "default", metadata: dict = None) -> Dict[str, Any]:
+    async def _get_embedding(self, text: str) -> List[float]:
+        try:
+            response = await self.llm_client.embeddings.create(
+                input=text,
+                model=self.embed_model
+            )
+            return response.data[0].embedding
+        except Exception as e:
+            logger.error(f"Error getting embedding: {e}")
+            return []
+
+    def _cosine_similarity(self, vec1: List[float], vec2: List[float]) -> float:
+        if not vec1 or not vec2: return 0.0
+        dot_product = sum(a * b for a, b in zip(vec1, vec2))
+        norm_a = math.sqrt(sum(a * a for a in vec1))
+        norm_b = math.sqrt(sum(b * b for b in vec2))
+        if norm_a == 0 or norm_b == 0: return 0.0
+        return dot_product / (norm_a * norm_b)
+
+    async def add(self, text: str, user_id: str = "default", metadata: dict = None) -> Dict[str, Any]:
+        if not self._initialized:
+            await self.initialize()
+            
         text = redact_secrets(text)
         memory_id = str(uuid.uuid4())
         created_at = datetime.now().isoformat()
-        import json
 
         meta = dict(metadata) if isinstance(metadata, dict) else {}
         workspace_root = os.environ.get("MEMENTO_DIR")
@@ -182,23 +209,36 @@ class NeuroGraphProvider:
 
         meta_str = json.dumps(meta) if meta else "{}"
         
-        with self._get_conn() as conn:
-            conn.execute(
+        embedding = await self._get_embedding(text)
+        emb_str = json.dumps(embedding) if embedding else "[]"
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            await db.execute(
                 "INSERT INTO memories (id, user_id, text, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
                 (memory_id, user_id, text, created_at, meta_str)
             )
-            conn.commit()
+            await db.execute(
+                "INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)",
+                (memory_id, emb_str)
+            )
+            await db.commit()
             
         if self.kg:
             try:
-                self.kg.add(text)
+                await asyncio.to_thread(self.kg.add, text)
             except Exception as e:
                 logger.warning(f"Failed to add to KG: {e}")
             
         return {"id": memory_id, "memory": text, "event": "ADD"}
 
-    def search(self, query: str, user_id: str = "default", limit: int = 100, filters: dict = None) -> List[Dict[str, Any]]:
-        with self._get_conn() as conn:
+    async def search(self, query: str, user_id: str = "default", limit: int = 100, filters: dict = None) -> List[Dict[str, Any]]:
+        if not self._initialized:
+            await self.initialize()
+            
+        query_emb = await self._get_embedding(query)
+        
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
             fts_query = " OR ".join([f"{word}*" for word in query.split() if len(word) > 2])
             if not fts_query:
                 fts_query = f"{query}*"
@@ -210,39 +250,89 @@ class NeuroGraphProvider:
                     filter_sql += f" AND json_extract(metadata, '$.{k}') = ?"
                     filter_params.append(v)
                 
+            # FTS5 search
             try:
-                cursor = conn.execute(
-                    f"SELECT id, text, created_at FROM memories WHERE user_id = ? AND text MATCH ? {filter_sql} ORDER BY rank LIMIT ?",
-                    (user_id, fts_query, *filter_params, limit)
+                cursor = await db.execute(
+                    f"SELECT id, text, created_at, rank as fts_score FROM memories WHERE user_id = ? AND text MATCH ? {filter_sql} LIMIT 200",
+                    (user_id, fts_query, *filter_params)
                 )
-                rows = cursor.fetchall()
+                fts_rows = await cursor.fetchall()
             except sqlite3.OperationalError:
-                cursor = conn.execute(
-                    f"SELECT id, text, created_at FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT ?",
-                    (user_id, f"%{query}%", *filter_params, limit)
+                cursor = await db.execute(
+                    f"SELECT id, text, created_at, 0 as fts_score FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT 200",
+                    (user_id, f"%{query}%", *filter_params)
                 )
-                rows = cursor.fetchall()
+                fts_rows = await cursor.fetchall()
+
+            # Retrieve embeddings for Vector search
+            cursor = await db.execute(
+                f"SELECT m.id, m.text, m.created_at, e.embedding FROM memories m LEFT JOIN memory_embeddings e ON m.id = e.id WHERE m.user_id = ? {filter_sql}",
+                (user_id, *filter_params)
+            )
+            all_rows = await cursor.fetchall()
+
+        fts_results = {row["id"]: row for row in fts_rows}
+        
+        # Calculate semantic scores
+        semantic_scores = {}
+        row_map = {}
+        for row in all_rows:
+            row_id = row["id"]
+            row_map[row_id] = row
+            emb_str = row["embedding"]
+            if emb_str and query_emb:
+                try:
+                    vec = json.loads(emb_str)
+                    score = self._cosine_similarity(query_emb, vec)
+                    semantic_scores[row_id] = score
+                except Exception:
+                    semantic_scores[row_id] = 0.0
+            else:
+                semantic_scores[row_id] = 0.0
+
+        # RRF (Reciprocal Rank Fusion)
+        k_rrf = 60
+        rrf_scores = {}
+        
+        # Rank FTS
+        fts_sorted = sorted(fts_rows, key=lambda x: x["fts_score"]) # fts_score is negative or lower is better in FTS5 rank usually, wait, fts5 rank is more negative for better matches.
+        for rank, row in enumerate(fts_sorted, 1):
+            rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 1.0 / (k_rrf + rank)
+            
+        # Rank Semantic
+        semantic_sorted = sorted(semantic_scores.items(), key=lambda x: x[1], reverse=True)
+        for rank, (row_id, score) in enumerate(semantic_sorted, 1):
+            rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 1.0 / (k_rrf + rank)
+
+        # Sort by RRF score
+        final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
 
         results = []
-        for r in rows:
-            res = {"id": r["id"], "memory": r["text"], "created_at": r["created_at"]}
+        for row_id, score in final_sorted:
+            r = row_map[row_id]
+            res = {"id": r["id"], "memory": r["text"], "created_at": r["created_at"], "score": score}
             if self.kg:
                 try:
-                    relations = self.kg.query_entity(r["text"], direction="both")
+                    relations = await asyncio.to_thread(self.kg.query_entity, r["text"], direction="both")
                     res["relations"] = relations
                 except Exception:
                     pass
             results.append(res)
+            
         return results
 
-    def get_all(self, user_id: str = "default", limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+    async def get_all(self, user_id: str = "default", limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+        if not self._initialized:
+            await self.initialize()
+            
         safe_limit = min(limit, 100)
-        with self._get_conn() as conn:
-            cursor = conn.execute(
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
                 "SELECT id, text, created_at FROM memories WHERE user_id = ? ORDER BY created_at DESC LIMIT ? OFFSET ?",
                 (user_id, safe_limit, offset)
             )
-            rows = cursor.fetchall()
+            rows = await cursor.fetchall()
             
         results = [{"id": r["id"], "memory": r["text"], "created_at": r["created_at"]} for r in rows]
         return results

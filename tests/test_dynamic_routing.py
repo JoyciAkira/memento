@@ -4,12 +4,13 @@ import tempfile
 from memento.workspace_context import get_workspace_context
 
 
-def test_get_active_goals_uses_context_in_search_query(monkeypatch):
+@pytest.mark.asyncio
+async def test_get_active_goals_uses_context_in_search_query(monkeypatch):
     import memento.mcp_server as ms
 
     captured = {}
 
-    def fake_search(query, user_id=None, filters=None):
+    async def fake_search(query, user_id=None, filters=None):
         captured["query"] = query
         captured["user_id"] = user_id
         captured["filters"] = filters
@@ -18,7 +19,7 @@ def test_get_active_goals_uses_context_in_search_query(monkeypatch):
     with tempfile.TemporaryDirectory() as ws:
         ctx = get_workspace_context(ws)
         monkeypatch.setattr(ctx.provider, "search", fake_search)
-        out = ms.get_active_goals(ctx, context="frontend/app.py")
+        out = await ms.get_active_goals(ctx, context="frontend/app.py")
 
     assert captured["user_id"] == "default"
     assert captured["filters"] is None
@@ -38,7 +39,7 @@ async def test_search_memory_applies_module_filter_from_active_context(monkeypat
         lambda active_context, workspace_root: "backend",
     )
 
-    def fake_search(query, user_id=None, filters=None):
+    async def fake_search(query, user_id=None, filters=None):
         assert query == "find stuff"
         assert user_id == "default"
         assert filters == {"module": "backend"}
@@ -63,17 +64,20 @@ async def test_universal_router_focus_area_routes_and_passes_module_filter(monke
         ctx = get_workspace_context(ws)
 
         monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
+        async def fake_parse(q):
+            return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
+            
         monkeypatch.setattr(
             ctx.cognitive_engine,
             "parse_natural_language_intent",
-            lambda q: {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"},
+            fake_parse,
         )
         monkeypatch.setattr(
             "memento.ontology.extract_logical_namespace",
             lambda focus_area, workspace_root: "frontend",
         )
 
-        def fake_search(query, user_id=None, filters=None):
+        async def fake_search(query, user_id=None, filters=None):
             assert query == "bug"
             assert user_id == "default"
             assert filters == {"module": "frontend"}
@@ -97,10 +101,13 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(monk
         ctx.enforcement_config["level1"] = True
         monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
 
+        async def fake_parse_x(q):
+            return {"action": "SEARCH", "payload": {"query": "x"}, "focus_area": "frontend"}
+
         monkeypatch.setattr(
             ctx.cognitive_engine,
             "parse_natural_language_intent",
-            lambda q: {"action": "SEARCH", "payload": {"query": "x"}, "focus_area": "frontend"},
+            fake_parse_x,
         )
         monkeypatch.setattr(
             "memento.ontology.extract_logical_namespace",
@@ -109,15 +116,20 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(monk
 
         captured = {"ctx": None}
 
-        def fake_get_active_goals(_ctx, max_goals: int = 3, context: str = None):
+        async def fake_get_active_goals(_ctx, max_goals: int = 3, context: str = None):
             captured["ctx"] = context
             return "[ACTIVE GOALS]\n- G1\n\n"
 
-        monkeypatch.setattr(ms, "get_active_goals", fake_get_active_goals)
+        import memento.tools.core as mc
+        monkeypatch.setattr(mc, "get_active_goals", fake_get_active_goals)
+        
+        async def fake_search2(query, user_id=None, filters=None):
+            return [{"memory": "hit"}]
+            
         monkeypatch.setattr(
             ctx.provider,
             "search",
-            lambda query, user_id=None, filters=None: [{"memory": "hit"}],
+            fake_search2,
         )
 
         res = await ms.call_tool("memento", {"query": "whatever", "workspace_root": ws})

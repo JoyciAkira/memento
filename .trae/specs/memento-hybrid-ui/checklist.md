@@ -1,0 +1,5 @@
+- [x] Il server MCP carica i goal all'avvio dal DB o dal file `.mempalace/memento.rules.md`
+- [x] Il tool `memento_configure_enforcement` salva lo stato aggiornato in modo persistente
+- [x] Il server Web UI parte sulla porta 8080 in thread separato mostrando la configurazione attuale
+- [x] Il Cognitive Engine estrae feature latenti dal contesto passato al demone
+- [x] Il demone invia notifiche MCP proponendo la memorizzazione di feature latenti all'IDE

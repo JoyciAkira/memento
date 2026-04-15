@@ -1,0 +1,8 @@
+- [x] `mempalace/entropy.py` correctly detects dense rooms.
+- [x] `mempalace/crystallize.py` accurately identifies core vectors using PageRank.
+- [x] `mempalace/archive.py` updates metadata to "archive" wing and creates `has_archive` relation in KG.
+- [x] `mempalace/searcher.py` filters out "archive" wing unless `deep=True`.
+- [x] CLI command `mempalace crystallize` triggers the full lifecycle.
+- [x] All new functions include type hints and docstrings.
+- [x] `ruff format .` and `ruff check .` pass without errors (100-char limit).
+- [x] 100% of tests (`pytest tests/ -v`) pass successfully.
