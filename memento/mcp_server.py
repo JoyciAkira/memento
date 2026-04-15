@@ -25,6 +25,7 @@ logger = logging.getLogger("memento-mcp")
 app = Server("memento-mcp")
 
 access_manager = MementoAccessManager()
+_ui_thread = None
 
 @app.list_tools()
 async def list_tools() -> list[Tool]:
@@ -42,6 +43,18 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     workspace_root = workspace_root or os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
     ctx = get_workspace_context(workspace_root)
+
+    global _ui_thread
+    ui_enabled = os.environ.get("MEMENTO_UI", "").lower() in ("1", "true", "yes", "on")
+    if ui_enabled and _ui_thread is None:
+        ui_port = int(os.environ.get("MEMENTO_UI_PORT", "8089"))
+        _ui_thread = start_ui_server_thread(
+            ctx.enforcement_config,
+            lambda max_goals: get_active_goals(ctx, max_goals=max_goals),
+            ctx.provider,
+            port=ui_port,
+            active_coercion=ctx.active_coercion,
+        )
     
     return await registry.execute(name, arguments, ctx, access_manager=access_manager)
 

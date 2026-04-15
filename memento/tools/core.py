@@ -51,8 +51,10 @@ async def memento_status(arguments: dict, ctx, access_manager) -> list[TextConte
     status_lines.append("\n[UI]")
     if UI_ENABLED:
         status_lines.append(f"- enabled: yes ({UI_PORT})")
+        status_lines.append(f"- url: http://localhost:{UI_PORT}/")
     else:
         status_lines.append("- enabled: no")
+        status_lines.append("- enable with: MEMENTO_UI=1 (optional) and MEMENTO_UI_PORT=8089")
 
     db_path = getattr(ctx.provider, "db_path", "Unknown")
     status_lines.append("\n[Database]")
