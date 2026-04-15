@@ -89,4 +89,4 @@ If you're planning a significant change, open an issue first to discuss the appr
 
 ## License
 
-MIT — your contributions will be released under the same license.
+AGPL-3.0 — your contributions will be released under the same license.

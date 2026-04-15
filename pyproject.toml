@@ -6,28 +6,34 @@ build-backend = "setuptools.build_meta"
 name = "memento-mcp"
 version = "0.1.0"
 authors = [
-  { name="Daniele Corrao", email="your.email@example.com" },
+  { name="Daniele Corrao" },
 ]
 description = "A local, PageRank-optimized SQLite graph provider for Mem0, powered by Memento architecture."
 readme = "README.md"
+license = { text = "AGPL-3.0" }
 requires-python = ">=3.10"
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: GNU Affero General Public License v3",
+    "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
 ]
 dependencies = [
     "mem0ai",
-    "pytest",
-    "pytest-asyncio",
     "mcp",
     "watchdog>=4.0.0",
     "aiosqlite",
     "openai",
 ]
 
+[project.optional-dependencies]
+test = [
+    "pytest",
+    "pytest-asyncio",
+    "pytest-cov",
+]
+
 [project.urls]
-"Homepage" = "https://github.com/yourusername/memento"
+"Homepage" = "https://github.com/JoyciAkira/memento"
 
 [project.scripts]
 memento-mcp = "memento.mcp_server:main"
@@ -46,3 +52,10 @@ exclude = [
     "fix*.py",
     "update_*.py",
 ]
+
+[tool.setuptools]
+packages = ["memento"]
+include-package-data = true
+
+[tool.setuptools.package-data]
+memento = ["prompts/*.json"]

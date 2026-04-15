@@ -1,6 +1,6 @@
 ---
-description: Show comprehensive MemPalace help — available skills, MCP tools, CLI commands, hooks, and architecture.
+description: Show comprehensive Memento help — available MCP tools and usage patterns.
 allowed-tools: Bash, Read
 ---
 
-Invoke the generic mempalace skill (using the Skill tool) with the `help` command, then follow its instructions.
+Invoke the generic memento skill (using the Skill tool), then follow its instructions.

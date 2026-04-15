@@ -1,17 +1,17 @@
 {
-  "name": "mempalace",
+  "name": "memento",
   "owner": {
-    "name": "milla-jovovich",
-    "url": "https://github.com/milla-jovovich"
+    "name": "JoyciAkira",
+    "url": "https://github.com/JoyciAkira"
   },
   "plugins": [
     {
-      "name": "mempalace",
+      "name": "memento",
       "source": "./.claude-plugin",
-      "description": "AI memory system — mine projects and conversations into a searchable palace. 19 MCP tools, auto-save hooks, guided setup.",
+      "description": "Autonomous Nervous System for AI Agents with RRF Search and Active Coercion.",
       "version": "3.0.14",
       "author": {
-        "name": "milla-jovovich"
+        "name": "Daniele Corrao"
       }
     }
   ]
