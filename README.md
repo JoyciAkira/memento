@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="https://coreva-normal.trae.ai/api/ide/v1/text_to_image?prompt=A%20minimalist%2C%20enterprise-grade%20vector%20logo%20for%20an%20AI%20memory%20system%20called%20%27Memento%27.%20The%20design%20should%20be%20clean%2C%20monochromatic%20%28black%20and%20white%20or%20subtle%20grayscale%29%2C%20resembling%20Vercel%20or%20Next.js%20aesthetics.%20It%20should%20subtly%20hint%20at%20a%20neural%20graph%2C%20a%20node%20network%2C%20or%20an%20abstract%20brain%20structure%2C%20but%20remain%20highly%20geometric%20and%20professional.%20No%20text%20in%20the%20image%2C%20just%20the%20icon.&image_size=landscape_16_9" alt="Memento Logo" width="100%">
+  <img src="assets/memento-logo.svg" alt="Memento Logo" width="100%">
 
   <h1>Memento</h1>
   <p><strong>The Autonomous Nervous System for AI Agents</strong></p>
@@ -49,8 +49,8 @@ You can install Memento globally via `uv` (recommended) or standard `pip`.
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/Memento.git
-cd Memento
+git clone https://github.com/JoyciAkira/memento.git
+cd memento
 
 # Install dependencies and sync lockfile
 uv sync
@@ -70,7 +70,7 @@ Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Works
       "command": "uv",
       "args": [
         "--directory",
-        "/absolute/path/to/Memento",
+        "/absolute/path/to/memento",
         "run",
         "memento-mcp"
       ],
