@@ -91,3 +91,19 @@ async def test_neurograph_add_injects_workspace_metadata():
             assert row is not None
             assert "workspace_root" in row[0]
             assert os.path.basename(ws) in row[0]
+
+
+@pytest.mark.asyncio
+async def test_memento_explain_search(tmp_path):
+    import json
+
+    from memento.mcp_server import call_tool
+
+    await call_tool("memento_add_memory", {"workspace_root": str(tmp_path), "text": "alpha hello", "metadata": {}})
+    await call_tool("memento_add_memory", {"workspace_root": str(tmp_path), "text": "beta world", "metadata": {}})
+    await call_tool("memento_search_memory", {"workspace_root": str(tmp_path), "query": "alpha"})
+
+    res = await call_tool("memento_explain_search", {"workspace_root": str(tmp_path), "query": "alpha"})
+    payload = json.loads(res[0].text)
+    assert payload["query"] == "alpha"
+    assert "lanes" in payload
