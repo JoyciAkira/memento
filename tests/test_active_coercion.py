@@ -42,6 +42,41 @@ def test_rule_engine_match_and_override(tmp_path):
     )
     assert v2 == []
 
+def test_tree_sitter_rule_matches(tmp_path):
+    try:
+        import tree_sitter as _tree_sitter
+        import tree_sitter_python as _tree_sitter_python
+    except Exception:
+        import pytest
+        pytest.skip("tree-sitter dependencies not available")
+    assert _tree_sitter and _tree_sitter_python
+
+    workspace_root = str(tmp_path)
+    rules = normalize_hard_rules(
+        [
+            {
+                "id": "no_print_py",
+                "enabled": True,
+                "path_globs": ["**/*.py"],
+                "kind": "tree-sitter",
+                "language": "python",
+                "query": '(call function: (identifier) @fn (#eq? @fn "print"))',
+                "message": "Do not use print().",
+                "severity": "block",
+                "override_token": "memento-override",
+            }
+        ]
+    )
+
+    file_path = os.path.join(workspace_root, "a.py")
+    v1 = check_text_against_rules(
+        workspace_root=workspace_root,
+        rules=rules,
+        file_path=file_path,
+        content="print('x')\n",
+    )
+    assert [v.rule_id for v in v1] == ["no_print_py"]
+
 
 def test_pre_commit_hook_logic_blocks_commit_and_allows_override(tmp_path):
     repo_root = tmp_path / "repo"

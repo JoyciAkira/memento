@@ -1,6 +1,4 @@
 import pytest
-import os
-from pathlib import Path
 from memento.dependency_tracker import (
     extract_imports_from_code,
     scan_workspace_for_imports,

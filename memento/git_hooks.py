@@ -22,10 +22,29 @@ def install_pre_commit_hook(workspace_root: str) -> str:
     os.makedirs(hooks_dir, exist_ok=True)
     hook_path = os.path.join(hooks_dir, "pre-commit")
 
+    previous_hook_path = os.path.join(hooks_dir, "pre-commit.memento.previous")
+    if os.path.exists(hook_path):
+        try:
+            with open(hook_path, "r") as f:
+                existing = f.read()
+        except Exception:
+            existing = ""
+        if "memento.active_coercion_hook" not in existing:
+            try:
+                if os.path.exists(previous_hook_path):
+                    os.remove(previous_hook_path)
+                os.replace(hook_path, previous_hook_path)
+            except Exception:
+                pass
+
     script = """#!/usr/bin/env bash
 set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel)"
+PREV="$ROOT/.git/hooks/pre-commit.memento.previous"
+if [ -x "$PREV" ]; then
+  "$PREV" "$@"
+fi
 PYTHONPATH="$ROOT" python3 -m memento.active_coercion_hook
 """
 

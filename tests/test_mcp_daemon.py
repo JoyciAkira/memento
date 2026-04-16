@@ -110,7 +110,6 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
     assert "Trovato bug nel frontend" in text
 
 def test_mcp_uses_neuro_provider():
-    import memento.mcp_server as ms
     from memento.provider import NeuroGraphProvider
     from memento.workspace_context import get_workspace_context
     import os

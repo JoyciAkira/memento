@@ -11,7 +11,10 @@ from typing import Any, Iterable
 class HardRule:
     id: str
     path_globs: tuple[str, ...]
-    regex: str
+    kind: str
+    regex: str | None
+    language: str | None
+    query: str | None
     message: str
     severity: str
     enabled: bool
@@ -24,6 +27,8 @@ class Violation:
     file: str
     message: str
     severity: str
+    line: int | None = None
+    column: int | None = None
 
 
 def _as_bool(value: Any, default: bool) -> bool:
@@ -62,19 +67,30 @@ def normalize_hard_rules(raw_rules: Any, *, default_override_token: str = "memen
             continue
         rule_id = _as_str(item.get("id"))
         path_globs = _as_list_of_str(item.get("path_globs"))
+        kind = _as_str(item.get("kind")) or "regex"
         regex = _as_str(item.get("regex"))
+        language = _as_str(item.get("language"))
+        query = _as_str(item.get("query"))
         message = _as_str(item.get("message")) or ""
         severity = _as_str(item.get("severity")) or "block"
         enabled = _as_bool(item.get("enabled"), True)
         override_token = _as_str(item.get("override_token")) or default_override_token
 
-        if rule_id is None or path_globs is None or regex is None:
+        if kind not in {"regex", "tree-sitter"}:
             continue
 
-        try:
-            re.compile(regex)
-        except re.error:
+        if rule_id is None or path_globs is None:
             continue
+        if kind == "regex":
+            if regex is None:
+                continue
+            try:
+                re.compile(regex)
+            except re.error:
+                continue
+        else:
+            if language is None or query is None:
+                continue
 
         if severity not in {"block", "warn"}:
             severity = "block"
@@ -83,7 +99,10 @@ def normalize_hard_rules(raw_rules: Any, *, default_override_token: str = "memen
             HardRule(
                 id=rule_id,
                 path_globs=tuple(path_globs),
+                kind=kind,
                 regex=regex,
+                language=language,
+                query=query,
                 message=message,
                 severity=severity,
                 enabled=enabled,
@@ -109,6 +128,32 @@ def file_matches_globs(file_relpath: str, globs: Iterable[str]) -> bool:
     return False
 
 
+_ts_cache: dict[str, tuple[Any, Any]] = {}
+
+def _get_tree_sitter(language_name: str) -> tuple[Any, Any]:
+    cached = _ts_cache.get(language_name)
+    if cached is not None:
+        return cached
+
+    from tree_sitter import Language, Parser
+
+    if language_name == "python":
+        import tree_sitter_python as tspython
+        lang = Language(tspython.language())
+    elif language_name in {"javascript", "js"}:
+        import tree_sitter_javascript as tsjavascript
+        lang = Language(tsjavascript.language())
+    elif language_name in {"typescript", "ts"}:
+        import tree_sitter_typescript as tstypescript
+        lang = Language(tstypescript.language_typescript())
+    else:
+        raise ValueError(f"Unsupported tree-sitter language: {language_name}")
+
+    parser = Parser(lang)
+    _ts_cache[language_name] = (parser, lang)
+    return parser, lang
+
+
 def check_text_against_rules(
     *,
     workspace_root: str,
@@ -127,7 +172,44 @@ def check_text_against_rules(
             continue
         if rule.override_token and rule.override_token in content:
             continue
-        if re.search(rule.regex, content, flags=re.MULTILINE) is None:
+        if rule.kind == "regex":
+            if not rule.regex:
+                continue
+            if re.search(rule.regex, content, flags=re.MULTILINE) is None:
+                continue
+            violations.append(
+                Violation(
+                    rule_id=rule.id,
+                    file=file_path,
+                    message=rule.message,
+                    severity=rule.severity,
+                )
+            )
+            continue
+
+        line = None
+        column = None
+        try:
+            from tree_sitter import Query, QueryCursor
+            parser, language = _get_tree_sitter(rule.language or "")
+            tree = parser.parse(content.encode("utf-8", errors="replace"))
+            query = Query(language, rule.query or "")
+            cursor = QueryCursor(query)
+            captures = cursor.captures(tree.root_node)
+            node = None
+            if isinstance(captures, dict):
+                for nodes in captures.values():
+                    if nodes:
+                        node = nodes[0]
+                        break
+            elif isinstance(captures, list) and captures:
+                node = captures[0][0]
+            if node is None:
+                continue
+            if hasattr(node, "start_point"):
+                line = int(node.start_point[0]) + 1
+                column = int(node.start_point[1]) + 1
+        except Exception:
             continue
         violations.append(
             Violation(
@@ -135,6 +217,8 @@ def check_text_against_rules(
                 file=file_path,
                 message=rule.message,
                 severity=rule.severity,
+                line=line,
+                column=column,
             )
         )
 

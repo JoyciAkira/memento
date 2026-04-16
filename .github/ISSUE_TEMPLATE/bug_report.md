@@ -17,4 +17,4 @@ labels: bug
 **Environment:**
 - OS:
 - Python version:
-- MemPal version: (check `python mempal.py --version` or git SHA)
+- Memento version: (check `python -c "import memento; print(memento.__version__)"` or git SHA)

@@ -6,11 +6,16 @@ def test_ui_escapes_memory_and_goals():
     goals = "<script>alert(1)</script>"
     memories = [{"memory": "<img src=x onerror=alert(1)>"}, {"memory": "ok"}]
 
-    page = render_dashboard_html(config, goals, memories)
+    page = render_dashboard_html(
+        enforcement_config=config,
+        active_coercion={"enabled": True, "rules": []},
+        goals=goals,
+        memories=memories,
+        query="<script>q</script>",
+    )
 
     assert "<script>" not in page
     assert "<img" not in page
     assert "&lt;script&gt;alert(1)&lt;/script&gt;" in page
     assert "&lt;img src=x onerror=alert(1)&gt;" in page
     assert "&lt;b&gt;unsafe&lt;/b&gt;" in page
-

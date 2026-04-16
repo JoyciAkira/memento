@@ -2,6 +2,31 @@ import json
 from mcp.types import Tool, TextContent
 from memento.registry import registry
 
+PRESETS: dict[str, list[dict]] = {
+    "python-dev-basics": [
+        {
+            "id": "no_print_py",
+            "enabled": True,
+            "path_globs": ["**/*.py"],
+            "kind": "tree-sitter",
+            "language": "python",
+            "query": '(call function: (identifier) @fn (#eq? @fn "print"))',
+            "message": "Do not use print(). Use structured logging instead.",
+            "severity": "block",
+            "override_token": "memento-override",
+        },
+        {
+            "id": "no_pdb_py",
+            "enabled": True,
+            "path_globs": ["**/*.py"],
+            "regex": "\\bpdb\\.set_trace\\(",
+            "message": "Do not commit pdb.set_trace().",
+            "severity": "block",
+            "override_token": "memento-override",
+        },
+    ]
+}
+
 @registry.register(Tool(
     name="memento_toggle_active_coercion",
     description="Toggle deterministic Active Coercion (IDE notifications and pre-commit blocking) for the current workspace.",
@@ -55,6 +80,44 @@ async def memento_list_active_coercion_rules(arguments: dict, ctx, access_manage
     return [TextContent(type="text", text=f"Active Coercion rules for workspace {ctx.workspace_root}:\n{formatted}")]
 
 @registry.register(Tool(
+    name="memento_list_active_coercion_presets",
+    description="List available Active Coercion preset packs.",
+    inputSchema={"type": "object", "properties": {}}
+))
+async def memento_list_active_coercion_presets(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    if not PRESETS:
+        return [TextContent(type="text", text="No presets available.")]
+    names = "\n- ".join(sorted(PRESETS.keys()))
+    return [TextContent(type="text", text=f"Available presets:\n- {names}")]
+
+@registry.register(Tool(
+    name="memento_apply_active_coercion_preset",
+    description="Apply an Active Coercion preset pack to the current workspace (merges by rule id).",
+    inputSchema={
+        "type": "object",
+        "properties": {
+            "preset": {"type": "string", "description": "Preset name to apply"}
+        },
+        "required": ["preset"]
+    }
+))
+async def memento_apply_active_coercion_preset(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    preset = arguments.get("preset")
+    if not preset or preset not in PRESETS:
+        return [TextContent(type="text", text=f"Unknown preset: {preset}")]
+    incoming = PRESETS[preset]
+    existing = ctx.active_coercion.get("rules", [])
+    if not isinstance(existing, list):
+        existing = []
+    by_id = {r.get("id"): r for r in existing if isinstance(r, dict) and isinstance(r.get("id"), str)}
+    for r in incoming:
+        if isinstance(r, dict) and isinstance(r.get("id"), str):
+            by_id[r["id"]] = r
+    ctx.active_coercion["rules"] = list(by_id.values())
+    ctx.save_active_coercion_config()
+    return [TextContent(type="text", text=f"Applied preset '{preset}'. Total rules: {len(ctx.active_coercion['rules'])}")]
+
+@registry.register(Tool(
     name="memento_add_active_coercion_rule",
     description="Add a new deterministic Active Coercion rule to the workspace. This rule will automatically block commits or trigger IDE warnings if violated.",
     inputSchema={
@@ -63,28 +126,43 @@ async def memento_list_active_coercion_rules(arguments: dict, ctx, access_manage
             "id": {"type": "string", "description": "Unique identifier for the rule (e.g. 'no_print_backend')"},
             "enabled": {"type": "boolean", "description": "Whether the rule is active (default: true)"},
             "path_globs": {"type": "array", "items": {"type": "string"}, "description": "List of glob patterns to match files (e.g. ['backend/**/*.py'])"},
-            "regex": {"type": "string", "description": "The exact regex pattern that triggers the violation (e.g. '\\\\bprint\\\\(')"},
+            "kind": {"type": "string", "enum": ["regex", "tree-sitter"], "description": "Rule kind (default: regex)"},
+            "regex": {"type": "string", "description": "Regex pattern for regex rules (e.g. '\\\\bprint\\\\(')"},
+            "language": {"type": "string", "description": "Language name for tree-sitter rules (e.g. 'python')"},
+            "query": {"type": "string", "description": "Tree-sitter query string for tree-sitter rules"},
             "message": {"type": "string", "description": "The error message shown to the developer"},
             "severity": {"type": "string", "enum": ["block", "warn"], "description": "Violation severity (default: 'block')"},
             "override_token": {"type": "string", "description": "A token that, if present in the file, bypasses the rule (default: 'memento-override')"}
         },
-        "required": ["id", "path_globs", "regex", "message"]
+        "required": ["id", "path_globs", "message"]
     }
 ))
 async def memento_add_active_coercion_rule(arguments: dict, ctx, access_manager) -> list[TextContent]:
     rule_id = arguments.get("id")
     path_globs = arguments.get("path_globs")
-    regex = arguments.get("regex")
     message = arguments.get("message")
+    kind = arguments.get("kind", "regex")
+    regex = arguments.get("regex")
+    language = arguments.get("language")
+    query = arguments.get("query")
     
-    if not rule_id or not path_globs or not regex or not message:
-        raise ValueError("Missing required fields: id, path_globs, regex, message")
+    if not rule_id or not path_globs or not message:
+        raise ValueError("Missing required fields: id, path_globs, message")
+    if kind not in ("regex", "tree-sitter"):
+        raise ValueError("kind must be 'regex' or 'tree-sitter'")
+    if kind == "regex" and not regex:
+        raise ValueError("regex is required for kind=regex")
+    if kind == "tree-sitter" and (not language or not query):
+        raise ValueError("language and query are required for kind=tree-sitter")
 
     new_rule = {
         "id": rule_id,
         "enabled": arguments.get("enabled", True),
         "path_globs": path_globs,
+        "kind": kind,
         "regex": regex,
+        "language": language,
+        "query": query,
         "message": message,
         "severity": arguments.get("severity", "block"),
         "override_token": arguments.get("override_token", "memento-override")

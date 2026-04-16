@@ -6,11 +6,10 @@ import logging
 import asyncio
 from typing import Dict, Any
 
-# Set up logging silently
-logging.basicConfig(level=logging.CRITICAL)
-
 from memento.workspace_context import WorkspaceContext
 from memento.access_manager import MementoAccessManager
+
+logging.basicConfig(level=logging.CRITICAL)
 
 # ANSI Colors for MCP-like UI
 CYAN = '\033[96m'
@@ -125,7 +124,7 @@ async def run_demo():
              formatted_res += "\n✅ Dependencies are perfectly synchronized.\n"
              
         print_tool_result(formatted_res, color=YELLOW)
-    except Exception as e:
+    except Exception:
         print_tool_result(res, color=YELLOW)
         
     if os.path.exists("demo_fake.py"):

@@ -45,8 +45,6 @@ Zero-config multi-tenant isolation. Memento automatically detects which project 
 
 ## 🚀 Installation
 
-You can install Memento globally via `uv` (recommended) or standard `pip`.
-
 ```bash
 # Clone the repository
 git clone https://github.com/JoyciAkira/memento.git
@@ -57,6 +55,12 @@ uv sync
 
 # Run the MCP Server
 uv run memento-mcp
+```
+
+Verify the install:
+
+```bash
+uv run python -c "import memento; print(memento.__version__)"
 ```
 
 ## 🛠️ MCP Configuration (Cursor / Trae / Claude)
@@ -77,12 +81,22 @@ Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Works
       "env": {
         "OPENAI_API_KEY": "your-api-key-here",
         "OPENAI_BASE_URL": "https://api.openai.com/v1",
-        "MEM0_MODEL": "gpt-4o-mini"
+        "MEM0_MODEL": "openai/gpt-4o-mini",
+        "MEM0_EMBEDDING_MODEL": "text-embedding-3-small"
       }
     }
   }
 }
 ```
+
+Environment variables:
+- `MEMENTO_DIR`: workspace root used for routing `.memento/` state
+- `MEMENTO_UI`: enable local UI (`1`/`true`)
+- `MEMENTO_UI_PORT`: local UI port (default `8089`)
+- `OPENAI_API_KEY`: required for embeddings and goal checks
+- `OPENAI_BASE_URL`: optional OpenAI-compatible endpoint
+- `MEM0_MODEL`: LLM used for cognitive features
+- `MEM0_EMBEDDING_MODEL`: embeddings model used by the hybrid memory provider
 
 ## 🧠 Using Memento
 
