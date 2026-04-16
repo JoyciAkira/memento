@@ -374,3 +374,26 @@ class NeuroGraphProvider:
             
         results = [{"id": r["id"], "memory": r["text"], "created_at": r["created_at"]} for r in rows]
         return results
+
+    async def search_vnext_bundle(
+        self,
+        query: str,
+        user_id: str = "default",
+        limit: int = 50,
+        filters: dict | None = None,
+        trace: bool = False,
+    ):
+        from memento.retrieval.pipeline import retrieve_bundle
+
+        if not self._initialized:
+            await self.initialize()
+
+        return await retrieve_bundle(
+            db_path=self.db_path,
+            query=query,
+            user_id=user_id,
+            limit=limit,
+            filters=filters,
+            embed_fn=self._get_embedding,
+            trace=trace,
+        )
