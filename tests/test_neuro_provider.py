@@ -19,3 +19,14 @@ async def test_neuro_provider_lifecycle():
         
         all_mem = await provider.get_all(user_id="default")
         assert len(all_mem) > 0
+
+
+@pytest.mark.asyncio
+async def test_neuro_provider_works_without_openai_api_key(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+
+    p = NeuroGraphProvider(db_path=str(tmp_path / "mem.db"))
+    await p.add("offline memory", user_id="default")
+    res = await p.search("offline", user_id="default")
+    assert res

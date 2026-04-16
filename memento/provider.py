@@ -147,11 +147,22 @@ class NeuroGraphProvider:
             
         self.db_path = db_path
         self.kg = MementoGraphProvider({"db_path": db_path})
-        
-        api_key = os.environ.get("OPENAI_API_KEY", "sk-dummy")
-        base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-        self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "text-embedding-3-small")
-        self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+
+        requested_backend = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()
+        has_openai_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
+        if requested_backend:
+            self.embedding_backend = requested_backend
+        else:
+            self.embedding_backend = "openai" if has_openai_key else "none"
+
+        self.llm_client = None
+        if self.embedding_backend == "openai":
+            api_key = os.environ.get("OPENAI_API_KEY", "sk-dummy")
+            base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "text-embedding-3-small")
+            self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+        else:
+            self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "none")
         self._initialized = False
 
     async def initialize(self):
@@ -175,6 +186,8 @@ class NeuroGraphProvider:
         self._initialized = True
 
     async def _get_embedding(self, text: str) -> List[float]:
+        if self.embedding_backend != "openai" or self.llm_client is None:
+            return []
         try:
             response = await self.llm_client.embeddings.create(
                 input=text,
@@ -344,6 +357,34 @@ class NeuroGraphProvider:
 
         # Sort by RRF score
         final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+
+        try:
+            traces_dir = os.path.join(os.path.dirname(self.db_path), "traces")
+            os.makedirs(traces_dir, exist_ok=True)
+            trace_path = os.path.join(traces_dir, "last_search.json")
+            trace = {
+                "query": query,
+                "filters": filters or {},
+                "lanes": {
+                    "fts": [
+                        {"id": row["id"], "score": float(1.0 / (k_rrf + rank))}
+                        for rank, row in enumerate(fts_sorted[:20], 1)
+                    ],
+                    "dense": [
+                        {"id": row_id, "score": float(1.0 / (k_rrf + rank))}
+                        for rank, (row_id, _score) in enumerate(semantic_sorted[:20], 1)
+                    ],
+                    "recency": [
+                        {"id": row["id"], "score": float(0.5 / (k_rrf + rank))}
+                        for rank, row in enumerate(recent_sorted[:20], 1)
+                    ],
+                },
+                "final": [{"id": row_id, "score": float(score)} for row_id, score in final_sorted[:50]],
+            }
+            with open(trace_path, "w") as f:
+                json.dump(trace, f, indent=2, ensure_ascii=False)
+        except Exception:
+            pass
 
         results = []
         for row_id, score in final_sorted:
