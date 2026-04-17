@@ -64,11 +64,11 @@ async def test_check_goal_alignment(monkeypatch):
     engine = CognitiveEngine(provider)
     
     async def mock_gen(msgs):
-        return "ALLINEAMENTO GOAL"
+        return "GOAL ALIGNMENT CHECK"
     monkeypatch.setattr(engine, "_generate_response", mock_gen)
     
     result = await engine.check_goal_alignment("def simple_function(): pass")
-    assert "ALLINEAMENTO GOAL" in result
+    assert "GOAL ALIGNMENT CHECK" in result
 
 @pytest.mark.asyncio
 async def test_parse_natural_language_intent(monkeypatch):
@@ -102,3 +102,25 @@ async def test_parse_natural_language_intent_with_focus_area(monkeypatch):
     assert result["action"] == "SEARCH"
     assert result["payload"]["query"] == "bug"
     assert result.get("focus_area") == "frontend"
+
+
+def test_prompt_registry_loads_all_prompts():
+    from memento.prompts.registry import load_prompt
+    for name in ["detect_latent_features", "synthesize_dreams", "check_goal_alignment", "parse_natural_language_intent"]:
+        data = load_prompt(name)
+        assert "system_prompt" in data
+        assert "user_prompt_template" in data
+
+
+def test_prompt_registry_caches():
+    from memento.prompts.registry import load_prompt, clear_cache
+    clear_cache()
+    a = load_prompt("synthesize_dreams")
+    b = load_prompt("synthesize_dreams")
+    assert a is b
+
+
+def test_prompt_registry_raises_on_missing():
+    from memento.prompts.registry import load_prompt
+    with pytest.raises(FileNotFoundError):
+        load_prompt("nonexistent_prompt")
