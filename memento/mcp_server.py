@@ -6,7 +6,6 @@ from mcp.server import Server
 from mcp.server.stdio import stdio_server
 from mcp.types import Tool, TextContent
 
-from memento.access_manager import MementoAccessManager
 from memento.workspace_context import get_workspace_context
 from memento.ui_server import start_ui_server_thread
 
@@ -23,7 +22,6 @@ logger = logging.getLogger("memento-mcp")
 
 app = Server("memento-mcp")
 
-access_manager = MementoAccessManager()
 _ui_thread = None
 _tool_registration = _memento_tools
 
@@ -56,7 +54,7 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             active_coercion=ctx.active_coercion,
         )
     
-    return await registry.execute(name, arguments, ctx, access_manager=access_manager)
+    return await registry.execute(name, arguments, ctx, access_manager=ctx.access_manager)
 
 async def run():
     logger.info("Starting Memento MCP server via stdio")
