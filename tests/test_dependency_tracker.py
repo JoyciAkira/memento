@@ -3,6 +3,9 @@ from memento.dependency_tracker import (
     extract_imports_from_code,
     scan_workspace_for_imports,
     parse_pyproject_dependencies,
+    parse_package_json_dependencies,
+    parse_cargo_toml_dependencies,
+    parse_go_mod_dependencies,
     map_import_to_package,
     analyze_dependencies,
 )
@@ -95,7 +98,7 @@ dependencies = [
     # yaml will be mapped to pyyaml if installed, but here we don't know environment.
     # It will fallback to yaml or pyyaml depending on environment.
 
-    results = await analyze_dependencies(tmp_path, tmp_path / "pyproject.toml")
+    results = await analyze_dependencies(tmp_path)
 
     # Declared: requests, pydantic, unused_pkg
     # Used: requests, yaml
@@ -108,6 +111,76 @@ dependencies = [
     assert "yaml" in results["ghosts"] or "pyyaml" in results["ghosts"]
     assert "requests" in results["used"]
     assert "requests" in results["declared"]
-    
-    # check if file location is in used
+
     assert "main.py" in results["used"]["requests"]
+
+
+def test_parse_package_json_dependencies(tmp_path):
+    package_json_content = """{
+    "name": "my-app",
+    "dependencies": {
+        "express": "^4.18.0",
+        "lodash": "^4.17.21"
+    },
+    "devDependencies": {
+        "jest": "^29.0.0",
+        "TypeScript": "^5.0.0"
+    }
+}"""
+    (tmp_path / "package.json").write_text(package_json_content)
+
+    deps = parse_package_json_dependencies(tmp_path / "package.json")
+    assert "express" in deps
+    assert "lodash" in deps
+    assert "jest" in deps
+    assert "typescript" in deps
+    assert len(deps) == 4
+
+
+def test_parse_cargo_toml_dependencies(tmp_path):
+    cargo_content = """[package]
+name = "my-crate"
+version = "0.1.0"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+tokio = "1.0"
+clap = "4.0"
+
+[dev-dependencies]
+"""
+    (tmp_path / "Cargo.toml").write_text(cargo_content)
+
+    deps = parse_cargo_toml_dependencies(tmp_path / "Cargo.toml")
+    assert "serde" in deps
+    assert "tokio" in deps
+    assert "clap" in deps
+    assert len(deps) == 3
+
+
+def test_parse_go_mod_dependencies(tmp_path):
+    go_mod_content = """module github.com/example/myapp
+
+go 1.21
+
+require (
+\tgithub.com/gin-gonic/gin v1.9.0
+\tgithub.com/stretchr/testify v1.8.0
+)
+
+require github.com/google/uuid v1.3.0
+"""
+    (tmp_path / "go.mod").write_text(go_mod_content)
+
+    deps = parse_go_mod_dependencies(tmp_path / "go.mod")
+    assert "github.com/gin-gonic/gin" in deps
+    assert "github.com/stretchr/testify" in deps
+    assert "github.com/google/uuid" in deps
+    assert len(deps) == 3
+
+
+def test_parse_missing_files_returns_empty(tmp_path):
+    assert parse_pyproject_dependencies(tmp_path / "nonexistent" / "pyproject.toml") == set()
+    assert parse_package_json_dependencies(tmp_path / "nonexistent" / "package.json") == set()
+    assert parse_cargo_toml_dependencies(tmp_path / "nonexistent" / "Cargo.toml") == set()
+    assert parse_go_mod_dependencies(tmp_path / "nonexistent" / "go.mod") == set()

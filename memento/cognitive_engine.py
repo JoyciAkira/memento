@@ -1,6 +1,9 @@
+import json
 import logging
 import os
 from openai import AsyncOpenAI
+
+from memento.prompts.registry import load_prompt
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +27,7 @@ class CognitiveEngine:
 
     async def _generate_response(self, messages: list) -> str:
         if not self.llm:
-            return "Errore: OPENAI_API_KEY non configurata."
+            return "Error: OPENAI_API_KEY not configured."
         try:
             response = await self.llm.chat.completions.create(
                 model=self.model,
@@ -33,7 +36,7 @@ class CognitiveEngine:
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM Error: {e}")
-            return f"Errore LLM: {str(e)}"
+            return f"LLM Error: {str(e)}"
 
     async def get_warnings(self, context: str) -> str:
         """
@@ -83,7 +86,7 @@ class CognitiveEngine:
                         tasks.add(mem)
                     
             if not tasks:
-                return "No latent tasks found in the subconsciuos memory."
+                return "No latent tasks found in the subconscious memory."
                 
             content = "# Memento Auto-Generated Tasks\n\n*These tasks were automatically crystallized from your subconscious AI memory.*\n\n"
             for t in tasks:
@@ -106,7 +109,7 @@ class CognitiveEngine:
         """
         logger.info(f"CognitiveEngine evaluating raw context from daemon for file: {filepath}...")
         try:
-            query = f"Problemi noti o bug simili al seguente testo nel file {filepath}:\n{raw_text}" if filepath else raw_text
+            query = f"Known issues or bugs similar to the following text in file {filepath}:\n{raw_text}" if filepath else raw_text
             res_dict = await self.provider.search(query)
             results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
             
@@ -140,10 +143,7 @@ class CognitiveEngine:
         """
         logger.info(f"CognitiveEngine detecting latent features for file: {filepath}...")
         try:
-            import json
-            prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "detect_latent_features.json")
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                prompt_data = json.load(f)
+            prompt_data = load_prompt("detect_latent_features")
             
             prompt = prompt_data.get("system_prompt", "")
             
@@ -157,10 +157,10 @@ class CognitiveEngine:
             
             llm_response = await self._generate_response(messages)
             
-            if "NESSUNA PROPOSTA" in llm_response.upper():
+            if "NO PROPOSAL" in llm_response.upper():
                 return ""
                 
-            return f"💡 [PROPOSTA FUNZIONALITÀ]\n\n{llm_response}"
+            return f"💡 [FEATURE PROPOSAL]\n\n{llm_response}"
         except Exception as e:
             logger.error(f"Error detecting latent features: {e}")
             return ""
@@ -173,7 +173,7 @@ class CognitiveEngine:
             results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
             
             if not results:
-                return "[DRAFT_INSIGHT] Non ci sono abbastanza ricordi per avviare il Dream State."
+                return "[DRAFT_INSIGHT] Not enough memories to start the Dream State."
                 
             memory_list = []
             for r in results:
@@ -185,10 +185,7 @@ class CognitiveEngine:
                 
             memories_str = "\n".join(memory_list)
             
-            import json
-            prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "synthesize_dreams.json")
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                prompt_data = json.load(f)
+            prompt_data = load_prompt("synthesize_dreams")
             
             prompt = prompt_data.get("system_prompt", "").format(memories_str=memories_str)
             user_content = prompt_data.get("user_prompt_template", "")
@@ -218,10 +215,7 @@ class CognitiveEngine:
             goals = [r.get("memory") for r in results if isinstance(r, dict)]
             goals_str = "\n- ".join(goals)
             
-            import json
-            prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "check_goal_alignment.json")
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                prompt_data = json.load(f)
+            prompt_data = load_prompt("check_goal_alignment")
             
             prompt = prompt_data.get("system_prompt", "").format(goals_str=goals_str)
             user_content = prompt_data.get("user_prompt_template", "").format(code_or_plan=code_or_plan)
@@ -244,10 +238,7 @@ class CognitiveEngine:
         """
         logger.info(f"CognitiveEngine parsing intent for: {query}")
         try:
-            import json
-            prompt_path = os.path.join(os.path.dirname(__file__), "prompts", "parse_natural_language_intent.json")
-            with open(prompt_path, "r", encoding="utf-8") as f:
-                prompt_data = json.load(f)
+            prompt_data = load_prompt("parse_natural_language_intent")
                 
             prompt = prompt_data.get("system_prompt", "")
             user_content = prompt_data.get("user_prompt_template", "").format(query=query)

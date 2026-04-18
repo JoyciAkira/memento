@@ -33,20 +33,20 @@ async def test_get_active_goals_uses_context_in_search_query(monkeypatch):
 async def test_search_memory_applies_module_filter_from_active_context(monkeypatch):
     import memento.mcp_server as ms
 
-    monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
-    monkeypatch.setattr(
-        "memento.ontology.extract_logical_namespace",
-        lambda active_context, workspace_root: "backend",
-    )
-
-    async def fake_search(query, user_id=None, filters=None):
-        assert query == "find stuff"
-        assert user_id == "default"
-        assert filters == {"module": "backend"}
-        return [{"memory": "Backend memory hit"}]
-
     with tempfile.TemporaryDirectory() as ws:
         ctx = get_workspace_context(ws)
+        monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
+        monkeypatch.setattr(
+            "memento.ontology.extract_logical_namespace",
+            lambda active_context, workspace_root: "backend",
+        )
+
+        async def fake_search(query, user_id=None, filters=None):
+            assert query == "find stuff"
+            assert user_id == "default"
+            assert filters == {"module": "backend"}
+            return [{"memory": "Backend memory hit"}]
+
         monkeypatch.setattr(ctx.provider, "search", fake_search)
 
         res = await ms.call_tool(
@@ -63,7 +63,7 @@ async def test_universal_router_focus_area_routes_and_passes_module_filter(monke
     with tempfile.TemporaryDirectory() as ws:
         ctx = get_workspace_context(ws)
 
-        monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
+        monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
         async def fake_parse(q):
             return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
             
@@ -99,7 +99,7 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(monk
         ctx = get_workspace_context(ws)
         prev = dict(ctx.enforcement_config)
         ctx.enforcement_config["level1"] = True
-        monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
+        monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
 
         async def fake_parse_x(q):
             return {"action": "SEARCH", "payload": {"query": "x"}, "focus_area": "frontend"}

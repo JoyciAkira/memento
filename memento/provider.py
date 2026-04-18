@@ -10,8 +10,6 @@ import logging
 import os
 from typing import List, Dict, Any, Optional
 from memento.knowledge_graph import KnowledgeGraph
-from mem0 import Memory
-from memento.ontology import OntologyManager
 from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
@@ -92,48 +90,6 @@ class MementoGraphProvider:
             if source and target and relationship:
                 self.kg.invalidate(subject=source, predicate=relationship, obj=target)
 
-class MementoProvider:
-    def __init__(self, db_path: Optional[str] = None):
-        # Mem0 provider requires OPENAI_API_KEY
-        if not os.environ.get("OPENAI_API_KEY"):
-            logger.warning("OPENAI_API_KEY not found in environment. Mem0 requires it for LLM operations.")
-        
-        self.memory = Memory()
-        self.graph_provider = MementoGraphProvider({"db_path": db_path})
-        self.memory.graph = self.graph_provider
-        self.memory.enable_graph = True
-        
-        class Mem0EmbedderAdapter:
-            def __init__(self, memory_instance):
-                self.mem = memory_instance
-            def embed(self, text):
-                return self.mem.embedding_model.embed(text)
-                
-        self.ontology = OntologyManager(
-            kg=self.graph_provider.kg, 
-            embedder=Mem0EmbedderAdapter(self.memory)
-        )
-
-    def add(self, text: str, user_id: str = "default", metadata: Optional[Dict[str, Any]] = None) -> Any:
-        room = self.ontology.assign_room(text)
-        
-        if not room:
-            # Fallback for now: create a general room
-            room = "general-knowledge"
-            vector = self.memory.embedding_model.embed(room)
-            # Some versions of mem0 return a list of vectors, handle gracefully
-            if isinstance(vector, list) and len(vector) > 0 and isinstance(vector[0], list):
-                vector = vector[0]
-            self.graph_provider.kg.add_room(room, vector)
-            
-        meta = metadata or {}
-        meta["room"] = room
-        
-        return self.memory.add(text, user_id=user_id, metadata=meta)
-
-    def search(self, query: str, user_id: str = "default") -> List[Dict[str, Any]]:
-        return self.memory.search(query, user_id=user_id)
-
 class NeuroGraphProvider:
     """
     A native, concurrent, lightweight hybrid memory provider replacing Mem0.
@@ -166,23 +122,16 @@ class NeuroGraphProvider:
         self._initialized = False
 
     async def initialize(self):
-        # Check if already initialized
         if self._initialized:
             return
-        async with aiosqlite.connect(self.db_path) as db:
-            await db.execute("PRAGMA journal_mode=WAL;")
-            await db.execute("PRAGMA synchronous=NORMAL;")
-            await db.execute('''
-                CREATE VIRTUAL TABLE IF NOT EXISTS memories 
-                USING fts5(id UNINDEXED, user_id UNINDEXED, text, created_at UNINDEXED, metadata UNINDEXED);
-            ''')
-            await db.execute('''
-                CREATE TABLE IF NOT EXISTS memory_embeddings (
-                    id TEXT PRIMARY KEY,
-                    embedding TEXT
-                );
-            ''')
-            await db.commit()
+        from memento.migrations.runner import MigrationRunner
+        from memento.migrations.versions import get_all_migrations
+
+        runner = MigrationRunner(self.db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+
+        await asyncio.to_thread(runner.run)
         self._initialized = True
 
     async def _get_embedding(self, text: str) -> List[float]:
@@ -416,6 +365,26 @@ class NeuroGraphProvider:
         results = [{"id": r["id"], "memory": r["text"], "created_at": r["created_at"]} for r in rows]
         return results
 
+    async def consolidate(
+        self,
+        threshold: float = 0.92,
+        min_age_hours: float = 1.0,
+        batch_size: int = 200,
+    ) -> Dict[str, Any]:
+        """Run a consolidation pass to merge near-duplicate memories."""
+        if not self._initialized:
+            await self.initialize()
+
+        from memento.consolidation import ConsolidationEngine
+
+        engine = ConsolidationEngine(
+            db_path=self.db_path,
+            threshold=threshold,
+            min_age_hours=min_age_hours,
+            batch_size=batch_size,
+        )
+        return await engine.consolidate()
+
     async def search_vnext_bundle(
         self,
         query: str,
@@ -438,3 +407,215 @@ class NeuroGraphProvider:
             embed_fn=self._get_embedding,
             trace=trace,
         )
+
+    async def soft_delete_memory(
+        self,
+        memory_id: str,
+        delete_reason: str,
+        supersedes_id: str | None = None,
+    ) -> Dict[str, Any]:
+        if not self._initialized:
+            await self.initialize()
+
+        now = datetime.now().isoformat()
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                "SELECT created_at FROM memories WHERE id = ? LIMIT 1",
+                (memory_id,),
+            )
+            row = await cursor.fetchone()
+            if row is None:
+                raise ValueError(f"Memory not found: {memory_id}")
+            created_at = row["created_at"] or now
+
+            await db.execute(
+                """
+                INSERT OR IGNORE INTO memory_meta (id, created_at, updated_at, is_deleted)
+                VALUES (?, ?, ?, 0)
+                """,
+                (memory_id, created_at, now),
+            )
+            await db.execute(
+                """
+                UPDATE memory_meta
+                SET is_deleted = 1,
+                    deleted_at = ?,
+                    delete_reason = ?,
+                    supersedes_id = ?,
+                    replaced_by_id = ?,
+                    updated_at = ?
+                WHERE id = ?
+                """,
+                (now, delete_reason, supersedes_id, supersedes_id, now, memory_id),
+            )
+            await db.commit()
+
+        return {
+            "id": memory_id,
+            "is_deleted": True,
+            "deleted_at": now,
+            "delete_reason": delete_reason,
+            "supersedes_id": supersedes_id,
+        }
+
+    async def list_deleted_memories(
+        self,
+        limit: int = 50,
+        offset: int = 0,
+        user_id: str = "default",
+    ) -> List[Dict[str, Any]]:
+        if not self._initialized:
+            await self.initialize()
+
+        safe_limit = min(int(limit), 200)
+        safe_offset = max(int(offset), 0)
+
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                """
+                SELECT mm.id, m.user_id, m.created_at, mm.deleted_at, mm.delete_reason,
+                       mm.supersedes_id, mm.replaced_by_id
+                FROM memory_meta mm
+                JOIN memories m ON m.id = mm.id
+                WHERE mm.is_deleted = 1 AND m.user_id = ?
+                ORDER BY mm.deleted_at DESC
+                LIMIT ? OFFSET ?
+                """,
+                (user_id, safe_limit, safe_offset),
+            )
+            rows = await cursor.fetchall()
+
+        return [
+            {
+                "id": r["id"],
+                "user_id": r["user_id"],
+                "created_at": r["created_at"],
+                "deleted_at": r["deleted_at"],
+                "delete_reason": r["delete_reason"],
+                "supersedes_id": r["supersedes_id"],
+                "replaced_by_id": r["replaced_by_id"],
+            }
+            for r in rows
+        ]
+
+    async def set_goals(
+        self,
+        goals: List[str],
+        *,
+        context: str | None = None,
+        mode: str = "replace",
+        delete_reason: str = "replaced",
+    ) -> Dict[str, Any]:
+        if not self._initialized:
+            await self.initialize()
+
+        now = datetime.now().isoformat()
+        batch_id = str(uuid.uuid4())
+
+        clean_goals = [g.strip() for g in (goals or []) if isinstance(g, str) and g.strip()]
+        if not clean_goals:
+            raise ValueError("goals must be a non-empty list of strings")
+
+        if mode not in {"replace", "append"}:
+            raise ValueError("mode must be 'replace' or 'append'")
+
+        async with aiosqlite.connect(self.db_path) as db:
+            if mode == "replace":
+                await db.execute(
+                    """
+                    UPDATE goals
+                    SET is_active = 0,
+                        is_deleted = 1,
+                        deleted_at = ?,
+                        delete_reason = ?,
+                        replaced_by_id = ?,
+                        updated_at = ?
+                    WHERE is_active = 1 AND is_deleted = 0
+                      AND (context IS ? OR context = ?)
+                    """,
+                    (now, delete_reason, batch_id, now, context, context),
+                )
+
+            inserted_ids: list[str] = []
+            for g in clean_goals:
+                gid = str(uuid.uuid4())
+                inserted_ids.append(gid)
+                goal_now = datetime.now().isoformat()
+                await db.execute(
+                    """
+                    INSERT INTO goals (id, context, goal, created_at, updated_at, is_active, is_deleted)
+                    VALUES (?, ?, ?, ?, ?, 1, 0)
+                    """,
+                    (gid, context, g, goal_now, goal_now),
+                )
+
+            await db.commit()
+
+        return {"batch_id": batch_id, "inserted_ids": inserted_ids, "mode": mode, "context": context}
+
+    async def list_goals(
+        self,
+        *,
+        context: str | None = None,
+        active_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> List[Dict[str, Any]]:
+        if not self._initialized:
+            await self.initialize()
+
+        safe_limit = min(int(limit), 200)
+        safe_offset = max(int(offset), 0)
+
+        where = ["(context IS ? OR context = ?)"]
+        params: list[Any] = [context, context]
+        if active_only:
+            where.append("is_active = 1 AND is_deleted = 0")
+
+        where_sql = " AND ".join(where)
+        async with aiosqlite.connect(self.db_path) as db:
+            db.row_factory = aiosqlite.Row
+            cursor = await db.execute(
+                f"""
+                SELECT id, context, goal, created_at, updated_at,
+                       is_active, is_deleted, deleted_at, delete_reason, replaced_by_id
+                FROM goals
+                WHERE {where_sql}
+                ORDER BY created_at DESC, rowid DESC
+                LIMIT ? OFFSET ?
+                 """,
+                (*params, safe_limit, safe_offset),
+            )
+            rows = await cursor.fetchall()
+
+        return [
+            {
+                "id": r["id"],
+                "context": r["context"],
+                "goal": r["goal"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "is_active": bool(r["is_active"]),
+                "is_deleted": bool(r["is_deleted"]),
+                "deleted_at": r["deleted_at"],
+                "delete_reason": r["delete_reason"],
+                "replaced_by_id": r["replaced_by_id"],
+            }
+            for r in rows
+        ]
+
+    async def extract_kg(self, max_memories: int = 50) -> Dict[str, Any]:
+        """Extract entities and relationships from unprocessed memories into the KG."""
+        if not self._initialized:
+            await self.initialize()
+        from memento.kg_extraction import KGExtractionEngine
+        engine = KGExtractionEngine(
+            db_path=self.db_path,
+            kg=self.kg.kg,
+            llm_client=self.llm_client,
+            model=os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini"),
+        )
+        return await engine.run_extraction_cycle(max_memories=max_memories)

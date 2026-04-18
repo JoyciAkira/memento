@@ -228,4 +228,4 @@ async def memento_configure_enforcement(arguments: dict, ctx, access_manager) ->
         
     ctx.save_enforcement_config()
     status = ", ".join([f"{k}={v}" for k, v in ctx.enforcement_config.items()])
-    return [TextContent(type="text", text=f"Configurazione Goal Enforcement aggiornata:\n{status}")]
+    return [TextContent(type="text", text=f"Goal Enforcement configuration updated:\n{status}")]

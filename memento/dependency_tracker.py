@@ -120,6 +120,101 @@ def parse_pyproject_dependencies(filepath: str | Path) -> Set[str]:
     return parsed_deps
 
 
+def parse_package_json_dependencies(filepath: str | Path) -> Set[str]:
+    """Parse dependencies and devDependencies from package.json."""
+    path = Path(filepath)
+    if not path.exists():
+        return set()
+    try:
+        import json as _json
+
+        with open(path, "r", encoding="utf-8") as f:
+            data = _json.load(f)
+        deps: set[str] = set()
+        for section in ("dependencies", "devDependencies"):
+            for name in data.get(section) or {}:
+                deps.add(name.lower())
+        return deps
+    except Exception:
+        return set()
+
+
+def parse_cargo_toml_dependencies(filepath: str | Path) -> Set[str]:
+    """Parse [dependencies] from Cargo.toml."""
+    path = Path(filepath)
+    if not path.exists():
+        return set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        deps: set[str] = set()
+        in_deps = False
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped == "[dependencies]":
+                in_deps = True
+                continue
+            if stripped.startswith("[") and in_deps:
+                break
+            if in_deps and "=" in stripped:
+                name = stripped.split("=")[0].strip()
+                if name:
+                    deps.add(name.lower())
+        return deps
+    except Exception:
+        return set()
+
+
+def parse_go_mod_dependencies(filepath: str | Path) -> Set[str]:
+    """Parse require block and single require directives from go.mod."""
+    path = Path(filepath)
+    if not path.exists():
+        return set()
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            content = f.read()
+        deps: set[str] = set()
+        in_require = False
+        for line in content.splitlines():
+            stripped = line.strip()
+            if stripped.startswith("require (") or stripped == "require(":
+                in_require = True
+                continue
+            if stripped == ")" and in_require:
+                in_require = False
+                continue
+            if in_require and stripped and not stripped.startswith("//"):
+                parts = stripped.split()
+                if parts:
+                    deps.add(parts[0].lower())
+        import re as _re
+
+        for m in _re.finditer(r"^\s*require\s+(\S+)\s+", content, _re.MULTILINE):
+            dep = m.group(1)
+            if dep != "(":
+                deps.add(dep.lower())
+        return deps
+    except Exception:
+        return set()
+
+
+def _detect_declared_packages(workspace_root: Path) -> tuple[Set[str], str]:
+    """Auto-detect project ecosystem and return (declared_packages, ecosystem_name)."""
+    pyproject = workspace_root / "pyproject.toml"
+    package_json = workspace_root / "package.json"
+    cargo_toml = workspace_root / "Cargo.toml"
+    go_mod = workspace_root / "go.mod"
+    if pyproject.exists():
+        return parse_pyproject_dependencies(pyproject), "python"
+    if package_json.exists():
+        return parse_package_json_dependencies(package_json), "node"
+    if cargo_toml.exists():
+        return parse_cargo_toml_dependencies(cargo_toml), "rust"
+    if go_mod.exists():
+        return parse_go_mod_dependencies(go_mod), "go"
+    return set(), "unknown"
+
+
 def map_import_to_package(import_name: str) -> str:
     """
     Map an import name (e.g., 'yaml') to its installed package name (e.g., 'PyYAML').
@@ -127,30 +222,23 @@ def map_import_to_package(import_name: str) -> str:
     """
     try:
         distributions = importlib.metadata.packages_distributions()
-        # packages_distributions returns a dict like {'yaml': ['PyYAML'], ...}
         if import_name in distributions and distributions[import_name]:
             return distributions[import_name][0].lower()
     except Exception:
         pass
 
-    # Fallback to standard conventions if metadata fails or package not installed
-    # (e.g. mapping simple names back to themselves)
     return import_name.lower()
 
 
 async def analyze_dependencies(
-    workspace_root: str | Path, pyproject_path: str | Path
+    workspace_root: str | Path,
 ) -> Dict[str, Any]:
-    """
-    Returns orphans and ghosts.
-    orphans: Declared in pyproject.toml but not used in code.
-    ghosts: Used in code but not declared in pyproject.toml.
-    """
+    root_path = Path(workspace_root)
+
     # 1. Get used imports
     used_imports_dict = await scan_workspace_for_imports(workspace_root)
 
     # Filter out local modules
-    root_path = Path(workspace_root)
     local_modules = set()
     for item in root_path.iterdir():
         if item.is_dir() and (item / "__init__.py").exists():
@@ -163,28 +251,37 @@ async def analyze_dependencies(
     }
 
     # Map to package names, preserving file locations
-    used_packages = {}
+    used_packages: Dict[str, Set[str]] = {}
     for imp, files in filtered_imports.items():
         pkg = map_import_to_package(imp)
         if pkg not in used_packages:
             used_packages[pkg] = set()
         used_packages[pkg].update(files)
 
-    # 2. Get declared dependencies
-    declared_packages = parse_pyproject_dependencies(pyproject_path)
+    # 2. Auto-detect ecosystem and get declared dependencies
+    declared_packages, ecosystem = _detect_declared_packages(root_path)
 
-    # Get project name to ignore
+    # Get project name to ignore (ecosystem-aware)
     project_name = None
     try:
-        with open(pyproject_path, "r", encoding="utf-8") as f:
-            content = f.read()
-            if tomllib is not None:
-                data = tomllib.loads(content)
-                project_name = data.get("project", {}).get("name")
-            else:
-                match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
-                if match:
-                    project_name = match.group(1)
+        if ecosystem == "python":
+            pyproject = root_path / "pyproject.toml"
+            with open(pyproject, "r", encoding="utf-8") as f:
+                content = f.read()
+                if tomllib is not None:
+                    data = tomllib.loads(content)
+                    project_name = data.get("project", {}).get("name")
+                else:
+                    match = re.search(r'name\s*=\s*["\']([^"\']+)["\']', content)
+                    if match:
+                        project_name = match.group(1)
+        elif ecosystem == "node":
+            import json as _json
+
+            package_json = root_path / "package.json"
+            with open(package_json, "r", encoding="utf-8") as f:
+                data = _json.load(f)
+                project_name = data.get("name")
     except Exception:
         pass
 
@@ -198,7 +295,7 @@ async def analyze_dependencies(
     # 3. Calculate orphans and ghosts
     orphans = declared_packages - used_package_names
     ghosts_names = used_package_names - declared_packages
-    
+
     ghosts = {pkg: list(used_packages[pkg]) for pkg in ghosts_names}
 
     return {

@@ -4,6 +4,7 @@ import logging
 from typing import Any, Dict
 from memento.provider import NeuroGraphProvider
 from memento.cognitive_engine import CognitiveEngine
+from memento.access_manager import MementoAccessManager
 from memento.enforcement_rules import extract_goal_enforcer_config_from_rules_md, upsert_goal_enforcer_block
 
 logger = logging.getLogger("memento-workspace")
@@ -19,6 +20,8 @@ class WorkspaceContext:
         self.db_path = os.path.join(self.memento_dir, "neurograph_memory.db")
         self.provider = NeuroGraphProvider(db_path=self.db_path)
         self.cognitive_engine = CognitiveEngine(self.provider)
+        settings_path = os.path.join(self.memento_dir, "settings.json")
+        self.access_manager = MementoAccessManager(state_path=settings_path)
         
         self.enforcement_config = {
             "level1": False,
@@ -34,6 +37,8 @@ class WorkspaceContext:
         }
         self.load_enforcement_config()
         self.daemon = None
+        self.consolidation_scheduler = None
+        self.kg_extraction_scheduler = None
 
     def _read_settings_json(self) -> dict[str, Any]:
         settings_path = os.path.join(self.memento_dir, "settings.json")
@@ -60,7 +65,26 @@ class WorkspaceContext:
         if enabled:
             if not self.daemon or not self.daemon.is_running:
                 from memento.daemon import PreCognitiveDaemon
-                self.daemon = PreCognitiveDaemon(workspace_path=self.workspace_root, callback=callback, debounce_seconds=5.0)
+
+                async def retrieval_callback(filepath: str):
+                    try:
+                        with open(filepath, "r", encoding="utf-8") as f:
+                            content = f.read()
+                        await self.provider.search_vnext_bundle(
+                            query=content[:500],
+                            user_id="default",
+                            limit=5,
+                            trace=True,
+                        )
+                    except Exception:
+                        pass
+
+                self.daemon = PreCognitiveDaemon(
+                    workspace_path=self.workspace_root,
+                    callback=callback,
+                    debounce_seconds=5.0,
+                    retrieval_pipeline=retrieval_callback,
+                )
                 self.daemon.start()
             return True
         else:

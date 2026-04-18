@@ -43,22 +43,4 @@ def test_ontology_matching():
     room2 = manager.assign_room("database tuning")
     assert room2 is None
 
-def test_provider_integration():
-    from memento.provider import MementoProvider
-    import os
-    os.environ["OPENAI_API_KEY"] = "sk-dummy" # Ensure key is set
-    
-    provider = MementoProvider(db_path=":memory:")
-    
-    class DummyOntology:
-        def assign_room(self, text):
-            return "test-room"
-            
-    provider.ontology = DummyOntology()
-    
-    # Just ensure it doesn't crash
-    try:
-        provider.add("Testing deterministic routing")
-    except Exception:
-        # Mem0 might fail with dummy key, we just want to ensure it passes through ontology
-        pass
+

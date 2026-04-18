@@ -65,7 +65,7 @@ async def memento_status(arguments: dict, ctx, access_manager) -> list[TextConte
     if goals:
         status_lines.append("\n" + goals.strip())
     else:
-        status_lines.append("\n[ACTIVE GOALS]\n- Nessun obiettivo attivo trovato.")
+        status_lines.append("\n[ACTIVE GOALS]\n- No active goals found.")
         
     return [TextContent(type="text", text="\n".join(status_lines))]
 
@@ -170,14 +170,14 @@ async def memento_generate_tasks(arguments: dict, ctx, access_manager) -> list[T
 async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
     query = arguments.get("query", "")
     if not query:
-        return [TextContent(type="text", text="Per favore, fornisci una richiesta nella variabile 'query'.")]
+        return [TextContent(type="text", text="Please provide a request in the 'query' variable.")]
         
     intent = await ctx.cognitive_engine.parse_natural_language_intent(query)
     action = intent.get("action", "UNKNOWN")
     payload = intent.get("payload", {})
     focus_area = intent.get("focus_area", "")
     
-    response_text = f"🤖 [MEMENTO ROUTER] Azione identificata: {action}\n---\n"
+    response_text = f"🤖 [MEMENTO ROUTER] Identified action: {action}\n---\n"
     if focus_area:
         response_text += f"🔍 Focus Context: {focus_area}\n---\n"
     
@@ -283,10 +283,9 @@ async def memento_audit_dependencies(arguments: dict, ctx, access_manager) -> li
     from memento.dependency_tracker import analyze_dependencies
 
     workspace_root = ctx.workspace_root
-    pyproject_path = os.path.join(workspace_root, "pyproject.toml")
-    
+
     try:
-        results = await analyze_dependencies(workspace_root, pyproject_path)
+        results = await analyze_dependencies(workspace_root)
         formatted_results = json.dumps(results, indent=2, ensure_ascii=False)
         return [TextContent(type="text", text=f"Dependency Audit Results:\n{formatted_results}")]
     except Exception as e:

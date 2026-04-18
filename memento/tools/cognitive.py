@@ -63,7 +63,7 @@ async def memento_toggle_precognition(arguments: dict, ctx, access_manager) -> l
         deviation = ""
         if ctx.enforcement_config.get("level3"):
             alignment = await ctx.cognitive_engine.check_goal_alignment(content)
-            if "❌ BOCCIATO" in alignment or "❌ REJECTED" in alignment:
+            if "❌ REJECTED" in alignment:
                 deviation = alignment
         
         final_alert = warning

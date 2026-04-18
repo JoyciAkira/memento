@@ -2,6 +2,7 @@ import threading
 import json
 import html
 import asyncio
+import logging
 from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
@@ -14,8 +15,14 @@ shared_state: dict[str, Any] = {
     "provider": None
 }
 
+_loop: asyncio.AbstractEventLoop | None = None
+
 def _run_async(coro):
-    return asyncio.run(coro)
+    global _loop
+    if _loop is None or _loop.is_closed():
+        _loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(_loop)
+    return _loop.run_until_complete(coro)
 
 def _safe_int(value: str | None, default: int) -> int:
     if not value:
@@ -236,12 +243,17 @@ class MementoUIHandler(BaseHTTPRequestHandler):
             self.end_headers()
 
 def run_ui_server(port=8089):
+    global _loop
+    _loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(_loop)
     try:
         server = HTTPServer(("localhost", port), MementoUIHandler)
         server.serve_forever()
     except Exception as e:
-        import logging
         logging.getLogger("memento-ui").error(f"Failed to start UI server on port {port}: {e}")
+    finally:
+        if _loop and not _loop.is_closed():
+            _loop.close()
 
 
 def start_ui_server_thread(enforcement_config, get_active_goals_fn, provider, port=8089, active_coercion=None):

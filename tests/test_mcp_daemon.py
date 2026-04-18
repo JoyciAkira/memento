@@ -17,7 +17,7 @@ async def test_memento_status_contains_core_sections():
 async def test_toggle_precognition():
     result = await call_tool("memento_toggle_precognition", {"enabled": True})
     text = result[0].text.lower()
-    assert "started" in text or "stopped" in text or "avviato" in text or "fermato" in text
+    assert "started" in text or "stopped" in text
 
 @pytest.mark.asyncio
 async def test_synthesize_dreams_tool():
@@ -38,7 +38,7 @@ async def test_goal_injection_level1(monkeypatch):
     ctx = get_workspace_context(os.getcwd())
 
     async def fake_search(*args, **kwargs):
-        return [{"memory": "Obiettivo: massima qualità e rivoluzione"}]
+        return [{"memory": "Goal: maximum quality and revolution"}]
 
     monkeypatch.setattr(ctx.provider, "search", fake_search)
 
@@ -60,7 +60,7 @@ async def test_configure_enforcement():
     result = await call_tool("memento_configure_enforcement", {"level1": True, "level2": True, "level3": True})
     assert ctx.enforcement_config["level1"] is True
     assert ctx.enforcement_config["level3"] is True
-    assert "Configurazione" in result[0].text
+    assert "configuration updated" in result[0].text.lower()
 
 @pytest.mark.asyncio
 async def test_universal_memento_tool(monkeypatch):
@@ -75,9 +75,9 @@ async def test_universal_memento_tool(monkeypatch):
         return "Memory added successfully"
     monkeypatch.setattr(ctx.provider, "add", fake_add)
     
-    result = await ms.call_tool("memento", {"query": "Memorizza questo test"})
+    result = await ms.call_tool("memento", {"query": "Store this test"})
     assert len(result) > 0
-    assert "Azione identificata: ADD" in result[0].text
+    assert "Identified action: ADD" in result[0].text
 
 @pytest.mark.asyncio
 async def test_universal_memento_tool_with_focus_area(monkeypatch):
@@ -98,16 +98,16 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
 
     async def fake_search(query, user_id=None, filters=None):
         assert filters == {"module": "frontend"}
-        return [{"memory": "Trovato bug nel frontend"}]
+        return [{"memory": "Found bug in frontend"}]
 
     monkeypatch.setattr(ctx.provider, "search", fake_search)
-    monkeypatch.setattr(ms.access_manager, "can_read", lambda: True)
+    monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
     
-    result = await ms.call_tool("memento", {"query": "cerca bug nel frontend"})
+    result = await ms.call_tool("memento", {"query": "search bug in frontend"})
     assert len(result) > 0
     text = result[0].text
     assert "Focus Context: frontend" in text
-    assert "Trovato bug nel frontend" in text
+    assert "Found bug in frontend" in text
 
 def test_mcp_uses_neuro_provider():
     from memento.provider import NeuroGraphProvider
