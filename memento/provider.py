@@ -95,7 +95,9 @@ class MementoGraphProvider:
 class NeuroGraphProvider:
     """
     A native, concurrent, lightweight hybrid memory provider replacing Mem0.
-    Uses SQLite FTS5 for fast semantic/keyword retrieval and WAL mode to prevent locking.
+    Uses SQLite FTS5 + WAL. Due connessioni aiosqlite (write / read) riducono contesa:
+    scritture serializzate su `_write_lock`, letture su `_read_lock` (compatibile WAL con
+    INSERT concorrenti). I/O trace e query KG non tengono lock SQLite.
     """
     def __init__(self, db_path: str = None):
         if not db_path:
@@ -129,12 +131,14 @@ class NeuroGraphProvider:
             self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "none")
         self._initialized = False
         self._db: aiosqlite.Connection | None = None
-        self._db_lock = asyncio.Lock()
+        self._db_read: aiosqlite.Connection | None = None
+        self._write_lock = asyncio.Lock()
+        self._read_lock = asyncio.Lock()
 
     async def initialize(self):
         if self._initialized:
             return
-        async with self._db_lock:
+        async with self._write_lock:
             if self._initialized:
                 return
             from memento.migrations.runner import MigrationRunner
@@ -149,9 +153,19 @@ class NeuroGraphProvider:
             self._db = await aiosqlite.connect(self.db_path)
             self._db.row_factory = aiosqlite.Row
             await self._db.execute("PRAGMA journal_mode=WAL")
-            await self._db.execute("PRAGMA busy_timeout=5000")
+            await self._db.execute("PRAGMA busy_timeout=8000")
             await self._db.execute("PRAGMA synchronous=NORMAL")
             await self._db.commit()
+
+            self._db_read = await aiosqlite.connect(self.db_path)
+            self._db_read.row_factory = aiosqlite.Row
+            await self._db_read.execute("PRAGMA journal_mode=WAL")
+            await self._db_read.execute("PRAGMA busy_timeout=8000")
+            try:
+                await self._db_read.execute("PRAGMA query_only=ON")
+            except Exception:
+                pass
+            await self._db_read.commit()
 
             self._initialized = True
 
@@ -216,7 +230,7 @@ class NeuroGraphProvider:
         embedding = await self._get_embedding(redacted_text)
         emb_str = json.dumps(embedding) if embedding else "[]"
 
-        async with self._db_lock:
+        async with self._write_lock:
             db = self._db
             assert db is not None
             await db.execute(
@@ -244,8 +258,8 @@ class NeuroGraphProvider:
         query_emb = await self._get_embedding(query)
         has_query_embedding = bool(query_emb)
 
-        async with self._db_lock:
-            db = self._db
+        async with self._read_lock:
+            db = self._db_read
             assert db is not None
             db.row_factory = aiosqlite.Row
             terms = re.findall(r"[A-Za-z0-9_]{3,}", query or "")
@@ -369,58 +383,73 @@ class NeuroGraphProvider:
                 },
                 "final": [{"id": row_id, "score": float(score)} for row_id, score in final_sorted[:50]],
             }
-            self._write_search_trace_file(trace)
+            rows_snapshot: dict[str, dict[str, Any]] = {
+                rid: {"id": r["id"], "text": r["text"], "created_at": r["created_at"]}
+                for rid, r in row_map.items()
+            }
 
-            results: list[Dict[str, Any]] = []
-            if self.kg:
-                try:
-                    all_names = [row_map[row_id]["text"] for row_id, _ in final_sorted]
-                    batch_relations = await asyncio.to_thread(self.kg.query_entities_batch, all_names)
-                    for row_id, score in final_sorted:
-                        r = row_map[row_id]
-                        res = {
-                            "id": r["id"],
-                            "memory": r["text"],
-                            "created_at": r["created_at"],
-                            "score": score,
-                        }
-                        entity_id = self.kg._entity_id(r["text"])
-                        if entity_id in batch_relations:
-                            res["relations"] = batch_relations[entity_id]
-                        results.append(res)
-                except Exception:
-                    logger.debug("KG batch query failed, returning results without relations")
-                    for row_id, score in final_sorted:
-                        r = row_map[row_id]
-                        results.append(
-                            {
-                                "id": r["id"],
-                                "memory": r["text"],
-                                "created_at": r["created_at"],
-                                "score": score,
-                            }
-                        )
-            else:
+        await asyncio.to_thread(self._write_search_trace_file, trace)
+
+        results: list[Dict[str, Any]] = []
+        if self.kg:
+            try:
+                all_names = [
+                    rows_snapshot[row_id]["text"]
+                    for row_id, _ in final_sorted
+                    if row_id in rows_snapshot
+                ]
+                batch_relations = await asyncio.to_thread(self.kg.query_entities_batch, all_names)
                 for row_id, score in final_sorted:
-                    r = row_map[row_id]
+                    snap = rows_snapshot.get(row_id)
+                    if not snap:
+                        continue
+                    res = {
+                        "id": snap["id"],
+                        "memory": snap["text"],
+                        "created_at": snap["created_at"],
+                        "score": score,
+                    }
+                    entity_id = self.kg._entity_id(snap["text"])
+                    if entity_id in batch_relations:
+                        res["relations"] = batch_relations[entity_id]
+                    results.append(res)
+            except Exception:
+                logger.debug("KG batch query failed, returning results without relations")
+                for row_id, score in final_sorted:
+                    snap = rows_snapshot.get(row_id)
+                    if not snap:
+                        continue
                     results.append(
                         {
-                            "id": r["id"],
-                            "memory": r["text"],
-                            "created_at": r["created_at"],
+                            "id": snap["id"],
+                            "memory": snap["text"],
+                            "created_at": snap["created_at"],
                             "score": score,
                         }
                     )
+        else:
+            for row_id, score in final_sorted:
+                snap = rows_snapshot.get(row_id)
+                if not snap:
+                    continue
+                results.append(
+                    {
+                        "id": snap["id"],
+                        "memory": snap["text"],
+                        "created_at": snap["created_at"],
+                        "score": score,
+                    }
+                )
 
-            return results
+        return results
 
     async def get_all(self, user_id: str = "default", limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         if not self._initialized:
             await self.initialize()
             
         safe_limit = min(limit, 100)
-        async with self._db_lock:
-            db = self._db
+        async with self._read_lock:
+            db = self._db_read
             assert db is not None
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
@@ -465,7 +494,9 @@ class NeuroGraphProvider:
         if not self._initialized:
             await self.initialize()
 
-        async with self._db_lock:
+        async with self._read_lock:
+            db_read = self._db_read
+            assert db_read is not None
             return await retrieve_bundle(
                 db_path=self.db_path,
                 query=query,
@@ -474,7 +505,7 @@ class NeuroGraphProvider:
                 filters=filters,
                 embed_fn=self._get_embedding,
                 trace=trace,
-                db=self._db,
+                db=db_read,
             )
 
     async def soft_delete_memory(
@@ -488,7 +519,7 @@ class NeuroGraphProvider:
 
         now = datetime.now().isoformat()
 
-        async with self._db_lock:
+        async with self._write_lock:
             db = self._db
             assert db is not None
             db.row_factory = aiosqlite.Row
@@ -543,8 +574,8 @@ class NeuroGraphProvider:
         safe_limit = min(int(limit), 200)
         safe_offset = max(int(offset), 0)
 
-        async with self._db_lock:
-            db = self._db
+        async with self._read_lock:
+            db = self._db_read
             assert db is not None
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
@@ -595,7 +626,7 @@ class NeuroGraphProvider:
         if mode not in {"replace", "append"}:
             raise ValueError("mode must be 'replace' or 'append'")
 
-        async with self._db_lock:
+        async with self._write_lock:
             db = self._db
             assert db is not None
             if mode == "replace":
@@ -651,8 +682,8 @@ class NeuroGraphProvider:
             where.append("is_active = 1 AND is_deleted = 0")
 
         where_sql = " AND ".join(where)
-        async with self._db_lock:
-            db = self._db
+        async with self._read_lock:
+            db = self._db_read
             assert db is not None
             db.row_factory = aiosqlite.Row
             cursor = await db.execute(
