@@ -43,6 +43,50 @@ Zero-config multi-tenant isolation. Memento automatically detects which project 
 
 ---
 
+## 🧬 The Seven Superpowers
+
+Memento's cognitive layer goes beyond passive memory. Seven autonomous superpowers transform it into a self-improving, proactive system:
+
+### SP1: Auto-Consolidation
+Automatically detects semantically similar memories and merges them into enriched, deduplicated entries. Uses cosine similarity clustering with sentence-level text fusion.
+- `memento_consolidate_memories` — run a full consolidation cycle
+- `memento_toggle_consolidation_scheduler` — start/stop background scheduler
+
+### SP2: KG Auto-Extraction
+Automatically extracts entities and relationships from memories and populates a temporal knowledge graph using LLM analysis.
+- `memento_extract_kg` — extract entities and triples from unprocessed memories
+- `memento_toggle_kg_extraction_scheduler` — start/stop background scheduler
+
+### SP3: Relevance Tracking
+Tracks memory access patterns with hit counting, temporal boosting, and exponential time decay. Frequently accessed recent memories rank higher.
+- `memento_get_relevance_stats` — hot/cold distribution, hit counts, decay metrics
+- `memento_record_memory_hit` — manually boost specific memories
+
+### SP4: Predictive Cache
+Pre-warms an in-memory cache of related memories before starting work. Proactive context injection that anticipates what the AI will need.
+- `memento_warm_predictive_cache` — warm cache with context text
+- `memento_get_predictive_cache_stats` — hit rate, cache size, TTL info
+
+### SP5: Self-Evaluation Loop
+Computes memory health scores (0-100) based on freshness, coverage, redundancy, and size. Identifies stale and orphan memories for cleanup.
+- `memento_get_quality_report` — full quality report with health score
+- `memento_record_quality_evaluation` — rate memory quality (0-1)
+- `memento_system_health` — comprehensive system health dashboard
+- `memento_kg_health` — knowledge graph entity/triple metrics
+
+### SP6: Cross-Workspace Sharing
+Share memories between different Memento workspaces. Enables cross-project context flow with directional sync tracking.
+- `memento_share_memory_to_workspace` — share a memory to another project
+- `memento_get_cross_workspace_stats` — sync statistics
+
+### SP7: Real-Time Notifications
+Proactive alerts about relevant context changes, memory events, and high-relevance discoveries. Configurable topics and confidence thresholds.
+- `memento_configure_notifications` — enable/disable, set topics and confidence
+- `memento_get_pending_notifications` — retrieve pending alerts
+- `memento_dismiss_notification` — dismiss an alert
+
+---
+
 ## 🚀 Installation
 
 ```bash
