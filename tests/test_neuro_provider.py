@@ -30,3 +30,18 @@ async def test_neuro_provider_works_without_openai_api_key(tmp_path, monkeypatch
     await p.add("offline memory", user_id="default")
     res = await p.search("offline", user_id="default")
     assert res
+
+
+@pytest.mark.asyncio
+async def test_search_trace_file_not_written_when_disabled(tmp_path, monkeypatch):
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+    monkeypatch.setenv("MEMENTO_WRITE_SEARCH_TRACE", "0")
+
+    db_file = tmp_path / "mem.db"
+    p = NeuroGraphProvider(db_path=str(db_file))
+    await p.add("trace off test", user_id="default")
+    await p.search("trace", user_id="default")
+
+    trace_path = tmp_path / "traces" / "last_search.json"
+    assert not trace_path.is_file()

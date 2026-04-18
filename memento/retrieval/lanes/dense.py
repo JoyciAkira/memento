@@ -1,23 +1,13 @@
 from __future__ import annotations
 
 import json
-import math
 from typing import Awaitable, Callable
 
 import aiosqlite
 
+from memento.math_utils import cosine_similarity
+
 EmbedFn = Callable[[str], Awaitable[list[float]]]
-
-
-def cosine_similarity(vec1: list[float], vec2: list[float]) -> float:
-    if not vec1 or not vec2 or len(vec1) != len(vec2):
-        return 0.0
-    dot = sum(a * b for a, b in zip(vec1, vec2))
-    n1 = math.sqrt(sum(a * a for a in vec1))
-    n2 = math.sqrt(sum(b * b for b in vec2))
-    if n1 == 0.0 or n2 == 0.0:
-        return 0.0
-    return dot / (n1 * n2)
 
 
 async def lane_dense(
@@ -31,6 +21,9 @@ async def lane_dense(
     query_vec = await embed_fn(query)
     if not candidate_ids:
         return []
+    if not query_vec:
+        return [(cid, 0.0) for cid in candidate_ids]
+
     placeholders = ",".join(["?"] * len(candidate_ids))
     cur = await db.execute(
         f"SELECT m.id, e.embedding FROM memories m "
