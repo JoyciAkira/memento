@@ -1,3 +1,33 @@
-from . import cognitive, coercion, consolidation, core, cross_workspace, explain, kg_extraction, memory, notifications, predictive, quality, relevance
+from . import (
+    cognitive,
+    coercion,
+    consolidation,
+    core,
+    cross_workspace,
+    explain,
+    goals,
+    kg_extraction,
+    memory,
+    notifications,
+    predictive,
+    quality,
+    relevance,
+    vnext_retrieval,
+)
 
-__all__ = ["cognitive", "coercion", "consolidation", "core", "cross_workspace", "explain", "kg_extraction", "memory", "notifications", "predictive", "quality", "relevance"]
+__all__ = [
+    "cognitive",
+    "coercion",
+    "consolidation",
+    "core",
+    "cross_workspace",
+    "explain",
+    "goals",
+    "kg_extraction",
+    "memory",
+    "notifications",
+    "predictive",
+    "quality",
+    "relevance",
+    "vnext_retrieval",
+]

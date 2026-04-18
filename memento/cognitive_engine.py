@@ -1,29 +1,22 @@
 import json
 import logging
 import os
-from openai import AsyncOpenAI
 
 from memento.prompts.registry import load_prompt
+from memento.llm_client import get_llm_client, get_model_name
 
 logger = logging.getLogger(__name__)
 
 class CognitiveEngine:
-    """
-    The Cognitive Engine for Memento.
-    Analyzes the KnowledgeGraph in background or proactively to generate insights.
-    """
-    def __init__(self, provider):
+    def __init__(self, provider, workspace_root: str | None = None):
         self.provider = provider
-        
-        api_key = os.environ.get("OPENAI_API_KEY")
-        base_url = os.environ.get("OPENAI_BASE_URL", "https://openrouter.ai/api/v1")
-        self.model = os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini")
-        
-        if not api_key:
+        self._workspace_root = (
+            os.path.abspath(workspace_root) if workspace_root else os.getcwd()
+        )
+        self.model = get_model_name()
+        self.llm = get_llm_client()
+        if not self.llm:
             logger.warning("OPENAI_API_KEY not found. LLM features will be disabled.")
-            self.llm = None
-        else:
-            self.llm = AsyncOpenAI(api_key=api_key, base_url=base_url)
 
     async def _generate_response(self, messages: list) -> str:
         if not self.llm:
@@ -36,7 +29,7 @@ class CognitiveEngine:
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM Error: {e}")
-            return f"LLM Error: {str(e)}"
+            return "Error: LLM request failed. Check API key and network."
 
     async def get_warnings(self, context: str) -> str:
         """
@@ -92,10 +85,11 @@ class CognitiveEngine:
             for t in tasks:
                 content += f"- [ ] {t}\n"
                 
-            filepath = os.path.join(os.getcwd(), "memento.todo.md")
-            with open(filepath, "w") as f:
+            filepath = os.path.join(self._workspace_root, "memento.todo.md")
+            os.makedirs(self._workspace_root, exist_ok=True)
+            with open(filepath, "w", encoding="utf-8") as f:
                 f.write(content)
-                
+
             return f"Successfully generated {len(tasks)} tasks in {filepath}"
             
         except Exception as e:
@@ -205,14 +199,18 @@ class CognitiveEngine:
     async def check_goal_alignment(self, code_or_plan: str, context: str = "") -> str:
         logger.info("CognitiveEngine checking goal alignment...")
         try:
-            search_query = f"active goal for context: {context}" if context else "active goal"
-            res_dict = await self.provider.search(search_query, limit=5)
-            results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
-            
-            if not results:
+            ctx_param = context.strip() if isinstance(context, str) and context.strip() else None
+            goal_rows = await self.provider.list_goals(
+                context=ctx_param, active_only=True, limit=20
+            )
+
+            if not goal_rows:
                 return "[GOAL ALIGNMENT] No active goals found in memory for comparison."
-                
-            goals = [r.get("memory") for r in results if isinstance(r, dict)]
+
+            goals = [r.get("goal") for r in goal_rows if isinstance(r, dict) and r.get("goal")]
+            if not goals:
+                return "[GOAL ALIGNMENT] No active goals found in memory for comparison."
+
             goals_str = "\n- ".join(goals)
             
             prompt_data = load_prompt("check_goal_alignment")

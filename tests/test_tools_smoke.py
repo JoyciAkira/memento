@@ -126,6 +126,10 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
         "memento_configure_notifications": {"workspace_root": str(ws)},
         "memento_get_pending_notifications": {"workspace_root": str(ws)},
         "memento_dismiss_notification": {"workspace_root": str(ws), "notification_id": "nonexistent"},
+        "memento_set_goals": {"workspace_root": str(ws), "goals": ["smoke: keep CI green"]},
+        "memento_list_goals": {"workspace_root": str(ws)},
+        "memento_search_vnext": {"workspace_root": str(ws), "query": "smoke"},
+        "memento_explain_retrieval": {"workspace_root": str(ws), "query": "smoke"},
     }
 
     await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
