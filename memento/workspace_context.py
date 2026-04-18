@@ -38,6 +38,7 @@ class WorkspaceContext:
         self.load_enforcement_config()
         self.daemon = None
         self.consolidation_scheduler = None
+        self.kg_extraction_scheduler = None
 
     def _read_settings_json(self) -> dict[str, Any]:
         settings_path = os.path.join(self.memento_dir, "settings.json")

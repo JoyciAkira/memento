@@ -586,7 +586,7 @@ class NeuroGraphProvider:
                 WHERE {where_sql}
                 ORDER BY created_at DESC, rowid DESC
                 LIMIT ? OFFSET ?
-                """,
+                 """,
                 (*params, safe_limit, safe_offset),
             )
             rows = await cursor.fetchall()
@@ -606,3 +606,16 @@ class NeuroGraphProvider:
             }
             for r in rows
         ]
+
+    async def extract_kg(self, max_memories: int = 50) -> Dict[str, Any]:
+        """Extract entities and relationships from unprocessed memories into the KG."""
+        if not self._initialized:
+            await self.initialize()
+        from memento.kg_extraction import KGExtractionEngine
+        engine = KGExtractionEngine(
+            db_path=self.db_path,
+            kg=self.kg.kg,
+            llm_client=self.llm_client,
+            model=os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini"),
+        )
+        return await engine.run_extraction_cycle(max_memories=max_memories)
