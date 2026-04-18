@@ -40,7 +40,11 @@ async def test_goal_injection_level1(monkeypatch):
     async def fake_search(*args, **kwargs):
         return [{"memory": "Goal: maximum quality and revolution"}]
 
+    async def fake_list_goals(context=None, active_only=True):
+        return [{"goal": "maximum quality and revolution"}]
+
     monkeypatch.setattr(ctx.provider, "search", fake_search)
+    monkeypatch.setattr(ctx.provider, "list_goals", fake_list_goals)
 
     ctx.enforcement_config["level1"] = True
     result = await ms.call_tool("memento_search_memory", {"query": "test"})

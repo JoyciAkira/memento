@@ -15,21 +15,13 @@ def find_project_root(current_dir: str) -> str:
 
 async def get_active_goals(ctx, max_goals: int = 3, context: str = None) -> str:
     try:
-        search_query = f"obiettivo goal per il contesto: {context}" if context else "obiettivo goal"
-        res = await ctx.provider.search(search_query, user_id="default")
-        results = res.get("results", []) if isinstance(res, dict) else res
-        if not isinstance(results, list):
-            return ""
-        goals = []
-        for r in results[:max_goals]:
-            if not isinstance(r, dict):
-                continue
-            memory = r.get("memory")
-            if isinstance(memory, str) and memory.strip():
-                goals.append(memory.strip())
+        goals = await ctx.provider.list_goals(context=context, active_only=True)
         if not goals:
             return ""
-        formatted = "\n- ".join(goals)
+        entries = [g["goal"] for g in goals[:max_goals] if isinstance(g, dict) and "goal" in g]
+        if not entries:
+            return ""
+        formatted = "\n- ".join(entries)
         return f"[ACTIVE GOALS]\n- {formatted}\n\n"
     except Exception:
         return ""

@@ -5,25 +5,17 @@ from memento.workspace_context import get_workspace_context
 
 
 @pytest.mark.asyncio
-async def test_get_active_goals_uses_context_in_search_query(monkeypatch):
+async def test_get_active_goals_queries_goals_storage(monkeypatch):
     import memento.mcp_server as ms
 
-    captured = {}
-
-    async def fake_search(query, user_id=None, filters=None):
-        captured["query"] = query
-        captured["user_id"] = user_id
-        captured["filters"] = filters
-        return [{"memory": "Goal A"}, {"memory": "Goal B"}]
+    async def fake_list_goals(context=None, active_only=True):
+        return [{"goal": "Goal A"}, {"goal": "Goal B"}]
 
     with tempfile.TemporaryDirectory() as ws:
         ctx = get_workspace_context(ws)
-        monkeypatch.setattr(ctx.provider, "search", fake_search)
+        monkeypatch.setattr(ctx.provider, "list_goals", fake_list_goals)
         out = await ms.get_active_goals(ctx, context="frontend/app.py")
 
-    assert captured["user_id"] == "default"
-    assert captured["filters"] is None
-    assert captured["query"] == "obiettivo goal per il contesto: frontend/app.py"
     assert out.startswith("[ACTIVE GOALS]\n- ")
     assert "Goal A" in out
     assert "Goal B" in out
