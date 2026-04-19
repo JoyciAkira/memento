@@ -85,6 +85,7 @@ class PreCognitiveDaemon:
         handler = Handler(self)
         self.observer.schedule(handler, self.workspace_path, recursive=True)
         self.observer.start()
+        logger.info(f"Daemon started watching: {self.workspace_path}")
 
     def stop(self):
         self.is_running = False

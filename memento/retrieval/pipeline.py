@@ -51,15 +51,15 @@ async def retrieve_bundle(
     filters: dict | None,
     embed_fn: EmbedFn,
     trace: bool,
+    db: aiosqlite.Connection | None = None,
 ) -> ContextBundle:
     filter_sql, filter_params = _build_filter(filters)
-    traces: list[LaneTrace] = []
 
-    async with aiosqlite.connect(db_path) as db:
-        db.row_factory = aiosqlite.Row
+    async def _run(db_conn: aiosqlite.Connection) -> tuple[list[dict[str, Any]], list[LaneTrace]]:
+        db_conn.row_factory = aiosqlite.Row
 
         fts_ranked = await lane_fts(
-            db=db,
+            db=db_conn,
             user_id=user_id,
             query=query,
             filter_sql=filter_sql,
@@ -67,7 +67,7 @@ async def retrieve_bundle(
             limit=200,
         )
         recent_ranked = await lane_recency(
-            db=db,
+            db=db_conn,
             user_id=user_id,
             filter_sql=filter_sql,
             filter_params=filter_params,
@@ -85,7 +85,7 @@ async def retrieve_bundle(
                 break
 
         dense_ranked = await lane_dense(
-            db=db,
+            db=db_conn,
             user_id=user_id,
             query=query,
             candidate_ids=candidate_ids,
@@ -103,7 +103,7 @@ async def retrieve_bundle(
         results: list[dict[str, Any]] = []
         if ids:
             placeholders = ",".join(["?"] * len(ids))
-            cur = await db.execute(
+            cur = await db_conn.execute(
                 f"SELECT id, text, created_at, metadata "
                 f"FROM memories WHERE user_id = ? AND id IN ({placeholders})",
                 (user_id, *ids),
@@ -121,8 +121,9 @@ async def retrieve_bundle(
                     "score": score,
                 })
 
+        local_traces: list[LaneTrace] = []
         if trace:
-            traces.extend([
+            local_traces.extend([
                 {
                     "lane": "fts",
                     "considered": len(fts_ranked),
@@ -142,11 +143,18 @@ async def retrieve_bundle(
                     "top": [{"id": i, "score": s} for i, s in recent_ranked[:10]],
                 },
             ])
+        return results, local_traces
+
+    if db is not None:
+        results_out, traces_out = await _run(db)
+    else:
+        async with aiosqlite.connect(db_path) as db_conn:
+            results_out, traces_out = await _run(db_conn)
 
     return {
         "query": query,
-        "results": results,
+        "results": results_out,
         "facts": [],
         "entities": [],
-        "traces": traces,
+        "traces": traces_out,
     }

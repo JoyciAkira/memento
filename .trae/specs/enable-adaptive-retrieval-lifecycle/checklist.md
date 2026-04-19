@@ -1,0 +1,8 @@
+- [x] Le tabelle `memory_meta` e `goals` vengono create in modo idempotente all’inizializzazione del provider
+- [x] Il tool `memento_soft_delete_memory` marca una memoria come deleted con `delete_reason` e timestamp e rispetta lo stato di accesso (write-gated)
+- [x] Le memorie soft-deleted non compaiono in `memento_search_memory` e nel retrieval vNext (tutte le lane)
+- [x] Il tool `memento_list_deleted_memories` permette audit locale (id + delete_reason + deleted_at)
+- [x] I goals sono first-class: `memento_set_goals` sostituisce/archivia i precedenti con history e reason, e `memento_list_goals` funziona per active_only/context
+- [x] `get_active_goals` usa lo storage goals (non keyword search su memorie) e non ritorna goals archiviati
+- [x] Adaptive retrieval v1 produce trace con tipo query + pesi lane scelti + top per lane e non include contenuti soft-deleted
+- [x] Test suite completa passa (`uv run pytest -q`) e lint passa (`uv run ruff check .`)

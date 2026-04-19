@@ -38,12 +38,15 @@ class MockProviderWithLLM(MockProvider):
         class MockMem0:
             llm = MockLLM()
         self.memory = MockMem0()
-        
+
     async def search(self, query, limit=10):
         return {"results": [
             {"id": "A", "memory": "Used SQLite for project X"},
             {"id": "B", "memory": "Project X needs faster caching"}
         ]}
+
+    async def list_goals(self, **kwargs):
+        return [{"id": "g1", "goal": "Ship secure API", "context": None}]
 
 @pytest.mark.asyncio
 async def test_synthesize_dreams(monkeypatch):
@@ -85,6 +88,29 @@ async def test_parse_natural_language_intent(monkeypatch):
     assert isinstance(result, dict)
     assert result["action"] == "ADD"
     assert result["payload"]["text"] == "Il server usa Nginx"
+
+@pytest.mark.asyncio
+async def test_generate_tasks_writes_under_workspace_root(tmp_path, monkeypatch):
+    from memento.provider import NeuroGraphProvider
+    from memento.cognitive_engine import CognitiveEngine
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+
+    db = tmp_path / "mem.db"
+    p = NeuroGraphProvider(db_path=str(db))
+    await p.add("must fix the flaky test in auth module", user_id="default")
+
+    proj = tmp_path / "project_tree"
+    proj.mkdir()
+    engine = CognitiveEngine(p, workspace_root=str(proj))
+
+    out = await engine.generate_tasks()
+    todo = proj / "memento.todo.md"
+    assert todo.is_file(), out
+    body = todo.read_text(encoding="utf-8")
+    assert "must fix" in body.lower()
+
 
 @pytest.mark.asyncio
 async def test_parse_natural_language_intent_with_focus_area(monkeypatch):

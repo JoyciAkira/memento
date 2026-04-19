@@ -19,26 +19,26 @@ We use `pytest`. To run the suite:
 uv run pytest tests/ -v
 ```
 
-All tests must pass before submitting a PR. Tests should run without API keys or network access.
+All tests must pass before submitting a PR. Tests should run without API keys or network access (use `tests/conftest.py` fixtures).
 
-## Running Benchmarks
+**MCP / gate rigidi (subset veloce + smoke + contratti):**
 
 ```bash
-# Quick test (20 questions, ~30 seconds)
-python benchmarks/longmemeval_bench.py /path/to/longmemeval_s_cleaned.json --limit 20
-
-# Full benchmark (500 questions, ~5 minutes)
-python benchmarks/longmemeval_bench.py /path/to/longmemeval_s_cleaned.json
+uv run python benchmarks/run_benchmarks.py
 ```
 
-See [benchmarks/README.md](benchmarks/README.md) for data download instructions and reproduction guide.
+Questo comando esegue `tests/test_mcp_benchmarks.py` (prestazioni e B6 offline esteso), `tests/test_mcp_tool_contracts.py` (roundtrip JSON/trace) e `tests/test_tools_smoke.py` (tutti i tool + validazione strutturale sui tool con contratto definito in `tests/mcp_contract_helpers.py`). Lo smoke salta `memento_explain_search` nel ciclo principale e lo riesegue in coda dopo una `search_memory` mirata, perché `last_search.json` viene sovrascritto ad ogni ricerca. La suite completa di benchmark include caricamenti massivi (migliaia di `add`) e può richiedere diversi minuti.
 
 ## Project Structure
 
 ```
 memento/          ← core package
-tests/            ← unit tests
-.trae/specs/      ← design documents and specs
+  tools/        ← MCP tool implementations
+  retrieval/    ← search pipeline (FTS, dense, recency lanes)
+  migrations/  ← SQLite schema versioning
+  prompts/      ← LLM prompt templates
+tests/            ← unit and integration tests
+docs/            ← design documents
 ```
 
 ## PR Guidelines
@@ -46,31 +46,28 @@ tests/            ← unit tests
 1. Fork the repo and create a feature branch: `git checkout -b feat/my-thing`
 2. Write your code
 3. Add or update tests if applicable
-4. Run `pytest tests/ -v` — everything must pass
+4. Run `uv run pytest tests/ -v` — everything must pass
 5. Commit with a clear message following [conventional commits](https://www.conventionalcommits.org/):
    - `feat: add Notion export format`
    - `fix: handle empty transcript files`
    - `docs: update MCP tool descriptions`
-   - `bench: add LoCoMo turn-level metrics`
 6. Push to your fork and open a PR against `main`
 
 ## Code Style
 
 - **Formatting**: [Ruff](https://docs.astral.sh/ruff/) with 100-char line limit (configured in `pyproject.toml`)
 - **Naming**: `snake_case` for functions/variables, `PascalCase` for classes
-- **Docstrings**: on all modules and public functions
 - **Type hints**: where they improve readability
-- **Dependencies**: minimize. ChromaDB + PyYAML only. Don't add new deps without discussion.
+- **Dependencies**: minimize. Don't add new deps without discussion.
 
 ## Finding Things to Work On
 
 Check the [Issues](https://github.com/JoyciAkira/memento/issues) tab. Great starting points:
 
-- **New chat formats**: Add import support for Cursor, Copilot, or other AI tool exports
-- **Room detection**: Improve pattern matching in `room_detector_local.py`
-- **Tests**: Increase coverage — especially for `knowledge_graph.py` and `palace_graph.py`
-- **Entity detection**: Better name disambiguation in `entity_detector.py`
+- **New retrieval lanes**: Add hybrid BM25 + dense lane improvements
+- **Tests**: Increase coverage — especially for `knowledge_graph.py` and `tools/`
 - **Docs**: Improve examples, add tutorials
+- **Performance**: ANN vector search via sqlite-vss or FAISS
 
 ## Architecture Decisions
 
@@ -79,13 +76,7 @@ If you're planning a significant change, open an issue first to discuss the appr
 - **Verbatim first**: Never summarize user content. Store exact words.
 - **Local first**: Everything runs on the user's machine. No cloud dependencies.
 - **Zero API by default**: Core features must work without any API key.
-- **Palace structure matters**: Wings, halls, and rooms aren't cosmetic — they drive a 34% retrieval improvement. Respect the hierarchy.
-
-## Community
-
-- **Discord**: [Join us](https://discord.com/invite/ycTQQCu6kn)
-- **Issues**: Bug reports and feature requests welcome
-- **Discussions**: For questions and ideas
+- **Hybrid search**: FTS5 + semantic retrieval fused via Reciprocal Rank Fusion.
 
 ## License
 

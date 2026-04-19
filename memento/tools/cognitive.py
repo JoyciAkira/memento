@@ -137,8 +137,11 @@ async def memento_check_goal_alignment(arguments: dict, ctx, access_manager) -> 
         return [TextContent(type="text", text="Level 2 Enforcement (Strict Mentor) is currently disabled. Use memento_configure_enforcement to enable it.")]
         
     content_val = arguments.get("content", "")
+    active_ctx = arguments.get("active_context") or ""
     try:
-        evaluation = await ctx.cognitive_engine.check_goal_alignment(content_val)
+        evaluation = await ctx.cognitive_engine.check_goal_alignment(
+            content_val, context=active_ctx if isinstance(active_ctx, str) else ""
+        )
         return [TextContent(type="text", text=evaluation)]
     except Exception as e:
         return [TextContent(type="text", text=f"Error evaluating alignment: {str(e)}")]
