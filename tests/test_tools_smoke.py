@@ -13,6 +13,10 @@ if _tests_dir not in sys.path:
     sys.path.insert(0, _tests_dir)
 import mcp_contract_helpers as _mcp_contract  # noqa: E402
 
+# ``last_search.json`` è sovrascritto a ogni ``search_*``; ``memento_explain_search`` è validato
+# dopo il ciclo con sequenza fissa add → search_memory → explain (strict trace).
+_SMOKE_EXPLAIN_ANCHOR = "SMOKE_EXPLAIN_ANCHOR_ZQ9"
+
 
 def _init_source_db(path: str) -> None:
     conn = sqlite3.connect(path)
@@ -85,7 +89,10 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             "metadata": {},
         },
         "memento_search_memory": {"workspace_root": str(ws), "query": "hello"},
-        "memento_explain_search": {"workspace_root": str(ws), "query": "hello"},
+        "memento_explain_search": {
+            "workspace_root": str(ws),
+            "query": _SMOKE_EXPLAIN_ANCHOR,
+        },
         "memento_get_warnings": {"workspace_root": str(ws), "context": "Using sqlite and asyncio"},
         "memento_generate_tasks": {"workspace_root": str(ws)},
         "memento_toggle_dependency_tracker": {"workspace_root": str(ws), "enabled": True},
@@ -144,6 +151,11 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
 
     failures: list[tuple[str, str]] = []
     for name in tool_names:
+        if name == "memento_explain_search":
+            # Il file ``.memento/traces/last_search.json`` è aggiornato ad ogni search;
+            # invocare explain_search dentro il loop è non-deterministico rispetto all'ordine
+            # dei tool registrati. Si valida in coda con sequenza fissa add → search → explain.
+            continue
         args = payloads.get(name, {"workspace_root": str(ws)})
         if name == "memento_toggle_access":
             try:
@@ -159,6 +171,31 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             _mcp_contract.validate_tool_response_contract(name, out)
         except Exception as e:
             failures.append((name, str(e)))
+
+    try:
+        await call_tool(
+            "memento_add_memory",
+            {
+                "workspace_root": str(ws),
+                "text": f"smoke explain-search seed {_SMOKE_EXPLAIN_ANCHOR} tail",
+                "metadata": {},
+            },
+        )
+        await call_tool(
+            "memento_search_memory",
+            {"workspace_root": str(ws), "query": _SMOKE_EXPLAIN_ANCHOR},
+        )
+        out_explain = await call_tool(
+            "memento_explain_search",
+            {"workspace_root": str(ws), "query": _SMOKE_EXPLAIN_ANCHOR},
+        )
+        _mcp_contract.validate_tool_response_contract(
+            "memento_explain_search",
+            out_explain,
+            strict_search_trace=True,
+        )
+    except Exception as e:
+        failures.append(("memento_explain_search (post-ciclo)", str(e)))
 
     assert failures == []
 

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 import pathlib
 import subprocess
 import sys
@@ -44,10 +43,11 @@ async def test_offline_explain_search_reads_last_trace(tmp_path, monkeypatch):
         "memento_explain_search",
         {"workspace_root": str(ws), "query": "C7K"},
     )
-    _mcp_contract.validate_tool_response_contract("memento_explain_search", out)
-    data = json.loads(out[0].text)
-    assert data.get("error") != "no trace", "last_search.json deve esistere dopo search_memory"
-    assert "lanes" in data, "traccia provider attesa con chiave lanes"
+    _mcp_contract.validate_tool_response_contract(
+        "memento_explain_search",
+        out,
+        strict_search_trace=True,
+    )
 
 
 @pytest.mark.asyncio

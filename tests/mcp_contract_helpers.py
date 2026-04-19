@@ -26,8 +26,18 @@ def assert_mcp_text_response(out: Any) -> None:
         assert isinstance(block.text, str)
 
 
-def validate_tool_response_contract(tool_name: str, out: Any) -> None:
-    """Verifica forma MCP +, per tool noti, JSON con chiavi minime."""
+def validate_tool_response_contract(
+    tool_name: str,
+    out: Any,
+    *,
+    strict_search_trace: bool = False,
+) -> None:
+    """Verifica forma MCP +, per tool noti, JSON con chiavi minime.
+
+    Per ``memento_explain_search``, ``strict_search_trace=True`` impone che esista
+    ``last_search.json`` (nessun ``error: no trace``) e che la traccia contenga ``lanes``
+    come scritto da ``NeuroGraphProvider._write_search_trace_file``.
+    """
     assert_mcp_text_response(out)
     raw = out[0].text.strip()
     if tool_name == "memento_list_goals":
@@ -37,6 +47,15 @@ def validate_tool_response_contract(tool_name: str, out: Any) -> None:
     if tool_name == "memento_explain_search":
         data = json.loads(raw)
         assert isinstance(data, dict) and "query" in data
+        if strict_search_trace:
+            assert data.get("error") != "no trace", (
+                "memento_explain_search: atteso last_search.json dopo search_memory; "
+                f"payload={data!r}"
+            )
+            assert "lanes" in data, (
+                "memento_explain_search: traccia provider priva di 'lanes' "
+                f"(chiavi: {sorted(data.keys())})"
+            )
         return
     required = _JSON_OBJECT_CONTRACTS.get(tool_name)
     if not required:

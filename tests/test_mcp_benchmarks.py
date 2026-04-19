@@ -238,11 +238,14 @@ async def test_b6_offline_mcp_tools_callable(tmp_path, monkeypatch):
         elif name == "memento_kg_health":
             assert "KG health" in out[0].text
             assert "{" in out[0].text
+        elif name == "memento_explain_search":
+            _mcp_contract.validate_tool_response_contract(
+                name, out, strict_search_trace=True
+            )
         elif name in (
             "memento_search_vnext",
             "memento_explain_retrieval",
             "memento_list_goals",
             "memento_set_goals",
-            "memento_explain_search",
         ):
             _mcp_contract.validate_tool_response_contract(name, out)

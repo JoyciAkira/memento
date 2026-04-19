@@ -43,3 +43,4 @@ All notable changes to this project will be documented in this file.
 - Added `tests/test_goal_store.py` — 5 tests for GoalStore CRUD operations
 - Added `tests/test_active_coercion_hook.py` — 3 tests for pre-commit hook enforcement
 - Extended MCP coverage: `tests/mcp_contract_helpers.py`, `tests/test_mcp_tool_contracts.py` (offline trace + vNext JSON), stricter `tests/test_tools_smoke.py`, wider `test_b6_offline_mcp_tools_callable`; `benchmarks/run_benchmarks.py` includes the contracts file
+- Smoke: `memento_explain_search` deferred post-loop with `strict_search_trace` on `validate_tool_response_contract` (deterministic `last_search.json`)

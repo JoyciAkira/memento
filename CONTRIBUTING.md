@@ -27,7 +27,7 @@ All tests must pass before submitting a PR. Tests should run without API keys or
 uv run python benchmarks/run_benchmarks.py
 ```
 
-Questo comando esegue `tests/test_mcp_benchmarks.py` (prestazioni e B6 offline esteso), `tests/test_mcp_tool_contracts.py` (roundtrip JSON/trace) e `tests/test_tools_smoke.py` (tutti i tool + validazione strutturale sui tool con contratto definito in `tests/mcp_contract_helpers.py`). La suite completa di benchmark include caricamenti massivi (migliaia di `add`) e può richiedere diversi minuti.
+Questo comando esegue `tests/test_mcp_benchmarks.py` (prestazioni e B6 offline esteso), `tests/test_mcp_tool_contracts.py` (roundtrip JSON/trace) e `tests/test_tools_smoke.py` (tutti i tool + validazione strutturale sui tool con contratto definito in `tests/mcp_contract_helpers.py`). Lo smoke salta `memento_explain_search` nel ciclo principale e lo riesegue in coda dopo una `search_memory` mirata, perché `last_search.json` viene sovrascritto ad ogni ricerca. La suite completa di benchmark include caricamenti massivi (migliaia di `add`) e può richiedere diversi minuti.
 
 ## Project Structure
 
