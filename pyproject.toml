@@ -40,6 +40,7 @@ test = [
 
 [project.scripts]
 memento-mcp = "memento.mcp_server:main"
+memento = "memento.cli:main"
 
 [tool.ruff]
 exclude = [
