@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 import time
 from statistics import median
 
@@ -49,6 +50,22 @@ def test_b1_exact_registered_tool_surface():
         "memento_list_goals",
     ):
         assert required in names
+
+
+@pytest.mark.asyncio
+async def test_b7_storage_kg_file_distinct_from_memory_db(tmp_path, monkeypatch):
+    """Layout storage: KG su file dedicato (stesso harness file-backed dei benchmark)."""
+    monkeypatch.delenv("MEMENTO_KG_DB_PATH", raising=False)
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+
+    from memento.provider import NeuroGraphProvider
+
+    mem = tmp_path / "neurograph_memory.db"
+    p = NeuroGraphProvider(db_path=str(mem))
+    await p.initialize()
+    assert os.path.abspath(p.kg_db_path) != os.path.abspath(p.db_path)
+    assert os.path.isfile(p.kg_db_path)
 
 
 @pytest.mark.asyncio

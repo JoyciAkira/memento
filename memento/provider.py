@@ -9,6 +9,7 @@ from openai import AsyncOpenAI
 from memento.redaction import redact_secrets
 from memento.math_utils import cosine_similarity
 from memento.goal_store import GoalStore
+from memento.kg_storage import migrate_kg_tables_if_needed, resolve_kg_db_path
 import logging
 import os
 from typing import List, Dict, Any, Optional
@@ -106,7 +107,8 @@ class NeuroGraphProvider:
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
             
         self.db_path = db_path
-        self.kg = MementoGraphProvider({"db_path": db_path})
+        self.kg_db_path = resolve_kg_db_path(db_path)
+        self.kg = MementoGraphProvider({"db_path": self.kg_db_path})
         self._goal_store = GoalStore(db_path)
 
         requested_backend = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()
@@ -149,6 +151,7 @@ class NeuroGraphProvider:
                 runner.register(version, name, fn)
 
             await asyncio.to_thread(runner.run)
+            await asyncio.to_thread(migrate_kg_tables_if_needed, self.db_path, self.kg_db_path)
 
             self._db = await aiosqlite.connect(self.db_path)
             self._db.row_factory = aiosqlite.Row

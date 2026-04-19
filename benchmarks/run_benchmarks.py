@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
-Esegue i benchmark MCP rigidi (pytest): latenza in ms, correttezza retrieval, smoke tool.
+Esegue i benchmark MCP rigidi (pytest): latenza in ms, correttezza retrieval, layout storage
+KG dedicato (B7), smoke tool.
 
 Uso dalla root del repo:
   uv run python benchmarks/run_benchmarks.py
