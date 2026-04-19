@@ -142,7 +142,30 @@ Environment variables:
 - `MEM0_MODEL`: LLM used for cognitive features
 - `MEM0_EMBEDDING_MODEL`: embeddings model used by the hybrid memory provider
 
-## 🧠 Using Memento
+## ⌨️ CLI Usage
+
+Memento also works directly from the terminal — no AI agent required.
+
+```bash
+# Auto-capture git context (branch, recent commits, diff stats) as a memory
+memento capture --auto
+
+# Save a free-form note
+memento capture --text "Resolved the auth timeout by increasing JWT expiry to 1h"
+
+# Combine auto context + custom note
+memento capture --auto --text "Refactored the retry logic after the incident"
+
+# Search your memories
+memento search "how did I fix the promise bug"
+
+# Show workspace status
+memento status
+```
+
+The `capture --auto` command extracts the current git branch, last 5 commits, and staged/unstaged diff stats — saving a snapshot of your work context with zero friction. Useful in git hooks, CI scripts, or just as a quick terminal habit.
+
+## 🧠 Using Memento (via MCP)
 
 Memento exposes a suite of MCP tools, but the primary entrypoint is fully autonomous. 
 
