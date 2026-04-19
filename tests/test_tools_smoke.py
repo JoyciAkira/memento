@@ -1,10 +1,17 @@
+import pathlib
 import sqlite3
 import subprocess
+import sys
 from datetime import datetime
 
 import pytest
 
 from memento.mcp_server import call_tool, list_tools
+
+_tests_dir = str(pathlib.Path(__file__).resolve().parent)
+if _tests_dir not in sys.path:
+    sys.path.insert(0, _tests_dir)
+import mcp_contract_helpers as _mcp_contract  # noqa: E402
 
 
 def _init_source_db(path: str) -> None:
@@ -78,6 +85,7 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             "metadata": {},
         },
         "memento_search_memory": {"workspace_root": str(ws), "query": "hello"},
+        "memento_explain_search": {"workspace_root": str(ws), "query": "hello"},
         "memento_get_warnings": {"workspace_root": str(ws), "context": "Using sqlite and asyncio"},
         "memento_generate_tasks": {"workspace_root": str(ws)},
         "memento_toggle_dependency_tracker": {"workspace_root": str(ws), "enabled": True},
@@ -139,14 +147,16 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
         args = payloads.get(name, {"workspace_root": str(ws)})
         if name == "memento_toggle_access":
             try:
-                await call_tool(name, args)
+                out = await call_tool(name, args)
+                _mcp_contract.validate_tool_response_contract(name, out)
             except Exception as e:
                 failures.append((name, str(e)))
             await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
             continue
 
         try:
-            await call_tool(name, args)
+            out = await call_tool(name, args)
+            _mcp_contract.validate_tool_response_contract(name, out)
         except Exception as e:
             failures.append((name, str(e)))
 

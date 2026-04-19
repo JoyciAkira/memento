@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Esegue i benchmark MCP rigidi (pytest): latenza in ms, correttezza retrieval, layout storage
-KG dedicato (B7), smoke tool.
+KG dedicato (B7), contratti JSON offline, smoke tool con assert di forma.
 
 Uso dalla root del repo:
   uv run python benchmarks/run_benchmarks.py
@@ -19,6 +19,7 @@ def main() -> int:
     root = Path(__file__).resolve().parent.parent
     tests = [
         "tests/test_mcp_benchmarks.py",
+        "tests/test_mcp_tool_contracts.py",
         "tests/test_tools_smoke.py",
     ]
     cmd = [sys.executable, "-m", "pytest", *tests, "-q", "--tb=short"]

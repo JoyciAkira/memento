@@ -2,8 +2,9 @@
 
 from __future__ import annotations
 
-import json
 import os
+import pathlib
+import sys
 import time
 from statistics import median
 
@@ -12,6 +13,11 @@ import pytest
 import memento.tools  # noqa: F401 — registra i tool nel registry
 from memento.mcp_server import call_tool
 from memento.registry import registry
+
+_tests_dir = str(pathlib.Path(__file__).resolve().parent)
+if _tests_dir not in sys.path:
+    sys.path.insert(0, _tests_dir)
+import mcp_contract_helpers as _mcp_contract  # noqa: E402
 
 # --- Prestazioni (locale + CI condiviso): warm-up escluso dalle misure.
 # Soglie in secondi. Su workstation tipiche sono ordini di grandezza sotto il limite;
@@ -199,6 +205,14 @@ async def test_b6_offline_mcp_tools_callable(tmp_path, monkeypatch):
         ("memento_status", {"workspace_root": ws}),
         ("memento_list_goals", {"workspace_root": ws}),
         (
+            "memento_search_memory",
+            {"workspace_root": ws, "query": "zeta"},
+        ),
+        (
+            "memento_explain_search",
+            {"workspace_root": ws, "query": "zeta"},
+        ),
+        (
             "memento_search_vnext",
             {"workspace_root": ws, "query": "zeta", "limit": 5, "trace": False},
         ),
@@ -206,13 +220,29 @@ async def test_b6_offline_mcp_tools_callable(tmp_path, monkeypatch):
             "memento_explain_retrieval",
             {"workspace_root": ws, "query": "zeta"},
         ),
+        (
+            "memento_set_goals",
+            {"workspace_root": ws, "goals": ["benchmark-offline-goal"]},
+        ),
+        ("memento_memory_stats", {"workspace_root": ws}),
+        ("memento_kg_health", {"workspace_root": ws}),
     ]
     for name, args in cases:
         out = await call_tool(name, args)
         assert isinstance(out, list) and len(out) > 0
-        if name == "memento_search_vnext":
-            payload = json.loads(out[0].text)
-            assert "query" in payload and "results" in payload
-        elif name == "memento_explain_retrieval":
-            payload = json.loads(out[0].text)
-            assert "query" in payload and "traces" in payload
+        if name == "memento_search_memory":
+            assert "zeta" in out[0].text.lower()
+        elif name == "memento_memory_stats":
+            assert "Memory stats" in out[0].text
+            assert "{" in out[0].text
+        elif name == "memento_kg_health":
+            assert "KG health" in out[0].text
+            assert "{" in out[0].text
+        elif name in (
+            "memento_search_vnext",
+            "memento_explain_retrieval",
+            "memento_list_goals",
+            "memento_set_goals",
+            "memento_explain_search",
+        ):
+            _mcp_contract.validate_tool_response_contract(name, out)
