@@ -1,6 +1,6 @@
 {
   "name": "Memento",
-  "version": "3.0.14",
+  "version": "0.1.0",
   "description": "Autonomous Nervous System for AI Agents with RRF Search and Active Coercion",
   "author": "Daniele Corrao",
   "license": "AGPL-3.0",
@@ -19,9 +19,10 @@
     "ai",
     "rag",
     "mcp",
-    "chromadb",
-    "palace",
-    "search"
+    "knowledge-graph",
+    "search",
+    "active-coercion",
+    "enforcement"
   ],
   "repository": "https://github.com/JoyciAkira/memento"
 }

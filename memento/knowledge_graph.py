@@ -39,6 +39,7 @@ import hashlib
 import json
 import os
 import sqlite3
+import threading
 from datetime import date, datetime
 from pathlib import Path
 
@@ -55,53 +56,57 @@ def get_default_kg_path():
 
 
 class KnowledgeGraph:
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str | None = None):
         self.db_path = db_path or get_default_kg_path()
         Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
         self._connection = None
+        self._lock = threading.Lock()
         self._init_db()
 
     def _init_db(self):
         conn = self._conn()
-        conn.executescript("""
-            PRAGMA journal_mode=WAL;
+        conn.execute("PRAGMA journal_mode=WAL")
+        existing = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table' AND name='entities'"
+        ).fetchone()
+        if not existing:
+            conn.executescript("""
+                CREATE TABLE IF NOT EXISTS entities (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    type TEXT DEFAULT 'unknown',
+                    properties TEXT DEFAULT '{}',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP
+                );
 
-            CREATE TABLE IF NOT EXISTS entities (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                type TEXT DEFAULT 'unknown',
-                properties TEXT DEFAULT '{}',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP
-            );
+                CREATE TABLE IF NOT EXISTS triples (
+                    id TEXT PRIMARY KEY,
+                    subject TEXT NOT NULL,
+                    predicate TEXT NOT NULL,
+                    object TEXT NOT NULL,
+                    valid_from TEXT,
+                    valid_to TEXT,
+                    confidence REAL DEFAULT 1.0,
+                    source_closet TEXT,
+                    source_file TEXT,
+                    extracted_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (subject) REFERENCES entities(id),
+                    FOREIGN KEY (object) REFERENCES entities(id)
+                );
 
-            CREATE TABLE IF NOT EXISTS triples (
-                id TEXT PRIMARY KEY,
-                subject TEXT NOT NULL,
-                predicate TEXT NOT NULL,
-                object TEXT NOT NULL,
-                valid_from TEXT,
-                valid_to TEXT,
-                confidence REAL DEFAULT 1.0,
-                source_closet TEXT,
-                source_file TEXT,
-                extracted_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (subject) REFERENCES entities(id),
-                FOREIGN KEY (object) REFERENCES entities(id)
-            );
+                CREATE TABLE IF NOT EXISTS rooms (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE NOT NULL,
+                    centroid TEXT NOT NULL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
 
-            CREATE TABLE IF NOT EXISTS rooms (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                name TEXT UNIQUE NOT NULL,
-                centroid TEXT NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
-            CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
-            CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate);
-            CREATE INDEX IF NOT EXISTS idx_triples_valid ON triples(valid_from, valid_to);
-        """)
-        conn.commit()
+                CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject);
+                CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object);
+                CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate);
+                CREATE INDEX IF NOT EXISTS idx_triples_valid ON triples(valid_from, valid_to);
+            """)
+            conn.commit()
 
     def _conn(self):
         if self._connection is None:
@@ -111,10 +116,21 @@ class KnowledgeGraph:
         return self._connection
 
     def close(self):
-        """Close the database connection."""
         if self._connection is not None:
             self._connection.close()
             self._connection = None
+
+    def _execute_write(self, operation, *args):
+        with self._lock:
+            conn = self._conn()
+            with conn:
+                return conn.execute(operation, args)
+
+    def _execute_write_script(self, script):
+        with self._lock:
+            conn = self._conn()
+            conn.executescript(script)
+            conn.commit()
 
     def _entity_id(self, name: str) -> str:
         return name.lower().replace(" ", "_").replace("'", "")
@@ -203,18 +219,14 @@ class KnowledgeGraph:
         return triple_id
 
     def invalidate(self, subject: str, predicate: str, obj: str, ended: str = None):
-        """Mark a relationship as no longer valid (set valid_to date)."""
         sub_id = self._entity_id(subject)
         obj_id = self._entity_id(obj)
         pred = predicate.lower().replace(" ", "_")
         ended = ended or date.today().isoformat()
-
-        conn = self._conn()
-        with conn:
-            conn.execute(
-                "UPDATE triples SET valid_to=? WHERE subject=? AND predicate=? AND object=? AND valid_to IS NULL",
-                (ended, sub_id, pred, obj_id),
-            )
+        self._execute_write(
+            "UPDATE triples SET valid_to=? WHERE subject=? AND predicate=? AND object=? AND valid_to IS NULL",
+            ended, sub_id, pred, obj_id,
+        )
 
     def add_bridge(self, room_a: str, room_b: str, score: float, reason: str = "") -> str:
         """Create a semantic wormhole between two rooms."""
@@ -282,6 +294,32 @@ class KnowledgeGraph:
                 "created_at": row["created_at"],
             })
         return rooms
+
+    def query_entities_batch(self, names: list[str]) -> dict[str, list[dict]]:
+        if not names:
+            return {}
+        ids = [self._entity_id(n) for n in names]
+        placeholders = ",".join(["?"] * len(ids))
+        conn = self._conn()
+        query = (
+            "SELECT t.*, e.name as obj_name FROM triples t "
+            "JOIN entities e ON t.object = e.id "
+            f"WHERE t.subject IN ({placeholders}) AND t.valid_to IS NULL"
+        )
+        rows = conn.execute(query, ids).fetchall()
+        result: dict[str, list[dict]] = {}
+        for row in rows:
+            sub_name = row["subject"]
+            result.setdefault(sub_name, []).append({
+                "direction": "outgoing",
+                "predicate": row["predicate"],
+                "object": row["obj_name"],
+                "valid_from": row["valid_from"],
+                "confidence": row["confidence"],
+                "source_closet": row["source_closet"],
+                "current": True,
+            })
+        return result
 
     def query_entity(self, name: str, as_of: str = None, direction: str = "outgoing"):
         """

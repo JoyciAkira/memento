@@ -1,10 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 import re
 from dataclasses import dataclass
 from pathlib import PurePosixPath
 from typing import Any, Iterable
+
+logger = logging.getLogger(__name__)
+_MAX_REGEX_LENGTH = 1024
 
 
 @dataclass(frozen=True)
@@ -83,6 +87,8 @@ def normalize_hard_rules(raw_rules: Any, *, default_override_token: str = "memen
             continue
         if kind == "regex":
             if regex is None:
+                continue
+            if len(regex) > _MAX_REGEX_LENGTH:
                 continue
             try:
                 re.compile(regex)

@@ -14,6 +14,8 @@ from typing import Any, Dict, List, Set, Tuple
 
 import aiosqlite
 
+from memento.math_utils import cosine_similarity
+
 logger = logging.getLogger(__name__)
 
 # Similarity threshold for considering memories as duplicates
@@ -199,10 +201,12 @@ class ConsolidationEngine:
 
         # Compare all pairs
         ids = list(embeddings.keys())
+        if len(ids) > self.batch_size:
+            ids = ids[:self.batch_size]
         pairs: List[Tuple[str, str, float]] = []
         for i in range(len(ids)):
             for j in range(i + 1, len(ids)):
-                sim = _cosine_similarity(embeddings[ids[i]], embeddings[ids[j]])
+                sim = cosine_similarity(embeddings[ids[i]], embeddings[ids[j]])
                 if sim >= self.threshold:
                     pairs.append((ids[i], ids[j], sim))
 

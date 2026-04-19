@@ -147,7 +147,25 @@ def render_dashboard_html(
             """
 
 class MementoUIHandler(BaseHTTPRequestHandler):
+    def _check_auth(self):
+        if not _UI_AUTH_TOKEN:
+            return True
+        auth = self.headers.get("Authorization", "")
+        if auth == f"Bearer {_UI_AUTH_TOKEN}":
+            return True
+        token = urlparse(self.path).query
+        qs = parse_qs(token)
+        if qs.get("token", [None])[0] == _UI_AUTH_TOKEN:
+            return True
+        self.send_response(401)
+        self.send_header("Content-type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps({"error": "Unauthorized"}).encode("utf-8"))
+        return False
+
     def do_GET(self):
+        if not self._check_auth():
+            return
         parsed = urlparse(self.path)
         path = parsed.path
         qs = parse_qs(parsed.query)

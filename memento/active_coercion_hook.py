@@ -40,6 +40,13 @@ def run_pre_commit(repo_root: str) -> int:
         rel = rel.strip()
         if not rel:
             continue
+        if ".." in rel.split("/"):
+            logger.warning(f"Skipping path with traversal component: {rel}")
+            continue
+        abs_path = os.path.realpath(os.path.join(repo_root, rel))
+        if not abs_path.startswith(os.path.realpath(repo_root)):
+            logger.warning(f"Skipping path outside repo root: {rel}")
+            continue
         try:
             content = subprocess.check_output(["git", "show", f":{rel}"], cwd=repo_root)
         except subprocess.CalledProcessError:

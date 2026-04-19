@@ -1,6 +1,11 @@
 import json
+import os
 from mcp.types import Tool, TextContent
 from memento.registry import registry
+
+RULE_MODIFICATION_REQUIRES_CONFIRMATION = (
+    os.environ.get("MEMENTO_RULE_CONFIRMATION", "true").strip().lower() == "true"
+)
 
 PRESETS: dict[str, list[dict]] = {
     "python-dev-basics": [
@@ -138,6 +143,12 @@ async def memento_apply_active_coercion_preset(arguments: dict, ctx, access_mana
     }
 ))
 async def memento_add_active_coercion_rule(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    if RULE_MODIFICATION_REQUIRES_CONFIRMATION and not access_manager.can_write():
+        raise PermissionError(
+            "Rule modification requires write access. "
+            "Set MEMENTO_RULE_CONFIRMATION=false to bypass (not recommended for shared workspaces)."
+        )
+
     rule_id = arguments.get("id")
     path_globs = arguments.get("path_globs")
     message = arguments.get("message")
