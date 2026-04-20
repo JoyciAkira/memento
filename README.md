@@ -5,6 +5,7 @@
   <p><strong>The Autonomous Nervous System for AI Agents</strong></p>
 
   [![Tests](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml/badge.svg)](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml)
+  [![PyPI version](https://img.shields.io/pypi/v/memento-mcp.svg)](https://pypi.org/project/memento-mcp/)
   [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![MCP Protocol](https://img.shields.io/badge/MCP-Ready-success.svg)](https://modelcontextprotocol.io/)
@@ -99,49 +100,84 @@ Proactive alerts about relevant context changes, memory events, and high-relevan
 
 ## 🚀 Quick Start
 
-Get from zero to a running Memento in under 5 minutes:
+Choose your preferred installation method:
+
+### Option A: `pip install` (Recommended)
 
 ```bash
-# 1. Clone and install
+pip install memento-mcp
+```
+
+That's it. The `memento-mcp` and `memento` commands are now available globally.
+
+### Option B: `uvx` (Zero-install)
+
+Run Memento instantly without installing anything permanently:
+
+```bash
+uvx memento-mcp
+```
+
+### Option C: `pip install` from GitHub (Latest dev)
+
+```bash
+pip install git+https://github.com/JoyciAkira/memento.git
+```
+
+### Option D: Clone for development
+
+```bash
 git clone https://github.com/JoyciAkira/memento.git
 cd memento
 uv sync
-
-# 2. Verify
-uv run python -c "import memento; print(memento.__version__)"
-
-# 3. Run the MCP Server (requires OPENAI_API_KEY for embeddings)
-OPENAI_API_KEY=your-key uv run memento-mcp
-
-# 3b. Or run without embeddings (for testing / offline use)
-MEMENTO_EMBEDDING_BACKEND=none uv run memento-mcp
 ```
 
-Then add Memento to your IDE's MCP config (see [Configuration](#-mcp-configuration-cursor--trae--claude) below). That's it — the Dynamic Workspace Router handles the rest.
-
-## 📦 Installation
+Verify any installation:
 
 ```bash
-# Clone the repository
-git clone https://github.com/JoyciAkira/memento.git
-cd memento
-
-# Install dependencies and sync lockfile
-uv sync
-
-# Run the MCP Server
-uv run memento-mcp
+python -c "import memento; print(memento.__version__)"
+memento-mcp --help
+memento --help
 ```
 
-Verify the install:
+<details>
+<summary>📝 Running without OpenAI (offline / testing)</summary>
+
+Set `MEMENTO_EMBEDDING_BACKEND=none` to disable embeddings entirely. Memento falls back to FTS5-only full-text search — no API key needed.
 
 ```bash
-uv run python -c "import memento; print(memento.__version__)"
+MEMENTO_EMBEDDING_BACKEND=none memento-mcp
 ```
+
+</details>
+
+---
 
 ## 🛠️ MCP Configuration (Cursor / Trae / Claude)
 
-Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Workspace Router, you only need to configure it **once globally**:
+Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Workspace Router, you only need to configure it **once globally**.
+
+### Config for `pip` / `uvx` install (Recommended)
+
+No local clone needed. Just use the installed command directly:
+
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento-mcp",
+      "env": {
+        "OPENAI_API_KEY": "your-api-key-here",
+        "OPENAI_BASE_URL": "https://api.openai.com/v1",
+        "MEM0_MODEL": "openai/gpt-4o-mini",
+        "MEM0_EMBEDDING_MODEL": "text-embedding-3-small"
+      }
+    }
+  }
+}
+```
+
+### Config for local clone (development)
 
 ```json
 {
@@ -165,15 +201,18 @@ Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Works
 }
 ```
 
-Environment variables:
-- `OPENAI_API_KEY`: required for embeddings and goal checks
-- `OPENAI_BASE_URL`: optional OpenAI-compatible endpoint
-- `MEM0_MODEL`: LLM used for cognitive features
-- `MEM0_EMBEDDING_MODEL`: embeddings model used by the hybrid memory provider
-- `MEMENTO_EMBEDDING_BACKEND`: set to `none` to disable embeddings entirely (for testing or offline use; falls back to FTS5-only search)
-- `MEMENTO_DIR`: workspace root used for routing `.memento/` state
-- `MEMENTO_UI`: enable local UI (`1`/`true`)
-- `MEMENTO_UI_PORT`: local UI port (default `8089`)
+### Environment variables
+
+| Variable | Description |
+|----------|-------------|
+| `OPENAI_API_KEY` | Required for embeddings and goal checks |
+| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint |
+| `MEM0_MODEL` | LLM used for cognitive features |
+| `MEM0_EMBEDDING_MODEL` | Embeddings model used by the hybrid memory provider |
+| `MEMENTO_EMBEDDING_BACKEND` | Set to `none` to disable embeddings (FTS5-only fallback) |
+| `MEMENTO_DIR` | Workspace root used for routing `.memento/` state |
+| `MEMENTO_UI` | Enable local UI (`1`/`true`) |
+| `MEMENTO_UI_PORT` | Local UI port (default `8089`) |
 
 ## ⌨️ CLI Usage
 
