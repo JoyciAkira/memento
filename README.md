@@ -4,6 +4,7 @@
   <h1>Memento</h1>
   <p><strong>The Autonomous Nervous System for AI Agents</strong></p>
 
+  [![Tests](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml/badge.svg)](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml)
   [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
   [![MCP Protocol](https://img.shields.io/badge/MCP-Ready-success.svg)](https://modelcontextprotocol.io/)
@@ -37,6 +38,15 @@ Keep your AI strictly aligned with your project's core objectives:
 - **Level 1 (Context Injection)**: Seamlessly injects active goals into the AI's context on every memory retrieval.
 - **Level 2 (Strict Mentor Checkpoint)**: Forces the AI to submit code or plans for a strict evaluation against the project's core goals.
 - **Level 3 (Proactive Autonomy)**: The AI is instructed via MCP to autonomously query Memento *before* writing any code.
+
+**Goal Enforcer MCP Tools:**
+
+| Tool | Description |
+|------|-------------|
+| `memento_set_goals` | Set active goals (replace or append mode) |
+| `memento_list_goals` | List goals with optional context and active-only filters |
+| `memento_check_goal_alignment` | L2 gate — submit code/plans for strict goal evaluation |
+| `memento_configure_enforcement` | Toggle L1/L2/L3 enforcement levels |
 
 ### 4. 🕸️ Dynamic Workspace Router
 Zero-config multi-tenant isolation. Memento automatically detects which project repository the AI is currently working on and routes the memory/database to the correct `.memento/` folder. No more context bleeding between your Frontend and Backend projects.
@@ -87,7 +97,29 @@ Proactive alerts about relevant context changes, memory events, and high-relevan
 
 ---
 
-## 🚀 Installation
+## 🚀 Quick Start
+
+Get from zero to a running Memento in under 5 minutes:
+
+```bash
+# 1. Clone and install
+git clone https://github.com/JoyciAkira/memento.git
+cd memento
+uv sync
+
+# 2. Verify
+uv run python -c "import memento; print(memento.__version__)"
+
+# 3. Run the MCP Server (requires OPENAI_API_KEY for embeddings)
+OPENAI_API_KEY=your-key uv run memento-mcp
+
+# 3b. Or run without embeddings (for testing / offline use)
+MEMENTO_EMBEDDING_BACKEND=none uv run memento-mcp
+```
+
+Then add Memento to your IDE's MCP config (see [Configuration](#-mcp-configuration-cursor--trae--claude) below). That's it — the Dynamic Workspace Router handles the rest.
+
+## 📦 Installation
 
 ```bash
 # Clone the repository
@@ -134,13 +166,14 @@ Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Works
 ```
 
 Environment variables:
-- `MEMENTO_DIR`: workspace root used for routing `.memento/` state
-- `MEMENTO_UI`: enable local UI (`1`/`true`)
-- `MEMENTO_UI_PORT`: local UI port (default `8089`)
 - `OPENAI_API_KEY`: required for embeddings and goal checks
 - `OPENAI_BASE_URL`: optional OpenAI-compatible endpoint
 - `MEM0_MODEL`: LLM used for cognitive features
 - `MEM0_EMBEDDING_MODEL`: embeddings model used by the hybrid memory provider
+- `MEMENTO_EMBEDDING_BACKEND`: set to `none` to disable embeddings entirely (for testing or offline use; falls back to FTS5-only search)
+- `MEMENTO_DIR`: workspace root used for routing `.memento/` state
+- `MEMENTO_UI`: enable local UI (`1`/`true`)
+- `MEMENTO_UI_PORT`: local UI port (default `8089`)
 
 ## ⌨️ CLI Usage
 
