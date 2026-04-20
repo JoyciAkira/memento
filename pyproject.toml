@@ -8,12 +8,21 @@ version = "0.1.0"
 authors = [
   { name="Daniele Corrao" },
 ]
-description = "A local, PageRank-optimized SQLite graph provider for Mem0, powered by Memento architecture."
+description = "The Autonomous Nervous System for AI Agents — local-first MCP middleware with temporal graph memory, active coercion, and proactive goal alignment."
 readme = "README.md"
 license = { text = "AGPL-3.0" }
 requires-python = ">=3.10"
+keywords = ["mcp", "ai-agents", "memory", "graph-database", "sqlite", "coercion", "llm", "knowledge-graph", "model-context-protocol"]
 classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Topic :: Software Development :: Libraries",
+    "Topic :: Software Development :: Quality Assurance",
     "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "License :: OSI Approved :: GNU Affero General Public License v3 or later (AGPLv3+)",
     "Operating System :: OS Independent",
 ]
@@ -29,6 +38,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+embeddings = [
+    "fastembed>=0.3.0",
+]
 test = [
     "pytest",
     "pytest-asyncio",
@@ -37,6 +49,8 @@ test = [
 
 [project.urls]
 "Homepage" = "https://github.com/JoyciAkira/memento"
+"Repository" = "https://github.com/JoyciAkira/memento"
+"Issues" = "https://github.com/JoyciAkira/memento/issues"
 
 [project.scripts]
 memento-mcp = "memento.mcp_server:main"

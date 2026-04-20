@@ -18,9 +18,39 @@ class CognitiveEngine:
         if not self.llm:
             logger.warning("OPENAI_API_KEY not found. LLM features will be disabled.")
 
+    def _deterministic_intent_parse(self, query: str) -> dict:
+        q = query.lower().strip()
+
+        add_keywords = ("remember", "save", "store", "capture", "ricorda", "salva", "nota", "memorizza", "add")
+        search_keywords = ("how", "find", "search", "what", "where", "cerca", "trova", "come", "dove", "cosa", "chi", "when")
+        list_keywords = ("list", "show", "tutte", "elenca", "mostra", "tutti", "lista", "all memories")
+        dream_keywords = ("dream", "insight", "idea", "sogno", "intuizione", "synthesize", "synthesis")
+        alignment_keywords = ("align", "check goal", "evaluate", "alignment", "allinea", "valuta", "verify")
+
+        for kw in dream_keywords:
+            if kw in q:
+                return {"action": "DREAM", "payload": {"context": query}, "fallback": True}
+        for kw in alignment_keywords:
+            if kw in q:
+                return {"action": "ALIGNMENT", "payload": {"content": query}, "fallback": True}
+        for kw in add_keywords:
+            if kw in q:
+                return {"action": "ADD", "payload": {"text": query}, "fallback": True}
+        for kw in list_keywords:
+            if kw in q:
+                return {"action": "LIST", "payload": {}, "fallback": True}
+        for kw in search_keywords:
+            if kw in q:
+                return {"action": "SEARCH", "payload": {"query": query}, "fallback": True}
+
+        return {"action": "UNKNOWN", "payload": {}, "fallback": True}
+
     async def _generate_response(self, messages: list) -> str:
         if not self.llm:
-            return "Error: OPENAI_API_KEY not configured."
+            return (
+                "Error: LLM not configured. Set OPENAI_API_KEY for cloud LLMs, "
+                "or OPENAI_BASE_URL=http://localhost:1234/v1 for local LLMs (LM Studio, Ollama)."
+            )
         try:
             response = await self.llm.chat.completions.create(
                 model=self.model,
@@ -29,7 +59,12 @@ class CognitiveEngine:
             return response.choices[0].message.content
         except Exception as e:
             logger.error(f"LLM Error: {e}")
-            return "Error: LLM request failed. Check API key and network."
+            base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
+            return (
+                f"Error: LLM request failed — {type(e).__name__}: {e}. "
+                f"Attempted endpoint: {base_url} with model: {self.model}. "
+                f"Verify the LLM server is running and reachable."
+            )
 
     async def get_warnings(self, context: str) -> str:
         """
@@ -247,6 +282,11 @@ class CognitiveEngine:
             ]
             
             llm_response = await self._generate_response(messages)
+
+            if llm_response.startswith("Error:"):
+                fallback = self._deterministic_intent_parse(query)
+                logger.info(f"LLM returned error, falling back to deterministic: {fallback}")
+                return fallback
             
             cleaned = llm_response.strip()
             if cleaned.startswith("```json"):
@@ -261,4 +301,6 @@ class CognitiveEngine:
             
         except Exception as e:
             logger.error(f"Error parsing intent: {e}")
-            return {"action": "UNKNOWN", "payload": {}}
+            fallback = self._deterministic_intent_parse(query)
+            logger.info(f"Falling back to deterministic routing: {fallback}")
+            return fallback

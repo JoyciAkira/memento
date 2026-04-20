@@ -150,3 +150,71 @@ def test_prompt_registry_raises_on_missing():
     from memento.prompts.registry import load_prompt
     with pytest.raises(FileNotFoundError):
         load_prompt("nonexistent_prompt")
+
+
+def test_deterministic_intent_add():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("remember that nginx is the proxy")
+    assert result["action"] == "ADD"
+    assert result.get("fallback") is True
+
+
+def test_deterministic_intent_add_italian():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("ricorda che abbiamo cambiato il database")
+    assert result["action"] == "ADD"
+
+
+def test_deterministic_intent_search():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("how do I fix the auth bug")
+    assert result["action"] == "SEARCH"
+
+
+def test_deterministic_intent_search_italian():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("cerca come abbiamo risolto il bug")
+    assert result["action"] == "SEARCH"
+
+
+def test_deterministic_intent_list():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("list all memories")
+    assert result["action"] == "LIST"
+
+
+def test_deterministic_intent_dream():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("dream about architecture patterns")
+    assert result["action"] == "DREAM"
+
+
+def test_deterministic_intent_alignment():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("check goal alignment for this code")
+    assert result["action"] == "ALIGNMENT"
+
+
+def test_deterministic_intent_unknown():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    result = e._deterministic_intent_parse("random gibberish text xyz")
+    assert result["action"] == "UNKNOWN"
+
+
+@pytest.mark.asyncio
+async def test_parse_intent_falls_back_to_deterministic():
+    from memento.cognitive_engine import CognitiveEngine
+    e = CognitiveEngine(None)
+    e.llm = None
+
+    result = await e.parse_natural_language_intent("remember this important decision")
+    assert result["action"] == "ADD"
+    assert result.get("fallback") is True

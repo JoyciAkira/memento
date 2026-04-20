@@ -131,6 +131,16 @@ class NeuroGraphProvider:
                 self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
         else:
             self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "none")
+        self._local_embedder = None
+        if self.embedding_backend == "local":
+            try:
+                from memento.local_embeddings import LocalEmbeddingBackend
+                self._local_embedder = LocalEmbeddingBackend()
+                self.embed_model = "BAAI/bge-small-en-v1.5"
+            except ImportError:
+                logger.warning("fastembed not installed. Local embeddings disabled.")
+                self.embedding_backend = "none"
+                self.embed_model = "none"
         self._initialized = False
         self._db: aiosqlite.Connection | None = None
         self._db_read: aiosqlite.Connection | None = None
@@ -186,6 +196,12 @@ class NeuroGraphProvider:
             pass
 
     async def _get_embedding(self, text: str) -> List[float]:
+        if self.embedding_backend == "local" and self._local_embedder is not None:
+            try:
+                return await self._local_embedder.embed(text)
+            except Exception as e:
+                logger.error(f"Error getting local embedding: {e}")
+                return []
         if self.embedding_backend != "openai" or self.llm_client is None:
             return []
         try:

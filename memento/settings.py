@@ -18,7 +18,12 @@ class Settings:
         explicit = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()
         if explicit:
             return explicit
-        return "openai" if self.openai_api_key else "none"
+        if self.openai_api_key:
+            return "openai"
+        from memento.local_embeddings import is_fastembed_available
+        if is_fastembed_available():
+            return "local"
+        return "none"
 
     @property
     def has_openai_key(self) -> bool:
