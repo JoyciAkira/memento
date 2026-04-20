@@ -43,3 +43,24 @@ async def test_get_active_goals_uses_goals_storage(tmp_path, monkeypatch):
     injection = await get_active_goals(Ctx(p), max_goals=3, context=None)
     assert "ship v1" in injection
 
+
+@pytest.mark.asyncio
+async def test_list_goals_context_none_returns_all_contexts(tmp_path, monkeypatch):
+    from memento.provider import NeuroGraphProvider
+
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+
+    p = NeuroGraphProvider(db_path=str(tmp_path / "mem.db"))
+
+    await p.set_goals(goals=["project goal"], context="project", mode="replace", delete_reason="init")
+    await p.set_goals(goals=["personal goal"], context="personal", mode="replace", delete_reason="init")
+
+    all_active = await p.list_goals(context=None, active_only=True)
+    goal_texts = [g["goal"] for g in all_active]
+    assert "project goal" in goal_texts
+    assert "personal goal" in goal_texts
+
+    only_project = await p.list_goals(context="project", active_only=True)
+    assert [g["goal"] for g in only_project] == ["project goal"]
+

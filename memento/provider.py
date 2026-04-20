@@ -695,12 +695,16 @@ class NeuroGraphProvider:
         safe_limit = min(int(limit), 200)
         safe_offset = max(int(offset), 0)
 
-        where = ["(context IS ? OR context = ?)"]
-        params: list[Any] = [context, context]
+        where: list[str] = []
+        params: list[Any] = []
+        if context is not None:
+            where.append("(context IS ? OR context = ?)")
+            params.extend([context, context])
         if active_only:
             where.append("is_active = 1 AND is_deleted = 0")
 
         where_sql = " AND ".join(where)
+        where_clause = f"WHERE {where_sql}" if where_sql else ""
         async with self._read_lock:
             db = self._db_read
             assert db is not None
@@ -710,7 +714,7 @@ class NeuroGraphProvider:
                 SELECT id, context, goal, created_at, updated_at,
                        is_active, is_deleted, deleted_at, delete_reason, replaced_by_id
                 FROM goals
-                WHERE {where_sql}
+                {where_clause}
                 ORDER BY created_at DESC, rowid DESC
                 LIMIT ? OFFSET ?
                  """,
