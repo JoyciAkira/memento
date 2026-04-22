@@ -1,4 +1,5 @@
 import aiosqlite
+import sqlite3
 import uuid
 import json
 import math
@@ -181,6 +182,11 @@ class NeuroGraphProvider:
             await self._db_read.commit()
 
             self._initialized = True
+
+            from memento.memory.orchestrator import MemoryOrchestrator
+            self._sync_db = sqlite3.connect(self.db_path)
+            self._sync_db.row_factory = sqlite3.Row
+            self.orchestrator = MemoryOrchestrator(self._sync_db)
 
     def _write_search_trace_file(self, trace: dict) -> None:
         v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "1").strip().lower()
