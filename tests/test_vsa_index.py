@@ -43,3 +43,21 @@ def test_index_stats():
     stats = idx.get_index_stats()
     assert stats["indexed_memories"] == 2
     assert stats["total_entities"] >= 2
+
+
+def test_vsa_persistence_and_reload(tmp_path):
+    db_path = str(tmp_path / "vsa_persist.db")
+
+    idx1 = VSAIndex(db_path)
+    idx1.index_memory("mem1", "Python is great for AI")
+    idx1.index_memory("mem2", "FastAPI is a Python web framework")
+
+    stats1 = idx1.get_index_stats()
+    assert stats1["indexed_memories"] == 2
+
+    idx2 = VSAIndex(db_path)
+    idx2.load_from_db()
+
+    stats2 = idx2.get_index_stats()
+    assert stats2["indexed_memories"] == 2
+    assert idx2._entity_cache.get("mem1") is not None

@@ -10,6 +10,7 @@ class VSAIndex:
     """
     Maintains a VSA index over stored memories for O(1) relational queries.
     Indexes memories by extracting entities and binding them into hypervectors.
+    Persists hypervectors to SQLite so they survive process restarts.
     """
     def __init__(self, db_path: str, hdc: Optional[HDCEncoder] = None):
         self.db_path = db_path
@@ -28,8 +29,60 @@ class VSAIndex:
         for entity in entities:
             self.hdc.concept(entity)
 
+        self._persist_memory(memory_id, text, entities)
+
     def unindex_memory(self, memory_id: str) -> None:
         self._entity_cache.pop(memory_id, None)
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("DELETE FROM _vsa_entities WHERE memory_id = ?", (memory_id,))
+            conn.commit()
+            conn.close()
+        except Exception:
+            pass
+
+    def _persist_memory(self, memory_id: str, text: str, entities: List[str]) -> None:
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS _vsa_entities (
+                    memory_id TEXT PRIMARY KEY,
+                    text TEXT,
+                    entities TEXT
+                )
+            """)
+            conn.execute(
+                "INSERT OR REPLACE INTO _vsa_entities (memory_id, text, entities) VALUES (?, ?, ?)",
+                (memory_id, text, json.dumps(entities))
+            )
+            conn.commit()
+            conn.close()
+        except Exception as e:
+            logger.warning(f"Failed to persist VSA entity: {e}")
+
+    def load_from_db(self) -> None:
+        """Load VSA entities from SQLite on startup."""
+        try:
+            conn = sqlite3.connect(self.db_path)
+            conn.execute("""
+                CREATE TABLE IF NOT EXISTS _vsa_entities (
+                    memory_id TEXT PRIMARY KEY,
+                    text TEXT,
+                    entities TEXT
+                )
+            """)
+            rows = conn.execute("SELECT memory_id, text, entities FROM _vsa_entities").fetchall()
+            conn.close()
+
+            for memory_id, text, entities_json in rows:
+                entities = json.loads(entities_json)
+                self._entity_cache[memory_id] = entities
+                for entity in entities:
+                    self.hdc.concept(entity)
+
+            logger.info(f"Loaded {len(self._entity_cache)} VSA entries from DB")
+        except Exception as e:
+            logger.warning(f"Failed to load VSA from DB: {e}")
 
     def query_by_entity(self, entity: str, top_k: int = 10) -> List[str]:
         try:

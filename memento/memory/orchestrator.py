@@ -29,6 +29,7 @@ class MemoryOrchestrator:
 
     def enable_vsa_index(self, db_path: str) -> None:
         self._vsa_index = VSAIndex(db_path, hdc=self._hdc)
+        self._vsa_index.load_from_db()
         logger.info("VSA index enabled for O(1) relational queries")
 
     def disable_vsa_index(self) -> None:

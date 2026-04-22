@@ -6,8 +6,7 @@ from dataclasses import dataclass, field
 
 from memento.memory.active_inference import ActiveInferenceEngine, Prediction, PredictionResult
 from memento.memory.orchestrator import MemoryOrchestrator
-from memento.memory.l2_episodic import L2EpisodicMemory
-from memento.memory.l3_semantic import L3SemanticMemory
+from memento.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
 
@@ -19,6 +18,42 @@ class ConsolidationResult:
     was_surprising: bool
     prediction_error: float
     timestamp: str
+
+class LLMPredictor:
+    """
+    Uses an LLM to generate semantically meaningful predictions.
+    Wraps the event in context and asks for likely outcomes.
+    """
+    PREDICTOR_PROMPT = (
+        "You are a predictor. Given an event, predict the most likely outcome. "
+        "Reply ONLY with a brief prediction (1 sentence). Be specific and concise.\n\n"
+        "Event: {event}\nPrediction:"
+    )
+
+    def __init__(self, llm_client=None, model: str = "openai/gpt-4o-mini"):
+        self._llm = llm_client
+        self._model = model
+
+    def set_client(self, llm_client) -> None:
+        self._llm = llm_client
+
+    async def predict(self, event: str) -> Prediction:
+        if not self._llm:
+            return Prediction(content=event, expected_outcome=event.lower(), confidence=0.5)
+
+        try:
+            response = await self._llm.chat.completions.create(
+                model=self._model,
+                messages=[{"role": "user", "content": self.PREDICTOR_PROMPT.format(event=event)}],
+                max_tokens=64,
+                temperature=0.3,
+            )
+            expected = response.choices[0].message.content.strip()
+            return Prediction(content=event, expected_outcome=expected, confidence=0.8)
+        except Exception as e:
+            logger.warning(f"LLM predictor failed: {e}, falling back to dummy")
+            return Prediction(content=event, expected_outcome=event.lower(), confidence=0.3)
+
 
 class CognitiveConsolidator:
     """
@@ -47,9 +82,14 @@ class CognitiveConsolidator:
         self._pending_events: List[str] = []
         self._consolidation_log: List[ConsolidationResult] = []
         self._running = False
+        self._event_queue: asyncio.Queue = asyncio.Queue()
+        self._llm_predictor = LLMPredictor()
+
+    def set_llm_client(self, llm_client) -> None:
+        self._llm_predictor.set_client(llm_client)
 
     async def predict_outcome(self, event: str) -> Prediction:
-        return await self._engine.predict(event)
+        return await self._llm_predictor.predict(event)
 
     async def process_event(
         self,
@@ -63,7 +103,8 @@ class CognitiveConsolidator:
         If actual_outcome is None, we only predict (monitoring phase).
         If actual_outcome is provided, we evaluate and potentially consolidate.
         """
-        await self._engine.predict(event)
+        pred = await self._llm_predictor.predict(event)
+        self._engine._predictions[event] = pred
 
         if actual_outcome is None:
             return ConsolidationResult(
@@ -124,6 +165,35 @@ class CognitiveConsolidator:
             results.append(result)
         return results
 
+    async def start_streaming(self) -> None:
+        """Start background processing of queued events."""
+        self._running = True
+        asyncio.create_task(self._process_queue())
+
+    async def stop_streaming(self) -> None:
+        self._running = False
+
+    async def enqueue_event(
+        self,
+        event: str,
+        actual_outcome: Optional[str] = None
+    ) -> None:
+        """Add an event to the processing queue."""
+        await self._event_queue.put((event, actual_outcome))
+
+    async def _process_queue(self) -> None:
+        """Background worker that processes queued events."""
+        while self._running:
+            try:
+                event, actual = await asyncio.wait_for(
+                    self._event_queue.get(), timeout=1.0
+                )
+                await self.process_event(event, actual)
+            except asyncio.TimeoutError:
+                continue
+            except Exception as e:
+                logger.error(f"Error processing queued event: {e}")
+
     def get_consolidation_stats(self) -> Dict[str, Any]:
         ai_stats = self._engine.get_stats()
         return {
@@ -135,6 +205,8 @@ class CognitiveConsolidator:
             "stored_to_working": sum(
                 1 for c in self._consolidation_log if c.tier == "working"
             ),
+            "queue_depth": self._event_queue.qsize(),
+            "streaming_active": self._running,
             "recent_events": [
                 {"content": c.content, "tier": c.tier, "surprise": c.was_surprising}
                 for c in self._consolidation_log[-10:]
