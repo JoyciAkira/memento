@@ -1,13 +1,21 @@
-import asyncio
-import os
-import tempfile
 import pytest
+import asyncio
+import sqlite3
 from memento.provider import NeuroGraphProvider
 
 @pytest.mark.asyncio
 async def test_orchestrator_initialized_after_init():
+    from memento.migrations.runner import MigrationRunner
+    from memento.migrations.versions import get_all_migrations
+    import tempfile, os
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
+        runner = MigrationRunner(db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+        runner.run()
+
         provider = NeuroGraphProvider(db_path=db_path)
         await provider.initialize()
 
@@ -19,8 +27,17 @@ async def test_orchestrator_initialized_after_init():
 
 @pytest.mark.asyncio
 async def test_orchestrator_add_to_different_tiers():
+    from memento.migrations.runner import MigrationRunner
+    from memento.migrations.versions import get_all_migrations
+    import tempfile, os
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
+        runner = MigrationRunner(db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+        runner.run()
+
         provider = NeuroGraphProvider(db_path=db_path)
         await provider.initialize()
         orch = provider.orchestrator
@@ -44,8 +61,17 @@ async def test_orchestrator_add_to_different_tiers():
 
 @pytest.mark.asyncio
 async def test_orchestrator_search_all_tiers():
+    from memento.migrations.runner import MigrationRunner
+    from memento.migrations.versions import get_all_migrations
+    import tempfile, os
+
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
+        runner = MigrationRunner(db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+        runner.run()
+
         provider = NeuroGraphProvider(db_path=db_path)
         await provider.initialize()
         orch = provider.orchestrator
@@ -58,3 +84,62 @@ async def test_orchestrator_search_all_tiers():
         assert len(results) == 3
         tiers = {r["memory_tier"] for r in results}
         assert tiers == {"working", "episodic", "semantic"}
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_vsa_index_integration():
+    from memento.migrations.runner import MigrationRunner
+    from memento.migrations.versions import get_all_migrations
+    import tempfile, os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test_vsa_orch.db")
+        runner = MigrationRunner(db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+        runner.run()
+
+        provider = NeuroGraphProvider(db_path=db_path)
+        await provider.initialize()
+        orch = provider.orchestrator
+
+        orch.enable_vsa_index(db_path)
+        assert orch._vsa_index is not None
+
+        orch.add("Python is a great language", tier="semantic")
+        orch.add("FastAPI is a Python web framework", tier="semantic")
+
+        results = orch.search("python", tier="semantic")
+        assert len(results) >= 1
+
+        vsa_stats = orch.get_vsa_stats()
+        assert vsa_stats is not None
+        assert vsa_stats["indexed_memories"] >= 2
+
+        orch.disable_vsa_index()
+        assert orch._vsa_index is None
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_vsa_search_relation():
+    from memento.migrations.runner import MigrationRunner
+    from memento.migrations.versions import get_all_migrations
+    import tempfile, os
+
+    with tempfile.TemporaryDirectory() as tmpdir:
+        db_path = os.path.join(tmpdir, "test_vsa_rel.db")
+        runner = MigrationRunner(db_path)
+        for version, name, fn in get_all_migrations():
+            runner.register(version, name, fn)
+        runner.run()
+
+        provider = NeuroGraphProvider(db_path=db_path)
+        await provider.initialize()
+        orch = provider.orchestrator
+
+        orch.enable_vsa_index(db_path)
+        orch.add("User prefers FastAPI", tier="semantic")
+        orch.add("FastAPI is a web framework", tier="semantic")
+
+        results = orch.search_relation("fastapi", "web framework")
+        assert len(results) >= 1
