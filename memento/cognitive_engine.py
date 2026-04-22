@@ -4,17 +4,28 @@ import os
 
 from memento.prompts.registry import load_prompt
 from memento.llm_client import get_llm_client, get_model_name
+from memento.memory.reflector import MetacognitiveReflector, RetrievalResult
+from memento.memory.vsa_index import VSAIndex
+from memento.memory.hdc import HDCEncoder
 
 logger = logging.getLogger(__name__)
 
 class CognitiveEngine:
-    def __init__(self, provider, workspace_root: str | None = None):
+    def __init__(self, provider, workspace_root: str | None = None,
+                 hdc_encoder: HDCEncoder | None = None,
+                 reflector: MetacognitiveReflector | None = None,
+                 vsa_index: VSAIndex | None = None):
         self.provider = provider
         self._workspace_root = (
             os.path.abspath(workspace_root) if workspace_root else os.getcwd()
         )
         self.model = get_model_name()
         self.llm = get_llm_client()
+        self._hdc = hdc_encoder or HDCEncoder()
+        self._reflector = reflector or MetacognitiveReflector(
+            provider=provider, hdc_encoder=self._hdc
+        )
+        self._vsa_index = vsa_index
         if not self.llm:
             logger.warning("OPENAI_API_KEY not found. LLM features will be disabled.")
 
@@ -304,3 +315,48 @@ class CognitiveEngine:
             fallback = self._deterministic_intent_parse(query)
             logger.info(f"Falling back to deterministic routing: {fallback}")
             return fallback
+
+    async def reflected_search(self, query: str, limit: int = 20) -> dict:
+        """
+        Perform a search with metacognitive reflection.
+        Monitors confidence and triggers self-healing if uncertainty is high.
+        """
+        logger.info(f"CognitiveEngine reflected_search: {query}")
+        try:
+            res_dict = await self.provider.search(query, limit=limit * 2)
+            results = res_dict.get("results", []) if isinstance(res_dict, dict) else res_dict
+
+            retrieval_results = []
+            for r in results[:limit]:
+                if not isinstance(r, dict):
+                    continue
+                retrieval_results.append(RetrievalResult(
+                    id=r.get("id", ""),
+                    memory=r.get("memory", ""),
+                    score=float(r.get("score", 0.0)),
+                    tier=r.get("memory_tier", "unknown"),
+                    relations=r.get("relations", [])
+                ))
+
+            confidence = await self._reflector.evaluate_confidence(
+                retrieval_results, query
+            )
+            report = await self._reflector.reflect(query, retrieval_results, confidence)
+
+            return {
+                "results": [
+                    {"id": r.id, "memory": r.memory, "score": r.score, "tier": r.tier}
+                    for r in retrieval_results[:limit]
+                ],
+                "confidence": round(confidence, 3),
+                "self_healed": report.self_healed,
+                "strategy": report.strategy,
+                "recommendation": report.recommendation,
+                "reflector_stats": self._reflector.get_stats(),
+            }
+        except Exception as e:
+            logger.error(f"Error in reflected_search: {e}")
+            return {"error": str(e), "results": [], "confidence": 0.0}
+
+    def get_reflector_stats(self) -> dict:
+        return self._reflector.get_stats()
