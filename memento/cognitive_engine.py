@@ -7,6 +7,7 @@ from memento.llm_client import get_llm_client, get_model_name
 from memento.memory.reflector import MetacognitiveReflector, RetrievalResult
 from memento.memory.vsa_index import VSAIndex
 from memento.memory.hdc import HDCEncoder
+from memento.memory.consolidator import CognitiveConsolidator, ConsolidationResult
 
 logger = logging.getLogger(__name__)
 
@@ -26,6 +27,7 @@ class CognitiveEngine:
             provider=provider, hdc_encoder=self._hdc
         )
         self._vsa_index = vsa_index
+        self._consolidator: CognitiveConsolidator | None = None
         if not self.llm:
             logger.warning("OPENAI_API_KEY not found. LLM features will be disabled.")
 
@@ -360,3 +362,61 @@ class CognitiveEngine:
 
     def get_reflector_stats(self) -> dict:
         return self._reflector.get_stats()
+
+    def get_consolidator(self, orchestrator) -> CognitiveConsolidator:
+        """Get or create a CognitiveConsolidator wired to this engine's LLM."""
+        if self._consolidator is None:
+            self._consolidator = CognitiveConsolidator(orchestrator)
+            self._consolidator.set_llm_client(self.llm)
+            logger.info("CognitiveConsolidator initialized with LLM client")
+        return self._consolidator
+
+    async def consolidate(
+        self,
+        event: str,
+        actual_outcome: str | None = None,
+        force_consolidate: bool = False
+    ) -> ConsolidationResult:
+        """
+        Process an event through Active Inference: predict -> evaluate -> consolidate.
+
+        If actual_outcome is None, only generates a prediction (monitoring phase).
+        If actual_outcome is provided, evaluates prediction error and consolidates if surprising.
+
+        Args:
+            event: the event description
+            actual_outcome: the observed outcome (optional)
+            force_consolidate: force storage regardless of prediction error
+
+        Returns:
+            ConsolidationResult with was_surprising, prediction_error, tier, memory_id
+        """
+        if not self._consolidator:
+            if hasattr(self.provider, "orchestrator") and self.provider.orchestrator:
+                self.get_consolidator(self.provider.orchestrator)
+            else:
+                raise RuntimeError(
+                    "Consolidator requires an orchestrator. "
+                    "Pass it via get_consolidator(orchestrator) first."
+                )
+
+        return await self._consolidator.process_event(event, actual_outcome, force_consolidate)
+
+    async def consolidate_batch(
+        self,
+        events: list[dict]
+    ) -> list[ConsolidationResult]:
+        """
+        Process a batch of events through Active Inference.
+
+        Each event dict should have:
+        - 'event': the event description
+        - 'actual': the actual outcome (optional)
+        """
+        if not self._consolidator:
+            if hasattr(self.provider, "orchestrator") and self.provider.orchestrator:
+                self.get_consolidator(self.provider.orchestrator)
+            else:
+                raise RuntimeError("Consolidator requires an orchestrator.")
+
+        return await self._consolidator.batch_process(events)
