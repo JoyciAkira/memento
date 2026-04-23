@@ -2,12 +2,14 @@ import pytest
 import os
 import tempfile
 
+_API_KEY_PLACEHOLDER = "sk-or-v2-placeholder-key-for-tests"
+
 @pytest.mark.asyncio
 async def test_consolidate_method_on_engine():
     from memento.provider import NeuroGraphProvider
     from memento.cognitive_engine import CognitiveEngine
 
-    os.environ["OPENAI_API_KEY"] = "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"
+    os.environ["OPENAI_API_KEY"] = _API_KEY_PLACEHOLDER
     os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
     os.environ["MEM0_MODEL"] = "nvidia/nemotron-3-super-120b-a12b:free"
 
@@ -34,7 +36,7 @@ async def test_consolidate_predict_only():
     from memento.provider import NeuroGraphProvider
     from memento.cognitive_engine import CognitiveEngine
 
-    os.environ["OPENAI_API_KEY"] = "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"
+    os.environ["OPENAI_API_KEY"] = "sk-or-v2-placeholder-key-for-tests"
     os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
     os.environ["MEM0_MODEL"] = "nvidia/nemotron-3-super-120b-a12b:free"
 
@@ -58,7 +60,7 @@ async def test_consolidate_batch():
     from memento.provider import NeuroGraphProvider
     from memento.cognitive_engine import CognitiveEngine
 
-    os.environ["OPENAI_API_KEY"] = "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"
+    os.environ["OPENAI_API_KEY"] = "sk-or-v2-placeholder-key-for-tests"
     os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
     os.environ["MEM0_MODEL"] = "nvidia/nemotron-3-super-120b-a12b:free"
 
@@ -85,7 +87,7 @@ def test_get_consolidator_initializes_once():
     from memento.cognitive_engine import CognitiveEngine
     import asyncio
 
-    os.environ["OPENAI_API_KEY"] = "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"
+    os.environ["OPENAI_API_KEY"] = "sk-or-v2-placeholder-key-for-tests"
     os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
     os.environ["MEM0_MODEL"] = "nvidia/nemotron-3-super-120b-a12b:free"
 

@@ -1,0 +1,8 @@
+{
+  "techStack": "Python 3.10+, SQLite, aiosqlite, OpenAI, tree-sitter, MCP SDK",
+  "build": "uv sync, uv run pytest tests/, uv run memento-mcp",
+  "conventions": "No print() in production, use logging. AGPL-3.0 license. Pre-commit: ruff + bandit + mypy.",
+  "version": "1.0.0",
+  "lastScanned": 1776490079447,
+  "projectRoot": "/Users/danielecorrao/GITHUB_REPOS/Memento"
+}
