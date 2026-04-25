@@ -1,6 +1,6 @@
 import time
 from collections import OrderedDict
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Iterable
 
 class L1WorkingMemory:
     """
@@ -34,3 +34,36 @@ class L1WorkingMemory:
 
     def clear(self) -> None:
         self._cache.clear()
+
+    def dump(self) -> List[Dict[str, Any]]:
+        return [
+            {
+                "id": item.get("id"),
+                "content": item.get("content"),
+                "metadata": item.get("metadata") if isinstance(item.get("metadata"), dict) else {},
+                "timestamp": float(item.get("timestamp") or 0.0),
+            }
+            for item in self.get_all()
+        ]
+
+    def restore(self, items: Iterable[Dict[str, Any]]) -> None:
+        self._cache.clear()
+        seq = list(items or [])
+        for raw in seq:
+            if not isinstance(raw, dict):
+                continue
+            entry_id = raw.get("id")
+            content = raw.get("content", "")
+            metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+            ts = float(raw.get("timestamp") or time.time())
+            if not isinstance(entry_id, str) or not entry_id:
+                continue
+            self._cache[entry_id] = {
+                "id": entry_id,
+                "content": str(content),
+                "metadata": metadata,
+                "timestamp": ts,
+            }
+
+        while len(self._cache) > self.max_size:
+            self._cache.popitem(last=False)
