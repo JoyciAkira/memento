@@ -143,6 +143,10 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
         "memento_dismiss_notification": {"workspace_root": str(ws), "notification_id": "nonexistent"},
         "memento_set_goals": {"workspace_root": str(ws), "goals": ["smoke: keep CI green"]},
         "memento_list_goals": {"workspace_root": str(ws)},
+        "memento_begin_session": {"workspace_root": str(ws)},
+        "memento_handoff": {"workspace_root": str(ws)},
+        "memento_list_sessions": {"workspace_root": str(ws)},
+        "memento_session_status": {"workspace_root": str(ws)},
         "memento_search_vnext": {"workspace_root": str(ws), "query": "smoke"},
         "memento_explain_retrieval": {"workspace_root": str(ws), "query": "smoke"},
     }
@@ -164,6 +168,25 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             except Exception as e:
                 failures.append((name, str(e)))
             await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
+            continue
+
+        if name == "memento_resume_session":
+            try:
+                out_handoff = await call_tool("memento_handoff", {"workspace_root": str(ws)})
+                _mcp_contract.validate_tool_response_contract("memento_handoff", out_handoff)
+                handoff_text = out_handoff[0].text if out_handoff else ""
+                session_line = next(
+                    (line for line in (handoff_text or "").splitlines() if line.startswith("Session:")),
+                    "",
+                )
+                session_id = session_line.split("Session:", 1)[1].strip() if "Session:" in session_line else ""
+                out = await call_tool(
+                    name,
+                    {"workspace_root": str(ws), "session_id": session_id},
+                )
+                _mcp_contract.validate_tool_response_contract(name, out)
+            except Exception as e:
+                failures.append((name, str(e)))
             continue
 
         try:
@@ -198,4 +221,3 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
         failures.append(("memento_explain_search (post-ciclo)", str(e)))
 
     assert failures == []
-
