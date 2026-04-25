@@ -25,6 +25,14 @@ app = Server("memento-mcp")
 _ui_thread = None
 _tool_registration = _memento_tools
 
+
+def _auto_checkpoint_every_n() -> int:
+    try:
+        return max(int(os.environ.get("MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS", "25")), 1)
+    except Exception:
+        return 25
+
+
 @app.list_tools()
 async def list_tools() -> list[Tool]:
     return registry.get_tools()
@@ -53,8 +61,41 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             port=ui_port,
             active_coercion=ctx.active_coercion,
         )
-    
-    return await registry.execute(name, arguments, ctx, access_manager=ctx.access_manager)
+
+    await ctx.provider.initialize()
+    session_id = await ctx.session_manager.ensure_session()
+
+    is_error = False
+    out: list[TextContent] = []
+    try:
+        out = await registry.execute(name, arguments, ctx, access_manager=ctx.access_manager)
+        return out
+    except Exception:
+        is_error = True
+        raise
+    finally:
+        try:
+            active_context_val = arguments.get("active_context") if isinstance(arguments, dict) else None
+            result_text = "\n".join(
+                c.text
+                for c in out
+                if getattr(c, "type", None) == "text" and isinstance(getattr(c, "text", None), str)
+            )
+            await ctx.session_manager.store.append_tool_event(
+                session_id=session_id,
+                tool_name=name,
+                arguments=arguments if isinstance(arguments, dict) else {},
+                result_text=result_text,
+                is_error=is_error,
+                active_context=active_context_val if isinstance(active_context_val, str) else None,
+            )
+
+            n = _auto_checkpoint_every_n()
+            recent = await ctx.session_manager.store.get_recent_events(session_id=session_id, limit=n)
+            if len(recent) >= n:
+                await ctx.session_manager.create_checkpoint(session_id=session_id, reason="auto")
+        except Exception:
+            pass
 
 async def run():
     logger.info("Starting Memento MCP server via stdio")
