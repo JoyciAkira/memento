@@ -57,8 +57,11 @@ class GoalStore:
         safe_limit = min(int(limit), 200)
         safe_offset = max(int(offset), 0)
 
-        where = ["(context IS ? OR context = ?)"]
-        params: list[Any] = [context, context]
+        where: list[str] = []
+        params: list[Any] = []
+        if context is not None:
+            where.append("(context IS ? OR context = ?)")
+            params.extend([context, context])
         if active_only:
             where.append("is_active = 1 AND is_deleted = 0")
 
@@ -69,7 +72,7 @@ class GoalStore:
                 f"""
                 SELECT id, context, goal, created_at, updated_at, is_active, is_deleted,
                        deleted_at, delete_reason, replaced_by_id
-                FROM goals WHERE {where_sql}
+                FROM goals {"WHERE " + where_sql if where_sql else ""}
                 ORDER BY created_at DESC, rowid DESC LIMIT ? OFFSET ?
                 """,
                 (*params, safe_limit, safe_offset),

@@ -17,6 +17,8 @@ logger = logging.getLogger("memento-mcp")
             "properties": {
                 "goals": {"type": "array", "items": {"type": "string"}},
                 "context": {"type": "string"},
+                "active_context": {"type": "string"},
+                "workspace_root": {"type": "string"},
                 "mode": {"type": "string", "enum": ["replace", "append"], "default": "replace"},
                 "delete_reason": {"type": "string"},
             },
@@ -55,6 +57,8 @@ async def memento_set_goals(arguments: dict, ctx, access_manager) -> list[TextCo
             "properties": {
                 "active_only": {"type": "boolean", "default": True},
                 "context": {"type": "string"},
+                "active_context": {"type": "string"},
+                "workspace_root": {"type": "string"},
                 "limit": {"type": "integer", "default": 50},
                 "offset": {"type": "integer", "default": 0},
             },
