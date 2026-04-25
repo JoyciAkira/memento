@@ -91,8 +91,8 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             )
 
             n = _auto_checkpoint_every_n()
-            recent = await ctx.session_manager.store.get_recent_events(session_id=session_id, limit=n)
-            if len(recent) >= n:
+            cnt = await ctx.session_manager.store.count_events(session_id=session_id)
+            if cnt > 0 and cnt % n == 0:
                 await ctx.session_manager.create_checkpoint(session_id=session_id, reason="auto")
         except Exception:
             pass

@@ -257,3 +257,11 @@ class SessionStore:
             for r in rows
         ]
 
+    async def count_events(self, *, session_id: str) -> int:
+        async with aiosqlite.connect(self.db_path) as db:
+            cursor = await db.execute(
+                "SELECT COUNT(*) FROM session_events WHERE session_id=?",
+                (session_id,),
+            )
+            row = await cursor.fetchone()
+        return int(row[0] or 0) if row else 0
