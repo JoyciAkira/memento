@@ -5,6 +5,7 @@ from memento.provider import NeuroGraphProvider
 from memento.cognitive_engine import CognitiveEngine
 from memento.access_manager import MementoAccessManager
 from memento.config_store import WorkspaceConfigStore
+from memento.session_manager import SessionManager
 
 logger = logging.getLogger("memento-workspace")
 
@@ -29,6 +30,11 @@ class WorkspaceContext:
         self.relevance_tracker = None
         self.predictive_cache = None
         self.notification_manager = None
+        self.session_manager = SessionManager(
+            db_path=self.db_path,
+            workspace_root=self.workspace_root,
+            provider=self.provider,
+        )
 
     @property
     def enforcement_config(self):
