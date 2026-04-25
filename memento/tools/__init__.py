@@ -12,6 +12,7 @@ from . import (
     predictive,
     quality,
     relevance,
+    sessions,
     vnext_retrieval,
 )
 
@@ -29,5 +30,6 @@ __all__ = [
     "predictive",
     "quality",
     "relevance",
+    "sessions",
     "vnext_retrieval",
 ]
