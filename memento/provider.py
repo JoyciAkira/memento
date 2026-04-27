@@ -187,6 +187,36 @@ class NeuroGraphProvider:
             self._sync_db = sqlite3.connect(self.db_path)
             self._sync_db.row_factory = sqlite3.Row
             self.orchestrator = MemoryOrchestrator(self._sync_db)
+            self.orchestrator.enable_vsa_index(self.db_path)
+            await asyncio.to_thread(self._ensure_vsa_backfilled)
+
+    def _ensure_vsa_backfilled(self) -> None:
+        try:
+            from memento.memory.vsa_index import VSAIndex
+
+            idx = VSAIndex(self.db_path)
+            idx.load_from_db()
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute(
+                """
+                SELECT id, text, metadata, memory_tier
+                FROM memories
+                WHERE id NOT IN (SELECT memory_id FROM _vsa_entities)
+                LIMIT 1000
+                """
+            ).fetchall()
+            conn.close()
+            for row in rows:
+                try:
+                    metadata = json.loads(row["metadata"] or "{}")
+                except Exception:
+                    metadata = {}
+                if row["memory_tier"]:
+                    metadata.setdefault("memory_tier", row["memory_tier"])
+                idx.index_memory(row["id"], row["text"] or "", metadata)
+        except Exception as e:
+            logger.debug(f"VSA backfill skipped: {e}")
 
     def _write_search_trace_file(self, trace: dict) -> None:
         v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "1").strip().lower()
@@ -268,6 +298,21 @@ class NeuroGraphProvider:
             )
             await db.commit()
 
+        try:
+            await asyncio.to_thread(
+                self.orchestrator._vsa_index.index_memory,
+                memory_id,
+                redacted_text,
+                {**meta, "memory_tier": meta.get("memory_tier", "semantic")},
+            )
+        except Exception as e:
+            logger.debug(f"VSA indexing skipped for {memory_id}: {e}")
+
+        try:
+            await self._record_autonomous_memory_signal(memory_id, redacted_text, meta)
+        except Exception as e:
+            logger.debug(f"Autonomous memory signal skipped for {memory_id}: {e}")
+
         if self.kg:
             try:
                 await asyncio.to_thread(self.kg.add, redacted_text)
@@ -275,6 +320,48 @@ class NeuroGraphProvider:
                 logger.warning(f"Failed to add to KG: {e}")
             
         return {"id": memory_id, "memory": redacted_text, "event": "ADD"}
+
+    async def _record_autonomous_memory_signal(
+        self,
+        memory_id: str,
+        text: str,
+        metadata: dict[str, Any],
+    ) -> None:
+        from memento.memory.governor import MemoryGovernor
+
+        governor = MemoryGovernor()
+        surprise = float(metadata.get("prediction_error", metadata.get("surprise_score", 0.0)) or 0.0)
+        signal = governor.score(
+            memory_id=memory_id,
+            semantic_similarity=1.0,
+            vsa_resonance=1.0,
+            created_at=datetime.now().isoformat(),
+            hit_count=0,
+            surprise=surprise,
+        )
+        decision = governor.decide(signal, novelty=1.0 if metadata.get("source") == "daemon" else 0.0)
+        now = datetime.now().isoformat()
+        async with self._write_lock:
+            db = self._db
+            assert db is not None
+            await db.execute(
+                """
+                INSERT OR IGNORE INTO memory_meta (id, created_at, updated_at, is_deleted)
+                VALUES (?, ?, ?, 0)
+                """,
+                (memory_id, now, now),
+            )
+            await db.execute(
+                """
+                UPDATE memory_meta
+                SET updated_at = ?,
+                    hit_count = COALESCE(hit_count, 0) + ?,
+                    last_accessed_at = CASE WHEN ? THEN ? ELSE last_accessed_at END
+                WHERE id = ?
+                """,
+                (now, 1 if decision.should_prefetch else 0, 1 if decision.should_inject else 0, now, memory_id),
+            )
+            await db.commit()
 
     async def search(self, query: str, user_id: str = "default", limit: int = 100, filters: dict = None) -> List[Dict[str, Any]]:
         if not self._initialized:
@@ -522,7 +609,7 @@ class NeuroGraphProvider:
         async with self._read_lock:
             db_read = self._db_read
             assert db_read is not None
-            return await retrieve_bundle(
+            bundle = await retrieve_bundle(
                 db_path=self.db_path,
                 query=query,
                 user_id=user_id,
@@ -532,6 +619,11 @@ class NeuroGraphProvider:
                 trace=trace,
                 db=db_read,
             )
+            if bundle.get("results"):
+                from memento.memory.governor import MemoryGovernor
+
+                bundle["results"] = MemoryGovernor().annotate_results(bundle["results"])
+            return bundle
 
     async def soft_delete_memory(
         self,

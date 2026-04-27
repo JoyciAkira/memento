@@ -60,4 +60,16 @@ def test_vsa_persistence_and_reload(tmp_path):
 
     stats2 = idx2.get_index_stats()
     assert stats2["indexed_memories"] == 2
+    assert stats2["stored_vectors"] == 2
     assert idx2._entity_cache.get("mem1") is not None
+
+
+def test_vsa_query_returns_ranked_scores():
+    idx = VSAIndex(":memory:")
+    idx.index_memory("mem1", "Python FastAPI retrieval pipeline")
+    idx.index_memory("mem2", "Kitchen recipe with tomatoes")
+
+    ranked = idx.query("FastAPI retrieval", top_k=2)
+
+    assert ranked[0][0] == "mem1"
+    assert ranked[0][1] >= ranked[1][1]

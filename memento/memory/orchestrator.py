@@ -65,10 +65,13 @@ class MemoryOrchestrator:
         tier: str = "all",
         limit: int = 100
     ) -> List[Dict[str, Any]]:
+        vsa_results: List[Dict[str, Any]] = []
         if self._vsa_index and tier in ("episodic", "semantic", "all"):
             vsa_ids = self._vsa_index.query_by_entity(query, top_k=limit)
             if vsa_ids:
-                return self._fetch_by_ids(vsa_ids, tier)
+                vsa_results = self._fetch_by_ids(vsa_ids, tier)
+                if tier != "all":
+                    return vsa_results
 
         if tier == "all":
             l3_results = self.l3.search(query, limit)
@@ -78,7 +81,15 @@ class MemoryOrchestrator:
                 {"id": item["id"], "memory": item["content"], "metadata": item.get("metadata", {}), "memory_tier": "working"}
                 for item in l1_items
             ]
-            return l3_results + l2_results + l1_formatted
+            merged: List[Dict[str, Any]] = []
+            seen: set[str] = set()
+            for item in vsa_results + l3_results + l2_results + l1_formatted:
+                item_id = item.get("id")
+                if item_id in seen:
+                    continue
+                seen.add(item_id)
+                merged.append(item)
+            return merged
         elif tier == "working":
             return self.l1.get_all()
         elif tier == "episodic":

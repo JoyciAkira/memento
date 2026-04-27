@@ -1,1 +1,1 @@
-__all__ = ["fts", "recency", "dense"]
+__all__ = ["fts", "recency", "dense", "vsa"]

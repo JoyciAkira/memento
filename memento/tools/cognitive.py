@@ -71,6 +71,15 @@ async def memento_toggle_precognition(arguments: dict, ctx, access_manager) -> l
             final_alert += f"\n\n{deviation}" if final_alert else deviation
             
         if final_alert:
+            try:
+                await ctx.cognitive_engine.consolidate(
+                    event=f"Relevant workspace change detected in {filepath}",
+                    actual_outcome=content[:1200],
+                    force_consolidate=False,
+                )
+            except Exception as e:
+                logger.debug(f"Autonomous consolidation skipped for {filepath}: {e}")
+
             logger.warning(f"Pushing MCP Notification for {filepath}")
             from mcp.server import request_ctx
             try:

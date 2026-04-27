@@ -56,7 +56,9 @@ async def test_vnext_pipeline_returns_traces_and_results():
         assert len(bundle["results"]) >= 1
         assert any(t["lane"] == "fts" for t in bundle["traces"])
         assert any(t["lane"] == "dense" for t in bundle["traces"])
+        assert any(t["lane"] == "vsa" for t in bundle["traces"])
         assert any(t["lane"] == "recency" for t in bundle["traces"])
+        assert "strength" in bundle["results"][0]
 
 
 @pytest.mark.asyncio

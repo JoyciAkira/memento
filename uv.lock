@@ -887,6 +887,12 @@ test = [
     { name = "pytest-cov" },
 ]
 
+[package.dev-dependencies]
+dev = [
+    { name = "numpy", version = "2.2.6", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version < '3.11'" },
+    { name = "numpy", version = "2.4.4", source = { registry = "https://pypi.org/simple" }, marker = "python_full_version >= '3.11'" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "aiosqlite" },
@@ -903,6 +909,9 @@ requires-dist = [
     { name = "watchdog", specifier = ">=4.0.0" },
 ]
 provides-extras = ["embeddings", "test"]
+
+[package.metadata.requires-dev]
+dev = [{ name = "numpy", specifier = ">=2.2.6" }]
 
 [[package]]
 name = "mmh3"

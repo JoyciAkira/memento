@@ -7,6 +7,7 @@ import aiosqlite
 from memento.retrieval.lanes.dense import lane_dense
 from memento.retrieval.lanes.fts import lane_fts
 from memento.retrieval.lanes.recency import lane_recency
+from memento.retrieval.lanes.vsa import lane_vsa
 from memento.retrieval.types import ContextBundle, LaneTrace
 
 EmbedFn = Callable[[str], Awaitable[list[float]]]
@@ -73,10 +74,16 @@ async def retrieve_bundle(
             filter_params=filter_params,
             limit=200,
         )
+        vsa_ranked = await lane_vsa(
+            db_path=db_path,
+            query=query,
+            limit=200,
+            filters=filters,
+        )
 
         seen: set[str] = set()
         candidate_ids: list[str] = []
-        for doc_id, _ in list(fts_ranked) + list(recent_ranked):
+        for doc_id, _ in list(fts_ranked) + list(vsa_ranked) + list(recent_ranked):
             if doc_id in seen:
                 continue
             seen.add(doc_id)
@@ -93,9 +100,9 @@ async def retrieve_bundle(
         )
 
         fused = rrf_fuse(
-            lanes={"fts": fts_ranked, "dense": dense_ranked, "recency": recent_ranked},
+            lanes={"fts": fts_ranked, "dense": dense_ranked, "vsa": vsa_ranked, "recency": recent_ranked},
             k=60,
-            lane_weights={"fts": 1.0, "dense": 1.0, "recency": 0.5},
+            lane_weights={"fts": 1.0, "dense": 1.0, "vsa": 1.2, "recency": 0.5},
             limit=limit,
         )
 
@@ -105,8 +112,8 @@ async def retrieve_bundle(
             placeholders = ",".join(["?"] * len(ids))
             cur = await db_conn.execute(
                 f"SELECT id, text, created_at, metadata "
-                f"FROM memories WHERE user_id = ? AND id IN ({placeholders})",
-                (user_id, *ids),
+                f"FROM memories WHERE user_id = ? {filter_sql} AND id IN ({placeholders})",
+                (user_id, *filter_params, *ids),
             )
             rows = await cur.fetchall()
             row_map = {r["id"]: r for r in rows}
@@ -135,6 +142,12 @@ async def retrieve_bundle(
                     "considered": len(dense_ranked),
                     "returned": min(10, len(dense_ranked)),
                     "top": [{"id": i, "score": s} for i, s in dense_ranked[:10]],
+                },
+                {
+                    "lane": "vsa",
+                    "considered": len(vsa_ranked),
+                    "returned": min(10, len(vsa_ranked)),
+                    "top": [{"id": i, "score": s} for i, s in vsa_ranked[:10]],
                 },
                 {
                     "lane": "recency",
