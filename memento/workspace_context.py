@@ -6,6 +6,7 @@ from memento.cognitive_engine import CognitiveEngine
 from memento.access_manager import MementoAccessManager
 from memento.config_store import WorkspaceConfigStore
 from memento.session_manager import SessionManager
+from memento.autonomous import AutonomousAgent, AutonomyLevel
 
 logger = logging.getLogger("memento-workspace")
 
@@ -35,6 +36,11 @@ class WorkspaceContext:
             workspace_root=self.workspace_root,
             provider=self.provider,
         )
+        self.autonomous_agent = AutonomousAgent(
+            provider=self.provider,
+            cognitive_engine=self.cognitive_engine,
+            workspace_root=self.workspace_root,
+        )
 
     @property
     def enforcement_config(self):
@@ -59,6 +65,14 @@ class WorkspaceContext:
     @dependency_tracker.setter
     def dependency_tracker(self, value):
         self.config.dependency_tracker = value
+
+    @property
+    def autonomy(self):
+        return self.config.autonomy
+
+    @autonomy.setter
+    def autonomy(self, value):
+        self.config.autonomy = value
 
     def toggle_daemon(self, enabled: bool, callback) -> bool:
         if enabled:
@@ -102,6 +116,18 @@ class WorkspaceContext:
 
     def save_dependency_tracker_config(self):
         self.config.save()
+
+    def save_autonomy_config(self):
+        self.config.save()
+
+    def start_autonomous_agent(self) -> bool:
+        """Start the autonomous agent with the configured level."""
+        level_str = self.autonomy.get("level", "off")
+        self.autonomous_agent.set_level(level_str)
+        return self.autonomous_agent.start()
+
+    def stop_autonomous_agent(self) -> bool:
+        return self.autonomous_agent.stop()
 
 _contexts: Dict[str, WorkspaceContext] = {}
 

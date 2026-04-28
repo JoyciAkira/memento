@@ -50,6 +50,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     workspace_root = workspace_root or os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
     ctx = get_workspace_context(workspace_root)
 
+    # Start autonomous agent if configured and not running
+    if ctx.autonomy.get("level", "off") != "off" and not ctx.autonomous_agent.is_running:
+        try:
+            ctx.start_autonomous_agent()
+        except Exception:
+            pass
+
     global _ui_thread
     ui_enabled = os.environ.get("MEMENTO_UI", "").lower() in ("1", "true", "yes", "on")
     if ui_enabled and _ui_thread is None:

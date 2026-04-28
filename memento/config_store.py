@@ -24,6 +24,7 @@ class WorkspaceConfigStore:
         self.enforcement_config: dict[str, Any] = {"level1": False, "level2": False, "level3": False}
         self.active_coercion: dict[str, Any] = {"enabled": False, "rules": []}
         self.dependency_tracker: dict[str, Any] = {"enabled": False}
+        self.autonomy: dict[str, Any] = {"level": "off"}
 
     def load(self) -> None:
         data = self._read_settings()
@@ -47,6 +48,12 @@ class WorkspaceConfigStore:
             if isinstance(enabled, bool):
                 self.dependency_tracker["enabled"] = enabled
 
+        autonomy = data.get("autonomy", {})
+        if isinstance(autonomy, dict):
+            level = autonomy.get("level", "off")
+            if isinstance(level, str) and level in ("off", "passive", "active", "autonomous"):
+                self.autonomy["level"] = level
+
         rules_content = self._read_rules_file()
         if rules_content is not None:
             try:
@@ -66,6 +73,9 @@ class WorkspaceConfigStore:
         }
         data["dependency_tracker"] = {
             "enabled": bool(self.dependency_tracker.get("enabled", False)),
+        }
+        data["autonomy"] = {
+            "level": self.autonomy.get("level", "off"),
         }
         self._write_settings(data)
 

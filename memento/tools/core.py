@@ -45,6 +45,13 @@ async def memento_status(arguments: dict, ctx, access_manager) -> list[TextConte
     status_lines.append("\n[Dependency Tracker]")
     status_lines.append(f"- enabled: {'yes' if ctx.dependency_tracker.get('enabled') else 'no'}")
 
+    status_lines.append("\n[Autonomous Agent]")
+    auto_status = ctx.autonomous_agent.get_status()
+    status_lines.append(f"- level: {auto_status['level']}")
+    status_lines.append(f"- running: {'yes' if auto_status['running'] else 'no'}")
+    status_lines.append(f"- cycles: {auto_status['cycle_count']}")
+    status_lines.append(f"- actions taken: {auto_status['stats']['actions_taken']}")
+
     status_lines.append("\n[Daemon]")
     status_lines.append(f"- running: {'yes' if ctx.daemon and ctx.daemon.is_running else 'no'}")
 

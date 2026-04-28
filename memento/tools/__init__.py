@@ -1,4 +1,5 @@
 from . import (
+    autonomy as autonomous_tools,
     cognitive,
     coercion,
     consolidation,
@@ -17,6 +18,7 @@ from . import (
 )
 
 __all__ = [
+    "autonomous_tools",
     "cognitive",
     "coercion",
     "consolidation",
