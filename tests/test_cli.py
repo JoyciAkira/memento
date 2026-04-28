@@ -142,3 +142,22 @@ class TestCLICoerce:
         captured = capsys.readouterr()
         assert "Active Coercion" in captured.out
         assert "no_print_py" in captured.out or "rules" in captured.out
+
+
+class TestCLIUpdateHelp:
+    def test_update_help(self, monkeypatch, capsys):
+        monkeypatch.setattr("sys.argv", ["memento", "update", "--help"])
+        with pytest.raises(SystemExit) as exc_info:
+            from memento.cli import main
+
+            main()
+        assert exc_info.value.code == 0
+
+    def test_update_dry_run(self, monkeypatch, capsys):
+        monkeypatch.setattr("sys.argv", ["memento", "update", "--dry-run"])
+        from unittest.mock import patch, MagicMock
+        with patch("memento.updater._get_version", return_value="0.1.0"):
+            from memento.cli import main
+            main()
+        captured = capsys.readouterr()
+        assert "dry-run" in captured.out.lower() or "dry_run" in captured.out.lower()

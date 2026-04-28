@@ -12,6 +12,9 @@ Usage::
     memento search "query string"                   # search memories
     memento status                                  # workspace info
     memento doctor                                  # environment health check
+    memento update                                  # update to latest version
+    memento update --dry-run                        # preview update
+    memento update --restart                        # update + best-effort restart
     memento coerce --list                           # list preset packs
     memento coerce --apply typescript-strict        # apply a preset
     memento coerce --status                         # show active rules
@@ -281,6 +284,51 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
     print("Use --apply PRESET, --list, or --status. Run 'memento coerce --help'.")
 
 
+def _handle_update(args: argparse.Namespace) -> None:
+    from memento.redaction import redact_secrets
+    from memento.updater import (
+        detect_installed_package,
+        upgrade_with_fallback,
+        format_report,
+        restart_best_effort,
+        _get_version,
+        _extract_version,
+    )
+
+    dry_run = getattr(args, "dry_run", False)
+    do_restart = getattr(args, "restart", False)
+
+    detected = detect_installed_package()
+    old_version = None
+    if detected:
+        old_version = _get_version(detected)
+
+    success, pkg_used, pip_output = upgrade_with_fallback(dry_run=dry_run)
+    pip_output = redact_secrets(pip_output)
+
+    new_version = None
+    if success and not dry_run:
+        new_version = _extract_version(pip_output)
+
+    report = format_report(
+        python_path=sys.executable,
+        package=pkg_used,
+        old_version=old_version,
+        new_version=new_version,
+        success=success,
+        pip_output=pip_output,
+        dry_run=dry_run,
+    )
+    print(report)
+
+    if success and do_restart and not dry_run:
+        result = restart_best_effort()
+        if result["killed"] > 0:
+            print(f"  Restarted {result['killed']} memento-mcp process(es).")
+        else:
+            print("  No running memento-mcp processes found. Restart your IDE manually.")
+
+
 def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="memento",
@@ -348,6 +396,23 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show active coercion rules.",
     )
 
+    update_parser = subparsers.add_parser(
+        "update",
+        help="Update Memento to the latest version via pip.",
+    )
+    update_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Show what would be done without actually upgrading.",
+    )
+    update_parser.add_argument(
+        "--restart",
+        action="store_true",
+        default=False,
+        help="Best-effort: kill running memento-mcp processes after update.",
+    )
+
     return parser
 
 
@@ -368,6 +433,7 @@ def main() -> None:
         "status": _handle_status,
         "doctor": _handle_doctor,
         "coerce": _handle_coerce,
+        "update": _handle_update,
     }
 
     handler = handler_map.get(args.command)
@@ -376,7 +442,10 @@ def main() -> None:
         sys.exit(1)
 
     try:
-        asyncio.run(handler(args))
+        if asyncio.iscoroutinefunction(handler):
+            asyncio.run(handler(args))
+        else:
+            handler(args)
     except KeyboardInterrupt:
         sys.exit(130)
     except Exception as exc:  # noqa: BLE001

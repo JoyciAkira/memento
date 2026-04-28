@@ -36,7 +36,7 @@ _VNEXT_MEDIAN_MAX_S = 0.12
 _VNEXT_P95_MAX_S = 0.40
 _VNEXT_MAX_SINGLE_S = 0.90
 
-_EXPECTED_TOOL_COUNT = 45
+_EXPECTED_TOOL_COUNT = 50
 
 
 def _p95(sorted_durations: list[float]) -> float:

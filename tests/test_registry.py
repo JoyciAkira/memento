@@ -19,9 +19,7 @@ class TestRegistry:
     def test_unknown_tool_raises(self):
         reg = ToolRegistry()
         with pytest.raises(ValueError, match="Unknown tool"):
-            asyncio.get_event_loop().run_until_complete(
-                reg.execute("nonexistent_tool", {}, None)
-            )
+            asyncio.run(reg.execute("nonexistent_tool", {}, None))
 
     def test_get_tools_returns_all(self):
         reg = ToolRegistry()
