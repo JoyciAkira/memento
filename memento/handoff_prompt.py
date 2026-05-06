@@ -60,9 +60,65 @@ def render_handoff_prompt(*, session_id: str, snapshot: dict[str, Any]) -> str:
         "",
         "RECENT TOOL CALLS",
         ev_block,
-        "",
-        "TO RESUME",
-        f"Call: memento_resume_session(session_id=\"{session_id}\")",
     ]
+
+    project_state = snapshot.get("project_state") or ""
+    if project_state and project_state.strip():
+        parts.append("")
+        parts.append("PROJECT STATE")
+        parts.append(project_state.strip())
+
+    parts.append("")
+    parts.append("TO RESUME")
+    parts.append(f"Call: memento_resume_session(session_id=\"{session_id}\")")
+
     return "\n".join(parts).strip() + "\n"
 
+
+def render_session_diff_prompt(
+    *,
+    current_snapshot: dict[str, Any],
+    previous_snapshot: dict[str, Any] | None,
+) -> str:
+    """Generate a diff between current and previous session checkpoints."""
+    if not previous_snapshot:
+        return ""
+
+    parts = ["SESSION DELTA (since last session)", ""]
+
+    prev_goals = {g.get("goal") for g in _as_list(previous_snapshot.get("goals")) if isinstance(g, dict)}
+    curr_goals = {g.get("goal") for g in _as_list(current_snapshot.get("goals")) if isinstance(g, dict)}
+    new_goals = curr_goals - prev_goals
+    removed_goals = prev_goals - curr_goals
+    if new_goals:
+        parts.append("NEW GOALS:")
+        for g in new_goals:
+            parts.append(f"  + {g}")
+        parts.append("")
+    if removed_goals:
+        parts.append("REMOVED GOALS:")
+        for g in removed_goals:
+            parts.append(f"  - {g}")
+        parts.append("")
+    if not new_goals and not removed_goals:
+        parts.append("GOALS: unchanged")
+        parts.append("")
+
+    prev_git = previous_snapshot.get("git_context") or ""
+    curr_git = current_snapshot.get("git_context") or ""
+    if prev_git != curr_git:
+        parts.append("GIT CHANGES:")
+        if curr_git.strip():
+            parts.append(curr_git.strip())
+        parts.append("")
+
+    prev_files = set(_as_list(previous_snapshot.get("active_contexts")))
+    curr_files = set(_as_list(current_snapshot.get("active_contexts")))
+    new_files = curr_files - prev_files
+    if new_files:
+        parts.append("NEW FILES TOUCHED:")
+        for f in sorted(new_files)[:10]:
+            parts.append(f"  + {f}")
+        parts.append("")
+
+    return "\n".join(parts).strip() + "\n" if len(parts) > 2 else ""

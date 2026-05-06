@@ -21,7 +21,7 @@ class WorkspaceConfigStore:
         self._rules_path = os.path.join(workspace_root, ".memento.rules.md")
         self._legacy_rules_path = os.path.join(memento_dir, "memento.rules.md")
 
-        self.enforcement_config: dict[str, Any] = {"level1": False, "level2": False, "level3": False}
+        self.enforcement_config: dict[str, Any] = {"level1": True, "level2": False, "level3": False}
         self.active_coercion: dict[str, Any] = {"enabled": False, "rules": []}
         self.dependency_tracker: dict[str, Any] = {"enabled": False}
         self.autonomy: dict[str, Any] = {"level": "off"}

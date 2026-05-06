@@ -12,6 +12,7 @@ from memento.ui_server import start_ui_server_thread
 from memento.registry import registry
 import memento.tools as _memento_tools
 from memento.tools.utils import find_project_root, get_active_goals
+from memento.goal_middleware import per_call_goal_check, session_progress_report
 
 # Configure logger
 logging.basicConfig(
@@ -72,10 +73,48 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     await ctx.provider.initialize()
     session_id = await ctx.session_manager.ensure_session()
 
+    # Auto-resume: restore L1 from last checkpoint on first tool call of session
+    try:
+        event_count = await ctx.session_manager.store.count_events(session_id=session_id)
+        if event_count <= 1:
+            sessions = await ctx.session_manager.store.list_sessions(limit=5, status="closed")
+            for prev in sessions:
+                prev_id = prev.get("id")
+                if not prev_id or not prev.get("last_checkpoint_at"):
+                    continue
+                prev_row = await ctx.session_manager.store.get_session(prev_id)
+                if not prev_row or not prev_row.checkpoint_data:
+                    continue
+                import json as _json
+                data = _json.loads(prev_row.checkpoint_data) if prev_row.checkpoint_data else {}
+                l1_items = data.get("l1") if isinstance(data, dict) else []
+                if l1_items:
+                    try:
+                        ctx.provider.orchestrator.l1.restore(l1_items)
+                    except Exception:
+                        pass
+                break
+    except Exception:
+        pass
+
     is_error = False
     out: list[TextContent] = []
     try:
         out = await registry.execute(name, arguments, ctx, access_manager=ctx.access_manager)
+
+        # Goal-driven middleware: lightweight awareness check on relevant tool calls
+        try:
+            warning = await per_call_goal_check(
+                tool_name=name,
+                arguments=arguments,
+                ctx=ctx,
+                session_id=session_id,
+            )
+            if warning:
+                out.append(TextContent(type="text", text=f"\n{warning}"))
+        except Exception:
+            pass
+
         return out
     except Exception:
         is_error = True
@@ -101,6 +140,15 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
             cnt = await ctx.session_manager.store.count_events(session_id=session_id)
             if cnt > 0 and cnt % n == 0:
                 await ctx.session_manager.create_checkpoint(session_id=session_id, reason="auto")
+
+            # Session progress report every 3 auto-checkpoints
+            if cnt > 0 and cnt % (n * 3) == 0:
+                try:
+                    progress = await session_progress_report(ctx=ctx, session_id=session_id)
+                    if progress:
+                        logger.info(progress)
+                except Exception:
+                    pass
         except Exception:
             pass
 

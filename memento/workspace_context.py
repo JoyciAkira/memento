@@ -7,6 +7,7 @@ from memento.access_manager import MementoAccessManager
 from memento.config_store import WorkspaceConfigStore
 from memento.session_manager import SessionManager
 from memento.autonomous import AutonomousAgent, AutonomyLevel
+from memento.project_state import ProjectStateStore
 
 logger = logging.getLogger("memento-workspace")
 
@@ -41,6 +42,10 @@ class WorkspaceContext:
             cognitive_engine=self.cognitive_engine,
             workspace_root=self.workspace_root,
         )
+        self.project_state = ProjectStateStore(self.db_path)
+
+        from memento.project_memory_graph import ProjectMemoryGraph
+        self.project_memory_graph = ProjectMemoryGraph(kg_provider=self.provider.kg)
 
     @property
     def enforcement_config(self):

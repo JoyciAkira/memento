@@ -50,7 +50,42 @@ class SessionManager:
             "git_context": git_context,
             "recent_events": list(reversed(recent_events)),
         }
+
+        # Include project state summary in snapshot
+        try:
+            from memento.project_state import ProjectStateStore
+            ps = ProjectStateStore(self.db_path)
+            project_summary = await ps.get_summary()
+            if project_summary:
+                snapshot["project_state"] = project_summary
+        except Exception:
+            pass
+
+        # Compute session diff from previous session
+        session_diff = ""
+        try:
+            prev_sessions = await self.store.list_sessions(limit=5, status="closed")
+            for prev in prev_sessions:
+                prev_id = prev.get("id")
+                if not prev_id or not prev.get("last_checkpoint_at"):
+                    continue
+                prev_row = await self.store.get_session(prev_id)
+                if not prev_row or not prev_row.checkpoint_data:
+                    continue
+                prev_data = json.loads(prev_row.checkpoint_data) if prev_row.checkpoint_data else {}
+                from memento.handoff_prompt import render_session_diff_prompt
+                session_diff = render_session_diff_prompt(
+                    current_snapshot=snapshot,
+                    previous_snapshot=prev_data,
+                )
+                break
+        except Exception:
+            pass
+
+        snapshot["session_diff"] = session_diff
         prompt = render_handoff_prompt(session_id=session_id, snapshot=snapshot)
+        if session_diff:
+            prompt += "\n" + session_diff
         await self.store.update_checkpoint(session_id=session_id, checkpoint_data=snapshot, handoff_prompt=prompt)
         return snapshot
 

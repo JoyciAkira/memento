@@ -18,6 +18,7 @@ Thumbs.db
 # IDEs
 .idea/
 .vscode/
+.cursor/
 *.swp
 *.swo
 *~
