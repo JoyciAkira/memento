@@ -4,7 +4,6 @@
   <h1>Memento</h1>
   <p><strong>The Autonomous Nervous System for AI Agents</strong></p>
 
-  [![Tests](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml/badge.svg)](https://github.com/JoyciAkira/memento/actions/workflows/ci.yml)
   [![PyPI version](https://img.shields.io/pypi/v/memento-mcp.svg)](https://pypi.org/project/memento-mcp/)
   [![License: AGPL v3](https://img.shields.io/badge/License-AGPL_v3-blue.svg)](https://www.gnu.org/licenses/agpl-3.0)
   [![Python 3.10+](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
@@ -13,137 +12,133 @@
 
 ---
 
-Memento is a revolutionary, open-source middleware that acts as the "Autonomous Nervous System" for your AI agents (like Cursor, Claude Desktop, or Trae). 
+Memento is a local-first, open-source MCP middleware that gives your AI agents (Cursor, Claude Desktop, Trae, etc.) persistent memory, proactive goal enforcement, and autonomous intelligence — all running on a zero-cost **SQLite temporal graph** with **Reciprocal Rank Fusion (RRF)** retrieval.
 
-While most agentic memory systems rely on expensive, cloud-hosted graph databases, Memento empowers your local agents with a powerful, zero-cost, **PageRank-optimized SQLite temporal graph** and **Reciprocal Rank Fusion (RRF)** for perfect semantic retrieval.
-
-But Memento goes **Beyond Memory**. It transforms your AI from a reactive assistant into a proactive, context-aware, and strictly aligned pair-programmer.
-
-## 🌟 Enterprise-Grade Architecture
-
-### 1. 🧠 Hybrid Search Engine (RRF)
-A zero-cost, local-first temporal graph memory provider optimized for AI.
-- Built on **SQLite FTS5** (Full-Text Search) and **Cosine Similarity** (Vector Embeddings).
-- Fuses exact keyword matches and semantic meaning using **Reciprocal Rank Fusion (RRF)**.
-- **Write-Ahead Logging (WAL)** enabled for extreme concurrency without database locking.
-- Completely private and runs locally.
-
-### 2. 🛡️ Active Coercion (The Code Immune System)
-A deterministic, regex/AST-based engine that physically prevents the AI (or you) from introducing known anti-patterns.
-- **Pre-commit Hook Integration**: Automatically blocks `git commit` if the code violates architectural rules.
-- **IDE Runtime Notifications**: Sends push notifications directly to the AI if it generates bad code.
-- **100% Deterministic**: Zero LLM hallucinations during enforcement. Bypassable via `// memento-override` tokens.
-
-### 3. 🎯 Tri-State Goal Enforcer
-Keep your AI strictly aligned with your project's core objectives:
-- **Level 1 (Context Injection)**: Seamlessly injects active goals into the AI's context on every memory retrieval.
-- **Level 2 (Strict Mentor Checkpoint)**: Forces the AI to submit code or plans for a strict evaluation against the project's core goals.
-- **Level 3 (Proactive Autonomy)**: The AI is instructed via MCP to autonomously query Memento *before* writing any code.
-
-**Goal Enforcer MCP Tools:**
-
-| Tool | Description |
-|------|-------------|
-| `memento_set_goals` | Set active goals (replace or append mode) |
-| `memento_list_goals` | List goals with optional context and active-only filters |
-| `memento_check_goal_alignment` | L2 gate — submit code/plans for strict goal evaluation |
-| `memento_configure_enforcement` | Toggle L1/L2/L3 enforcement levels |
-
-### 4. 🕸️ Dynamic Workspace Router
-Zero-config multi-tenant isolation. Memento automatically detects which project repository the AI is currently working on and routes the memory/database to the correct `.memento/` folder. No more context bleeding between your Frontend and Backend projects.
+No cloud databases. No API calls for storage. Everything stays on your machine.
 
 ---
 
-## 🧬 The Seven Superpowers
+## Architecture
 
-Memento's cognitive layer goes beyond passive memory. Seven autonomous superpowers transform it into a self-improving, proactive system:
+### Temporal Graph Memory (RRF)
+Built on **SQLite FTS5** (full-text search) and **cosine similarity** (vector embeddings). Fuses keyword matches and semantic meaning via **Reciprocal Rank Fusion**. WAL-mode enabled for concurrency.
 
-### SP1: Auto-Consolidation
-Automatically detects semantically similar memories and merges them into enriched, deduplicated entries. Uses cosine similarity clustering with sentence-level text fusion.
-- `memento_consolidate_memories` — run a full consolidation cycle
-- `memento_toggle_consolidation_scheduler` — start/stop background scheduler
+### Tri-State Goal Enforcer
+Keep your AI aligned with project objectives at three escalation levels:
+- **Level 1 — Context Injection**: Automatically injects active goals into every search result. Active by default.
+- **Level 2 — Strict Mentor**: Forces the AI to submit code/plans for goal alignment evaluation via LLM.
+- **Level 3 — Daemon Push**: File-watcher monitors your workspace and proactively flags goal drift.
 
-### SP2: KG Auto-Extraction
-Automatically extracts entities and relationships from memories and populates a temporal knowledge graph using LLM analysis.
-- `memento_extract_kg` — extract entities and triples from unprocessed memories
-- `memento_toggle_kg_extraction_scheduler` — start/stop background scheduler
+### Active Coercion (Code Immune System)
+Deterministic regex/tree-sitter rules that block anti-patterns at commit time and in the IDE. 100% deterministic — zero LLM hallucination risk during enforcement.
 
-### SP3: Relevance Tracking
-Tracks memory access patterns with hit counting, temporal boosting, and exponential time decay. Frequently accessed recent memories rank higher.
-- `memento_get_relevance_stats` — hot/cold distribution, hit counts, decay metrics
-- `memento_record_memory_hit` — manually boost specific memories
+### Autonomous Agent
+Background cognitive loop with four levels:
+- **off**: No background behavior (default).
+- **passive**: Observe health and patterns every 5 min. No modifications.
+- **active**: Consolidate memories, extract KG, warm caches, detect anomalies every 2 min.
+- **autonomous**: All of the above plus dream synthesis, goal drift detection, task generation, health reports every 1 min.
 
-### SP4: Predictive Cache
-Pre-warms an in-memory cache of related memories before starting work. Proactive context injection that anticipates what the AI will need.
-- `memento_warm_predictive_cache` — warm cache with context text
-- `memento_get_predictive_cache_stats` — hit rate, cache size, TTL info
+### Workspace Isolation
+Each project gets its own `.memento/` directory with an isolated SQLite database. No context bleeding between projects. Configure via `MEMENTO_DIR` or per-project `.cursor/mcp.json`.
 
-### SP5: Self-Evaluation Loop
-Computes memory health scores (0-100) based on freshness, coverage, redundancy, and size. Identifies stale and orphan memories for cleanup.
-- `memento_get_quality_report` — full quality report with health score
-- `memento_record_quality_evaluation` — rate memory quality (0-1)
-- `memento_system_health` — comprehensive system health dashboard
-- `memento_kg_health` — knowledge graph entity/triple metrics
+### Session Continuity
+- Auto-checkpoints every 25 tool calls with full L1 working memory snapshot.
+- Auto-resume restores goals and context from the previous session.
+- LLM-agnostic handoff prompts for session transfer between agents.
 
-### SP6: Cross-Workspace Sharing
-Share memories between different Memento workspaces. Enables cross-project context flow with directional sync tracking.
-- `memento_share_memory_to_workspace` — share a memory to another project
-- `memento_get_cross_workspace_stats` — sync statistics
-
-### SP7: Real-Time Notifications
-Proactive alerts about relevant context changes, memory events, and high-relevance discoveries. Configurable topics and confidence thresholds.
-- `memento_configure_notifications` — enable/disable, set topics and confidence
-- `memento_get_pending_notifications` — retrieve pending alerts
-- `memento_dismiss_notification` — dismiss an alert
+### Project Memory Graph
+Semantic entity-relationship graph on top of the Knowledge Graph. Track files, components, decisions, and their dependencies. Impact analysis shows what breaks when you change something.
 
 ---
 
-## 🚀 Quick Start
+## Unified Tool API (v0.3.x)
 
-Choose your preferred installation method:
+Memento exposes **14 action-based tools** via MCP. Each tool uses an `action` parameter instead of separate tools per operation:
 
-### Option A: `pip install` (Recommended)
+| Tool | Actions | Purpose |
+|------|---------|---------|
+| `memento` | (main router) | Primary proactive memory interface |
+| `memento_project` | `set_state`, `get_state`, `delete_state`, `set_goals`, `list_goals`, `summary` | Vision, milestones, blockers, goals |
+| `memento_session` | `begin`, `resume`, `handoff`, `status`, `list` | Session lifecycle and handoff |
+| `memento_graph` | `add_entity`, `add_relation`, `query`, `impact`, `summary` | Project Memory Graph |
+| `memento_search` | `basic`, `advanced`, `explain` | FTS, vNext pipeline, routing trace |
+| `memento_remember` | `add`, `consolidate`, `share`, `evaluate`, `hit` | Memory write operations |
+| `memento_configure` | `enforcement`, `coercion`, `daemon`, `autonomy`, `consolidation_scheduler`, `kg_scheduler`, `dependency_tracker`, `superpowers`, `access` | All configuration |
+| `memento_cognitive` | `dream`, `align`, `warnings`, `tasks` | Cognitive engine operations |
+| `memento_health` | `status`, `health`, `memory`, `kg`, `quality`, `relevance`, `cache`, `explain` | Diagnostics |
+| `memento_coercion` | `list_presets`, `apply_preset`, `list_rules`, `add_rule`, `remove_rule`, `install_hooks` | Active Coercion management |
+| `memento_kg` | `extract`, `health`, `cross_workspace_stats` | Knowledge Graph operations |
+| `memento_notifications` | `configure`, `list`, `dismiss` | Proactive notifications |
+| `memento_audit_dependencies` | (standalone) | Dependency audit |
+| `memento_migrate_workspace_memories` | (standalone) | Workspace memory migration |
+
+---
+
+## Quick Start
+
+### Install
 
 ```bash
 pip install memento-mcp
 ```
 
-That's it. The `memento-mcp` and `memento` commands are now available globally.
-
-### Option B: `uvx` (Zero-install)
-
-Run Memento instantly without installing anything permanently:
+Or run without installing:
 
 ```bash
 uvx memento-mcp
 ```
 
-### Option C: `pip install` from GitHub (Latest dev)
+### Configure (Cursor / Claude Desktop / Trae)
 
-```bash
-pip install git+https://github.com/JoyciAkira/memento.git
+Add to your global `mcp.json` (e.g. `~/.cursor/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento-mcp",
+      "env": {
+        "OPENAI_API_KEY": "your-api-key",
+        "OPENAI_BASE_URL": "https://api.openai.com/v1",
+        "MEM0_MODEL": "openai/gpt-4o-mini"
+      }
+    }
+  }
+}
 ```
 
-### Option D: Clone for development
+For **per-project workspace isolation**, add to `.cursor/mcp.json` in your project root:
 
-```bash
-git clone https://github.com/JoyciAkira/memento.git
-cd memento
-uv sync
+```json
+{
+  "mcpServers": {
+    "memento": {
+      "command": "memento-mcp",
+      "env": {
+        "OPENAI_API_KEY": "your-api-key",
+        "OPENAI_BASE_URL": "https://api.openai.com/v1",
+        "MEM0_MODEL": "openai/gpt-4o-mini",
+        "MEMENTO_DIR": "${workspaceFolder}"
+      }
+    }
+  }
+}
 ```
 
-Verify any installation:
+Add `.cursor/` to your `.gitignore` to avoid committing API keys.
+
+### Verify
 
 ```bash
-python -c "import memento; print(memento.__version__)"
 memento-mcp --help
 memento --help
 ```
 
 <details>
-<summary>📝 Running without OpenAI (offline / testing)</summary>
+<summary>Running without OpenAI (offline / testing)</summary>
 
-Set `MEMENTO_EMBEDDING_BACKEND=none` to disable embeddings entirely. Memento falls back to FTS5-only full-text search — no API key needed.
+Set `MEMENTO_EMBEDDING_BACKEND=none` to disable embeddings. Memento falls back to FTS5-only search — no API key needed.
 
 ```bash
 MEMENTO_EMBEDDING_BACKEND=none memento-mcp
@@ -153,109 +148,72 @@ MEMENTO_EMBEDDING_BACKEND=none memento-mcp
 
 ---
 
-## 🛠️ MCP Configuration (Cursor / Trae / Claude)
-
-Add Memento to your `mcp.json` or IDE configuration. Thanks to the Dynamic Workspace Router, you only need to configure it **once globally**.
-
-### Config for `pip` / `uvx` install (Recommended)
-
-No local clone needed. Just use the installed command directly:
-
-```json
-{
-  "mcpServers": {
-    "memento": {
-      "command": "memento-mcp",
-      "env": {
-        "OPENAI_API_KEY": "your-api-key-here",
-        "OPENAI_BASE_URL": "https://api.openai.com/v1",
-        "MEM0_MODEL": "openai/gpt-4o-mini",
-        "MEM0_EMBEDDING_MODEL": "text-embedding-3-small"
-      }
-    }
-  }
-}
-```
-
-### Config for local clone (development)
-
-```json
-{
-  "mcpServers": {
-    "memento": {
-      "command": "uv",
-      "args": [
-        "--directory",
-        "/absolute/path/to/memento",
-        "run",
-        "memento-mcp"
-      ],
-      "env": {
-        "OPENAI_API_KEY": "your-api-key-here",
-        "OPENAI_BASE_URL": "https://api.openai.com/v1",
-        "MEM0_MODEL": "openai/gpt-4o-mini",
-        "MEM0_EMBEDDING_MODEL": "text-embedding-3-small"
-      }
-    }
-  }
-}
-```
-
-### Environment variables
+## Environment Variables
 
 | Variable | Description |
 |----------|-------------|
-| `OPENAI_API_KEY` | Required for embeddings and goal checks |
-| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint |
-| `MEM0_MODEL` | LLM used for cognitive features |
-| `MEM0_EMBEDDING_MODEL` | Embeddings model used by the hybrid memory provider |
-| `MEMENTO_EMBEDDING_BACKEND` | Set to `none` to disable embeddings (FTS5-only fallback) |
-| `MEMENTO_DIR` | Workspace root used for routing `.memento/` state |
-| `MEMENTO_UI` | Enable local UI (`1`/`true`) |
+| `OPENAI_API_KEY` | Required for embeddings and cognitive features |
+| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint (e.g. OpenRouter) |
+| `MEM0_MODEL` | LLM model for cognitive features |
+| `MEM0_EMBEDDING_MODEL` | Embeddings model for hybrid search |
+| `MEMENTO_EMBEDDING_BACKEND` | Set to `none` for FTS5-only (no API key) |
+| `MEMENTO_DIR` | Workspace root for `.memento/` state |
+| `MEMENTO_UI` | Enable local web UI (`1`/`true`) |
 | `MEMENTO_UI_PORT` | Local UI port (default `8089`) |
+| `MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS` | Auto-checkpoint frequency (default `25`) |
 
-## ⌨️ CLI Usage
+---
 
-Memento also works directly from the terminal — no AI agent required.
+## CLI Usage
+
+Memento works from the terminal too:
 
 ```bash
-# Auto-capture git context (branch, recent commits, diff stats) as a memory
+# Auto-capture git context as a memory
 memento capture --auto
 
 # Save a free-form note
-memento capture --text "Resolved the auth timeout by increasing JWT expiry to 1h"
+memento capture --text "Resolved auth timeout by increasing JWT expiry"
 
-# Combine auto context + custom note
-memento capture --auto --text "Refactored the retry logic after the incident"
-
-# Search your memories
+# Search memories
 memento search "how did I fix the promise bug"
 
 # Show workspace status
 memento status
 ```
 
-The `capture --auto` command extracts the current git branch, last 5 commits, and staged/unstaged diff stats — saving a snapshot of your work context with zero friction. Useful in git hooks, CI scripts, or just as a quick terminal habit.
+---
 
-## 🧠 Using Memento (via MCP)
+## How Proactivity Works
 
-Memento exposes a suite of MCP tools, but the primary entrypoint is fully autonomous. 
+Memento operates at two levels:
 
-### The Proactive Subconscious
-The primary `memento` tool is configured with a **Level 3 Proactive Autonomy** prompt. You don't need to say "Memento, remember this". The AI is strictly instructed to query Memento *before* executing any task, formulating its own search queries to retrieve your architectural rules, past bugs, and context.
+### Always-on (zero configuration)
+- **Goal awareness**: Every tool call is checked against active goals. If work drifts, a warning is appended.
+- **Auto-resume**: L1 working memory (goals, context) restores from the previous session's checkpoint.
+- **Auto-checkpoint**: Every 25 events, a full session snapshot is saved with project state and handoff prompt.
+- **Session diff**: Each checkpoint computes the delta from the previous session (goals changed, files touched).
 
-### Managing Active Coercion
-You can manage the Code Immune System directly via chat using the exposed MCP tools:
-- `memento_toggle_active_coercion`
-- `memento_install_git_hooks`
-- `memento_add_active_coercion_rule`
-- `memento_list_active_coercion_rules`
+### Activatable (via `memento_configure`)
+- **L2 enforcement**: Goal alignment checks via LLM on explicit request.
+- **L3 daemon**: File-watcher with proactive goal drift notifications.
+- **Autonomous agent**: Background consolidation, KG extraction, dream synthesis, task generation.
+- **Active coercion**: Deterministic code pattern enforcement.
+- **Consolidation/KG schedulers**: Background deduplication and knowledge extraction.
+
+Example activation sequence:
+
+```
+memento_project(action="set_goals", goals=["Implement auth flow", "Refactor DB layer"])
+memento_configure(action="enforcement", level="level2", enabled=true)
+memento_configure(action="consolidation_scheduler", enabled=true, interval_minutes=30)
+memento_configure(action="autonomy", level="active")
+```
 
 ---
 
-## ⚖️ License
+## License
 
-Memento is released under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. 
-This ensures that Memento remains free and open-source forever. If you modify Memento and offer it as a service over a network (e.g., as a Cloud SaaS), you **must** release your modified source code under the same AGPL-3.0 license. 
+Memento is released under the **GNU Affero General Public License v3.0 (AGPL-3.0)**. If you modify Memento and offer it as a network service, you must release your modified source code under the same license.
 
-See the [LICENSE](LICENSE) file for more details.
+See [LICENSE](LICENSE) for details.

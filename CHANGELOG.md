@@ -1,46 +1,61 @@
 # Changelog
 
-All notable changes to this project will be documented in this file.
+All notable changes to Memento are documented here.
 
-## [0.1.1] - 2026-04-17
+## [0.3.1] — 2026-05-06
 
-### Security
-- **CRITICAL**: Added regex timeout (2s) to Active Coercion engine to prevent ReDoS via crafted regex patterns
-- **CRITICAL**: Added authorization check on coercion rule add/remove MCP tools (gated by `MEMENTO_RULE_CONFIRMATION` env var)
-- **CRITICAL**: Added path traversal validation in pre-commit hook — paths with `..` component are rejected
-- Added bearer token authentication to UI server (`MEMENTO_UI_AUTH_TOKEN` env var)
-- Removed dummy API key `sk-dummy` — embedding backend now disables itself when no key is present
-- Sanitized OpenAI error messages in CognitiveEngine to prevent API key leakage
+### Fixed
+- Deprecated tools are now hidden from the MCP tool list. Clients see 14 active tools instead of 73.
 
-### Performance
-- Added migration v007 with performance indexes on embeddings, memory_meta, consolidation_log, and kg_extraction_log
-- Replaced N+1 KG queries with batch `query_entities_batch()` method — single SQL query for all search results
-- Added thread safety to KnowledgeGraph via `threading.Lock` on all write operations
-- Centralized OpenAI client into `llm_client.py` singleton — eliminates duplicate client with conflicting defaults
-- Added retry with exponential backoff for all OpenAI API calls (3 retries, configurable)
+## [0.3.0] — 2026-05-06
 
-### Architecture
-- Extracted `GoalStore` class from provider.py (~100 lines removed from the God Object)
-- Extracted `math_utils.py` with shared `cosine_similarity()` — eliminated 4x duplication
-- Extracted `llm_client.py` with centralized OpenAI client factory and retry logic
-- Extracted `settings.py` with centralized Settings class for all env vars
-- Added `memento.goal_store` module for first-class goal management
+### Breaking Change — Unified Tool API
+The MCP tool surface has been consolidated from 62 granular tools to 14 action-based unified tools. All old tools remain functional but are marked `[DEPRECATED]` and hidden from the tool list.
 
-### Code Quality
-- Fixed 17 silent `pass` blocks — replaced with `logger.debug()` for discoverable failures
-- Narrowed exception handling in provider.py and cognitive_engine.py
-- Fixed incorrect `Optional` type annotations in `knowledge_graph.py` and `provider.py`
-- Standardized typing style to modern Python 3.10+ syntax across touched modules
-- Added `_MAX_REGEX_LENGTH` validation (1024 chars) in Active Coercion rule normalization
-- Added watchdog exclusion logging in daemon
+New unified tools:
+- `memento_project` — project state and goals (replaces 6 tools)
+- `memento_session` — session management (replaces 5 tools)
+- `memento_graph` — Project Memory Graph (replaces 5 tools)
+- `memento_search` — unified search with basic/advanced/explain modes (replaces 3 tools)
+- `memento_remember` — memory write operations (replaces 5 tools)
+- `memento_configure` — all configuration (replaces 9 tools)
+- `memento_cognitive` — cognitive engine (replaces 4 tools)
+- `memento_health` — diagnostics (replaces 9 tools)
+- `memento_coercion` — Active Coercion CRUD (replaces 7 tools)
+- `memento_kg` — Knowledge Graph operations (replaces 4 tools)
+- `memento_notifications` — notification management (replaces 3 tools)
 
-### Testing
-- Added `tests/conftest.py` with shared `tmp_workspace` fixture and `autouse` OpenAI disable
-- Added `tests/test_redaction.py` — 6 tests for secret redaction patterns
-- Added `tests/test_registry.py` — 3 tests for ToolRegistry register/execute/get_tools
-- Added `tests/test_math_utils.py` — 8 tests for cosine_similarity edge cases
-- Added `tests/test_llm_client.py` — 5 tests for retry logic classification
-- Added `tests/test_goal_store.py` — 5 tests for GoalStore CRUD operations
-- Added `tests/test_active_coercion_hook.py` — 3 tests for pre-commit hook enforcement
-- Extended MCP coverage: `tests/mcp_contract_helpers.py`, `tests/test_mcp_tool_contracts.py` (offline trace + vNext JSON), stricter `tests/test_tools_smoke.py`, wider `test_b6_offline_mcp_tools_callable`; `benchmarks/run_benchmarks.py` includes the contracts file
-- Smoke: `memento_explain_search` deferred post-loop with `strict_search_trace` on `validate_tool_response_contract` (deterministic `last_search.json`)
+### Added
+- **Auto-resume**: L1 working memory automatically restores from previous session checkpoint.
+- **Project State Graph**: Structured storage for vision, milestones, blockers, tech_debt, decisions.
+- **Project Memory Graph**: Semantic entity-relationship graph with impact analysis.
+- **Goal-driven middleware**: Lightweight per-tool-call goal alignment check.
+- **Session progress report**: Periodic evaluation of goal coverage during sessions.
+- **Session diff**: Delta computation between current and previous session snapshots.
+- **Project state in handoff**: Checkpoints include project state summary.
+
+## [0.2.0] — 2026-04-26
+
+### Added
+- Autonomous agent with four levels (off, passive, active, autonomous).
+- Cognitive engine with dream synthesis, spider-sense warnings, task generation.
+- Active Coercion system with deterministic regex/tree-sitter rules.
+- Consolidation engine for memory deduplication.
+- Knowledge Graph auto-extraction.
+- Predictive cache for proactive context warming.
+- Quality metrics and relevance tracking.
+- Cross-workspace memory sharing.
+- Notification system.
+- Session management with checkpoints and handoff prompts.
+- vNext retrieval pipeline with multi-lane routing.
+- Workspace isolation via `MEMENTO_DIR` and dynamic router.
+- CLI: `memento capture --auto` and `memento search`.
+
+## [0.1.0] — 2026-04-13
+
+### Added
+- Initial release.
+- SQLite FTS5 + vector embedding hybrid search with RRF.
+- Tri-State Goal Enforcer (L1, L2, L3).
+- MCP server with stdio transport.
+- Basic memory add/search via MCP.
