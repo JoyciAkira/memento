@@ -22,9 +22,11 @@ class ToolRegistry:
             return func
         return decorator
 
-    def get_tools(self) -> List[Tool]:
-        """Return a list of all registered tools."""
-        return list(self._tools.values())
+    def get_tools(self, include_deprecated: bool = False) -> List[Tool]:
+        """Return registered tools, excluding deprecated ones by default."""
+        if include_deprecated:
+            return list(self._tools.values())
+        return [t for t in self._tools.values() if not t.description.startswith("[DEPRECATED]")]
 
     async def execute(self, name: str, arguments: dict, ctx: Any, **kwargs) -> List[TextContent]:
         """Execute the handler for the given tool name."""
