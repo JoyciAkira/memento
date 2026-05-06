@@ -19,7 +19,7 @@ _LEVEL_HELP = (
 @registry.register(Tool(
     name="memento_set_autonomy",
     description=(
-        f"Set the autonomous agent level. Levels: {_LEVEL_HELP}. "
+        f"[DEPRECATED] Set the autonomous agent level. Levels: {_LEVEL_HELP}. "
         "The autonomous agent runs a background cognitive loop that observes, reasons, and acts proactively."
     ),
     inputSchema={
@@ -79,7 +79,7 @@ async def memento_set_autonomy(arguments: dict, ctx, access_manager) -> list[Tex
 @registry.register(Tool(
     name="memento_autonomy_status",
     description=(
-        "Get detailed status of the autonomous agent: current level, cycle count, "
+        "[DEPRECATED] Get detailed status of the autonomous agent: current level, cycle count, "
         "recent decisions, actions taken, and error count."
     ),
     inputSchema={"type": "object", "properties": {}},
@@ -113,7 +113,7 @@ async def memento_autonomy_status(arguments: dict, ctx, access_manager) -> list[
 
 @registry.register(Tool(
     name="memento_autonomy_decisions",
-    description="Get the full decision log of the autonomous agent for auditing.",
+    description="[DEPRECATED] Get the full decision log of the autonomous agent for auditing.",
     inputSchema={
         "type": "object",
         "properties": {

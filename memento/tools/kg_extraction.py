@@ -12,7 +12,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_extract_kg",
-        description="Extract entities and relationships from unprocessed memories and populate the knowledge graph using LLM.",
+        description="[DEPRECATED] Extract entities and relationships from unprocessed memories and populate the knowledge graph using LLM.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -45,7 +45,7 @@ async def memento_extract_kg(arguments: dict, ctx, access_manager) -> list[TextC
 @registry.register(
     Tool(
         name="memento_toggle_kg_extraction_scheduler",
-        description="Start or stop the background KG auto-extraction scheduler.",
+        description="[DEPRECATED] Start or stop the background KG auto-extraction scheduler.",
         inputSchema={
             "type": "object",
             "properties": {

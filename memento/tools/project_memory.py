@@ -11,7 +11,7 @@ logger = logging.getLogger("memento-mcp")
     Tool(
         name="memento_pmg_add_entity",
         description=(
-            "Add an entity to the Project Memory Graph. Entity types: file, component, decision, "
+            "[DEPRECATED] Add an entity to the Project Memory Graph. Entity types: file, component, decision, "
             "bug_fix, feature, session, module, api. Entities enable semantic relationships."
         ),
         inputSchema={
@@ -50,7 +50,7 @@ async def memento_pmg_add_entity(arguments: dict, ctx, access_manager) -> list[T
     Tool(
         name="memento_pmg_add_relation",
         description=(
-            "Add a relation between entities. Predicates: depends_on, blocks, implements, "
+            "[DEPRECATED] Add a relation between entities. Predicates: depends_on, blocks, implements, "
             "breaks, supersedes, relates_to, part_of, uses."
         ),
         inputSchema={
@@ -81,7 +81,7 @@ async def memento_pmg_add_relation(arguments: dict, ctx, access_manager) -> list
 @registry.register(
     Tool(
         name="memento_pmg_entity_context",
-        description="Get semantic context for an entity including its relationships (what it depends on, what depends on it, etc.).",
+        description="[DEPRECATED] Get semantic context for an entity including its relationships (what it depends on, what depends on it, etc.).",
         inputSchema={
             "type": "object",
             "properties": {
@@ -105,7 +105,7 @@ async def memento_pmg_entity_context(arguments: dict, ctx, access_manager) -> li
 @registry.register(
     Tool(
         name="memento_pmg_what_might_break",
-        description="Find all entities that depend on the given entity (impact analysis).",
+        description="[DEPRECATED] Find all entities that depend on the given entity (impact analysis).",
         inputSchema={
             "type": "object",
             "properties": {
@@ -132,7 +132,7 @@ async def memento_pmg_what_might_break(arguments: dict, ctx, access_manager) -> 
 @registry.register(
     Tool(
         name="memento_pmg_summary",
-        description="Get a summary of the entire Project Memory Graph (all entities and recent relations).",
+        description="[DEPRECATED] Get a summary of the entire Project Memory Graph (all entities and recent relations).",
         inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
     )
 )

@@ -13,7 +13,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_warm_predictive_cache",
-        description="Pre-warm the predictive cache by searching for related memories given text context. Useful before starting work on a task.",
+        description="[DEPRECATED] Pre-warm the predictive cache by searching for related memories given text context. Useful before starting work on a task.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -58,7 +58,7 @@ async def memento_warm_predictive_cache(
 @registry.register(
     Tool(
         name="memento_get_predictive_cache_stats",
-        description="Get predictive cache statistics — hit rate, cache size, and TTL info.",
+        description="[DEPRECATED] Get predictive cache statistics — hit rate, cache size, and TTL info.",
         inputSchema={
             "type": "object",
             "properties": {},

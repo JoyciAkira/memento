@@ -13,7 +13,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_get_relevance_stats",
-        description="Get memory relevance statistics — hot/cold memory distribution, hit counts, and decay metrics.",
+        description="[DEPRECATED] Get memory relevance statistics — hot/cold memory distribution, hit counts, and decay metrics.",
         inputSchema={"type": "object", "properties": {}},
     )
 )
@@ -31,7 +31,7 @@ async def memento_get_relevance_stats(arguments: dict, ctx, access_manager) -> l
 @registry.register(
     Tool(
         name="memento_record_memory_hit",
-        description="Manually record that specific memories were accessed/used. Boosts their relevance.",
+        description="[DEPRECATED] Manually record that specific memories were accessed/used. Boosts their relevance.",
         inputSchema={
             "type": "object",
             "properties": {

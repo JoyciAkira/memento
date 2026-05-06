@@ -13,7 +13,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_configure_notifications",
-        description="Configure notification settings — enable/disable, set topics, set confidence threshold.",
+        description="[DEPRECATED] Configure notification settings — enable/disable, set topics, set confidence threshold.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -54,7 +54,7 @@ async def memento_configure_notifications(arguments: dict, ctx, access_manager) 
 @registry.register(
     Tool(
         name="memento_get_pending_notifications",
-        description="Get pending proactive notifications — relevant context alerts and memory events.",
+        description="[DEPRECATED] Get pending proactive notifications — relevant context alerts and memory events.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -88,7 +88,7 @@ async def handler(arguments: dict, ctx, access_manager) -> list[TextContent]:
 @registry.register(
     Tool(
         name="memento_dismiss_notification",
-        description="Dismiss a notification so it no longer appears.",
+        description="[DEPRECATED] Dismiss a notification so it no longer appears.",
         inputSchema={
             "type": "object",
             "properties": {

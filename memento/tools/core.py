@@ -13,7 +13,7 @@ UI_PORT = int(os.environ.get("MEMENTO_UI_PORT", "8089"))
 
 @registry.register(Tool(
     name="memento_status",
-    description="Get the current operational status of the Memento MCP server, including Goal Enforcer configuration, loaded active goals, database paths, and UI server port.",
+    description="[DEPRECATED] Get the current operational status of the Memento MCP server, including Goal Enforcer configuration, loaded active goals, database paths, and UI server port.",
     inputSchema={"type": "object", "properties": {}}
 ))
 async def memento_status(arguments: dict, ctx, access_manager) -> list[TextContent]:
@@ -78,7 +78,7 @@ async def memento_status(arguments: dict, ctx, access_manager) -> list[TextConte
 
 @registry.register(Tool(
     name="memento_toggle_access",
-    description="Toggle the access state of the Memento memory provider (read-write, read-only, lockdown)",
+    description="[DEPRECATED] Toggle the access state of the Memento memory provider (read-write, read-only, lockdown)",
     inputSchema={
         "type": "object",
         "properties": {
@@ -104,7 +104,7 @@ async def memento_toggle_access(arguments: dict, ctx, access_manager) -> list[Te
 
 @registry.register(Tool(
     name="memento_toggle_superpowers",
-    description="Toggle Memento Agentic Superpowers (Proactive Warnings and Auto-Generative Tasks)",
+    description="[DEPRECATED] Toggle Memento Agentic Superpowers (Proactive Warnings and Auto-Generative Tasks)",
     inputSchema={
         "type": "object",
         "properties": {
@@ -124,7 +124,7 @@ async def memento_toggle_superpowers(arguments: dict, ctx, access_manager) -> li
 
 @registry.register(Tool(
     name="memento_get_warnings",
-    description="Get proactive warnings (spider-sense) for a specific code context or library.",
+    description="[DEPRECATED] Get proactive warnings (spider-sense) for a specific code context or library.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -144,7 +144,7 @@ async def memento_get_warnings(arguments: dict, ctx, access_manager) -> list[Tex
 
 @registry.register(Tool(
     name="memento_generate_tasks",
-    description="Scan subconscious memory for latent intentions and auto-generate a todo.md file in the workspace.",
+    description="[DEPRECATED] Scan subconscious memory for latent intentions and auto-generate a todo.md file in the workspace.",
     inputSchema={"type": "object", "properties": {}}
 ))
 async def memento_generate_tasks(arguments: dict, ctx, access_manager) -> list[TextContent]:
@@ -255,7 +255,7 @@ async def memento(arguments: dict, ctx, access_manager) -> list[TextContent]:
 
 @registry.register(Tool(
     name="memento_toggle_dependency_tracker",
-    description="Enable or disable the Dependency Tracker to monitor orphan or ghost dependencies.",
+    description="[DEPRECATED] Enable or disable the Dependency Tracker to monitor orphan or ghost dependencies.",
     inputSchema={
         "type": "object",
         "properties": {

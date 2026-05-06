@@ -15,7 +15,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_consolidate_memories",
-        description="Detect semantically similar memories and merge them into enriched, deduplicated memories. Runs a full consolidation cycle.",
+        description="[DEPRECATED] Detect semantically similar memories and merge them into enriched, deduplicated memories. Runs a full consolidation cycle.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -69,7 +69,7 @@ async def memento_consolidate_memories(
 @registry.register(
     Tool(
         name="memento_toggle_consolidation_scheduler",
-        description="Start or stop the automatic background memory consolidation scheduler.",
+        description="[DEPRECATED] Start or stop the automatic background memory consolidation scheduler.",
         inputSchema={
             "type": "object",
             "properties": {

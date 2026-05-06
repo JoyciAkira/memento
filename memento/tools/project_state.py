@@ -12,7 +12,7 @@ logger = logging.getLogger("memento-mcp")
     Tool(
         name="memento_set_project_state",
         description=(
-            "Set a project state field. Use for vision, milestones, blockers, tech_debt, decisions, current_sprint. "
+            "[DEPRECATED] Set a project state field. Use for vision, milestones, blockers, tech_debt, decisions, current_sprint. "
             "Values can be strings, dicts, or lists of dicts with 'title' and 'status' fields."
         ),
         inputSchema={
@@ -48,7 +48,7 @@ async def memento_set_project_state(arguments: dict, ctx, access_manager) -> lis
 @registry.register(
     Tool(
         name="memento_get_project_state",
-        description="Get the full project state (vision, milestones, blockers, tech_debt, decisions, sprint).",
+        description="[DEPRECATED] Get the full project state (vision, milestones, blockers, tech_debt, decisions, sprint).",
         inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
     )
 )
@@ -62,7 +62,7 @@ async def memento_get_project_state(arguments: dict, ctx, access_manager) -> lis
 @registry.register(
     Tool(
         name="memento_delete_project_state",
-        description="Delete a project state field by key.",
+        description="[DEPRECATED] Delete a project state field by key.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -84,7 +84,7 @@ async def memento_delete_project_state(arguments: dict, ctx, access_manager) -> 
 @registry.register(
     Tool(
         name="memento_project_state_summary",
-        description="Get a human-readable summary of the project state for context injection into prompts.",
+        description="[DEPRECATED] Get a human-readable summary of the project state for context injection into prompts.",
         inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
     )
 )

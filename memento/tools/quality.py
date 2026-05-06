@@ -13,7 +13,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_system_health",
-        description="Get a comprehensive health report for the Memento memory system — memory stats, KG health, consolidation and extraction metrics.",
+        description="[DEPRECATED] Get a comprehensive health report for the Memento memory system — memory stats, KG health, consolidation and extraction metrics.",
         inputSchema={"type": "object", "properties": {}},
     )
 )
@@ -32,7 +32,7 @@ async def memento_system_health(arguments: dict, ctx, access_manager) -> list[Te
 @registry.register(
     Tool(
         name="memento_memory_stats",
-        description="Get detailed memory statistics — counts, age distribution, user distribution.",
+        description="[DEPRECATED] Get detailed memory statistics — counts, age distribution, user distribution.",
         inputSchema={"type": "object", "properties": {}},
     )
 )
@@ -46,7 +46,7 @@ async def memento_memory_stats(arguments: dict, ctx, access_manager) -> list[Tex
 @registry.register(
     Tool(
         name="memento_kg_health",
-        description="Get knowledge graph health — entity/triple counts, predicate distribution, temporal coverage.",
+        description="[DEPRECATED] Get knowledge graph health — entity/triple counts, predicate distribution, temporal coverage.",
         inputSchema={"type": "object", "properties": {}},
     )
 )
@@ -65,7 +65,7 @@ async def memento_kg_health(arguments: dict, ctx, access_manager) -> list[TextCo
 @registry.register(
     Tool(
         name="memento_get_quality_report",
-        description="Get a full quality report for the Memento memory system — health score, coverage analysis, stale and orphan memories.",
+        description="[DEPRECATED] Get a full quality report for the Memento memory system — health score, coverage analysis, stale and orphan memories.",
         inputSchema={"type": "object", "properties": {}},
     )
 )
@@ -92,7 +92,7 @@ async def memento_get_quality_report(
 @registry.register(
     Tool(
         name="memento_record_quality_evaluation",
-        description="Record a quality evaluation score for a specific memory. Score should be 0-1.",
+        description="[DEPRECATED] Record a quality evaluation score for a specific memory. Score should be 0-1.",
         inputSchema={
             "type": "object",
             "properties": {

@@ -9,7 +9,7 @@ from memento.registry import registry
 @registry.register(
     Tool(
         name="memento_explain_search",
-        description="Return the last retrieval trace for a given query (best-effort, local-only).",
+        description="[DEPRECATED] Return the last retrieval trace for a given query (best-effort, local-only).",
         inputSchema={
             "type": "object",
             "properties": {

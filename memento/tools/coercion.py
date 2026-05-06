@@ -462,7 +462,7 @@ PRESETS: dict[str, list[dict]] = {
 
 @registry.register(Tool(
     name="memento_toggle_active_coercion",
-    description="Toggle deterministic Active Coercion (IDE notifications and pre-commit blocking) for the current workspace.",
+    description="[DEPRECATED] Toggle deterministic Active Coercion (IDE notifications and pre-commit blocking) for the current workspace.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -489,7 +489,7 @@ async def memento_toggle_active_coercion(arguments: dict, ctx, access_manager) -
 
 @registry.register(Tool(
     name="memento_install_git_hooks",
-    description="Install or update deterministic git hooks (pre-commit) for Active Coercion in the current git repository.",
+    description="[DEPRECATED] Install or update deterministic git hooks (pre-commit) for Active Coercion in the current git repository.",
     inputSchema={"type": "object", "properties": {}}
 ))
 async def memento_install_git_hooks(arguments: dict, ctx, access_manager) -> list[TextContent]:
@@ -502,7 +502,7 @@ async def memento_install_git_hooks(arguments: dict, ctx, access_manager) -> lis
 
 @registry.register(Tool(
     name="memento_list_active_coercion_rules",
-    description="List all deterministic Active Coercion rules currently defined for the workspace.",
+    description="[DEPRECATED] List all deterministic Active Coercion rules currently defined for the workspace.",
     inputSchema={"type": "object", "properties": {}}
 ))
 async def memento_list_active_coercion_rules(arguments: dict, ctx, access_manager) -> list[TextContent]:
@@ -514,7 +514,7 @@ async def memento_list_active_coercion_rules(arguments: dict, ctx, access_manage
 
 @registry.register(Tool(
     name="memento_list_active_coercion_presets",
-    description="List available Active Coercion preset packs.",
+    description="[DEPRECATED] List available Active Coercion preset packs.",
     inputSchema={"type": "object", "properties": {}}
 ))
 async def memento_list_active_coercion_presets(arguments: dict, ctx, access_manager) -> list[TextContent]:
@@ -525,7 +525,7 @@ async def memento_list_active_coercion_presets(arguments: dict, ctx, access_mana
 
 @registry.register(Tool(
     name="memento_apply_active_coercion_preset",
-    description="Apply an Active Coercion preset pack to the current workspace (merges by rule id).",
+    description="[DEPRECATED] Apply an Active Coercion preset pack to the current workspace (merges by rule id).",
     inputSchema={
         "type": "object",
         "properties": {
@@ -552,7 +552,7 @@ async def memento_apply_active_coercion_preset(arguments: dict, ctx, access_mana
 
 @registry.register(Tool(
     name="memento_add_active_coercion_rule",
-    description="Add a new deterministic Active Coercion rule to the workspace. This rule will automatically block commits or trigger IDE warnings if violated.",
+    description="[DEPRECATED] Add a new deterministic Active Coercion rule to the workspace. This rule will automatically block commits or trigger IDE warnings if violated.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -618,7 +618,7 @@ async def memento_add_active_coercion_rule(arguments: dict, ctx, access_manager)
 
 @registry.register(Tool(
     name="memento_remove_active_coercion_rule",
-    description="Remove an existing Active Coercion rule from the workspace by its ID.",
+    description="[DEPRECATED] Remove an existing Active Coercion rule from the workspace by its ID.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -646,7 +646,7 @@ async def memento_remove_active_coercion_rule(arguments: dict, ctx, access_manag
 
 @registry.register(Tool(
     name="memento_configure_enforcement",
-    description="Configure the Tri-State Goal Steering mechanisms. Level 1: Context Injection. Level 2: Strict Mentor Checkpoint. Level 3: Daemon Push Notifications.",
+    description="[DEPRECATED] Configure the Tri-State Goal Steering mechanisms. Level 1: Context Injection. Level 2: Strict Mentor Checkpoint. Level 3: Daemon Push Notifications.",
     inputSchema={
         "type": "object",
         "properties": {

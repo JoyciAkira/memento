@@ -13,7 +13,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_share_memory_to_workspace",
-        description="Share a memory with another project workspace for cross-project context.",
+        description="[DEPRECATED] Share a memory with another project workspace for cross-project context.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -59,7 +59,7 @@ async def memento_share_memory_to_workspace(arguments: dict, ctx, access_manager
 @registry.register(
     Tool(
         name="memento_get_cross_workspace_stats",
-        description="Get cross-workspace sync statistics — counts of shared, imported, and pending memories.",
+        description="[DEPRECATED] Get cross-workspace sync statistics — counts of shared, imported, and pending memories.",
         inputSchema={
             "type": "object",
             "properties": {},

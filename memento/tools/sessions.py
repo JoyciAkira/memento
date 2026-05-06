@@ -11,7 +11,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_begin_session",
-        description="Start a new Memento session for this workspace (closes any active session).",
+        description="[DEPRECATED] Start a new Memento session for this workspace (closes any active session).",
         inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
     )
 )
@@ -26,7 +26,7 @@ async def memento_begin_session(arguments: dict, ctx, access_manager) -> list[Te
 @registry.register(
     Tool(
         name="memento_handoff",
-        description="Create a checkpoint and generate an LLM-agnostic handoff prompt for continuing in a new chat.",
+        description="[DEPRECATED] Create a checkpoint and generate an LLM-agnostic handoff prompt for continuing in a new chat.",
         inputSchema={
             "type": "object",
             "properties": {"workspace_root": {"type": "string"}, "reason": {"type": "string"}},
@@ -47,7 +47,7 @@ async def memento_handoff(arguments: dict, ctx, access_manager) -> list[TextCont
 @registry.register(
     Tool(
         name="memento_resume_session",
-        description="Resume from a previous session_id by restoring its checkpoint (including L1) and opening a new active session.",
+        description="[DEPRECATED] Resume from a previous session_id by restoring its checkpoint (including L1) and opening a new active session.",
         inputSchema={
             "type": "object",
             "properties": {"workspace_root": {"type": "string"}, "session_id": {"type": "string"}},
@@ -66,7 +66,7 @@ async def memento_resume_session(arguments: dict, ctx, access_manager) -> list[T
 @registry.register(
     Tool(
         name="memento_list_sessions",
-        description="List recent sessions for the current workspace.",
+        description="[DEPRECATED] List recent sessions for the current workspace.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -89,7 +89,7 @@ async def memento_list_sessions(arguments: dict, ctx, access_manager) -> list[Te
 @registry.register(
     Tool(
         name="memento_session_status",
-        description="Show status for the current active session in this workspace.",
+        description="[DEPRECATED] Show status for the current active session in this workspace.",
         inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
     )
 )

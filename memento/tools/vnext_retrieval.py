@@ -11,7 +11,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_search_vnext",
-        description="Search memories using the vNext retrieval pipeline and return a structured bundle.",
+        description="[DEPRECATED] Search memories using the vNext retrieval pipeline and return a structured bundle.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -53,7 +53,7 @@ async def memento_search_vnext(arguments: dict, ctx, access_manager) -> list[Tex
 @registry.register(
     Tool(
         name="memento_explain_retrieval",
-        description="Explain vNext retrieval routing and lane traces for a query.",
+        description="[DEPRECATED] Explain vNext retrieval routing and lane traces for a query.",
         inputSchema={
             "type": "object",
             "properties": {

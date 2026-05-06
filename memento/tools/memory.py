@@ -9,7 +9,7 @@ logger = logging.getLogger("memento-mcp")
 
 @registry.register(Tool(
     name="memento_add_memory",
-    description="Add a new memory to the Memento provider",
+    description="[DEPRECATED] Add a new memory to the Memento provider",
     inputSchema={
         "type": "object",
         "properties": {
@@ -58,7 +58,7 @@ async def memento_add_memory(arguments: dict, ctx, access_manager) -> list[TextC
 
 @registry.register(Tool(
     name="memento_search_memory",
-    description="Search memories in the Memento provider",
+    description="[DEPRECATED] Search memories in the Memento provider",
     inputSchema={
         "type": "object",
         "properties": {

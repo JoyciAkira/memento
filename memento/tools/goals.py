@@ -11,7 +11,7 @@ logger = logging.getLogger("memento-mcp")
 @registry.register(
     Tool(
         name="memento_set_goals",
-        description="Set active goals (first-class). Replaces existing goals by default and stores the reason.",
+        description="[DEPRECATED] Set active goals (first-class). Replaces existing goals by default and stores the reason.",
         inputSchema={
             "type": "object",
             "properties": {
@@ -51,7 +51,7 @@ async def memento_set_goals(arguments: dict, ctx, access_manager) -> list[TextCo
 @registry.register(
     Tool(
         name="memento_list_goals",
-        description="List goals (first-class).",
+        description="[DEPRECATED] List goals (first-class).",
         inputSchema={
             "type": "object",
             "properties": {

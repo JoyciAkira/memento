@@ -6,7 +6,7 @@ logger = logging.getLogger("memento-mcp")
 
 @registry.register(Tool(
     name="memento_toggle_precognition",
-    description="Toggle the Pre-cognitive Intervention background daemon",
+    description="[DEPRECATED] Toggle the Pre-cognitive Intervention background daemon",
     inputSchema={
         "type": "object",
         "properties": {
@@ -98,7 +98,7 @@ async def memento_toggle_precognition(arguments: dict, ctx, access_manager) -> l
 
 @registry.register(Tool(
     name="memento_synthesize_dreams",
-    description="Enter Dream State: Generates a novel, creative insight (Synthetic Diamond) by finding hidden patterns across existing isolated memories. Returns a DRAFT_INSIGHT that must be manually approved.",
+    description="[DEPRECATED] Enter Dream State: Generates a novel, creative insight (Synthetic Diamond) by finding hidden patterns across existing isolated memories. Returns a DRAFT_INSIGHT that must be manually approved.",
     inputSchema={
         "type": "object",
         "properties": {
@@ -125,7 +125,7 @@ async def memento_synthesize_dreams(arguments: dict, ctx, access_manager) -> lis
 
 @registry.register(Tool(
     name="memento_check_goal_alignment",
-    description="Level 2 Enforcer: Submit code or plans to be strictly evaluated against the project's core goals. Use this to verify if your work is innovative and aligned before finalizing a task.",
+    description="[DEPRECATED] Level 2 Enforcer: Submit code or plans to be strictly evaluated against the project's core goals. Use this to verify if your work is innovative and aligned before finalizing a task.",
     inputSchema={
         "type": "object",
         "properties": {
