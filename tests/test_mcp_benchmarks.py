@@ -36,7 +36,7 @@ _VNEXT_MEDIAN_MAX_S = 0.12
 _VNEXT_P95_MAX_S = 0.40
 _VNEXT_MAX_SINGLE_S = 0.90
 
-_EXPECTED_TOOL_COUNT = 53
+_EXPECTED_TOOL_COUNT = 14
 
 
 def _p95(sorted_durations: list[float]) -> float:
@@ -50,10 +50,20 @@ def test_b1_exact_registered_tool_surface():
     names = {t.name for t in registry.get_tools()}
     assert len(names) == _EXPECTED_TOOL_COUNT, f"attesi {_EXPECTED_TOOL_COUNT} tool, trovati {len(names)}"
     for required in (
-        "memento_search_vnext",
-        "memento_explain_retrieval",
-        "memento_set_goals",
-        "memento_list_goals",
+        "memento",
+        "memento_search",
+        "memento_project",
+        "memento_session",
+        "memento_graph",
+        "memento_remember",
+        "memento_configure",
+        "memento_cognitive",
+        "memento_health",
+        "memento_coercion",
+        "memento_kg",
+        "memento_notifications",
+        "memento_audit_dependencies",
+        "memento_migrate_workspace_memories",
     ):
         assert required in names
 

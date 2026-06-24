@@ -125,6 +125,10 @@ class WorkspaceContext:
     def save_autonomy_config(self):
         self.config.save()
 
+    @property
+    def last_external_write_at(self) -> str | None:
+        return self.provider._last_external_write_at
+
     def start_autonomous_agent(self) -> bool:
         """Start the autonomous agent with the configured level."""
         level_str = self.autonomy.get("level", "off")

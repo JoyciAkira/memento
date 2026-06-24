@@ -2,6 +2,14 @@
 
 All notable changes to Memento are documented here.
 
+## [0.4.0] — 2026-06-24
+
+### Added
+- **Temporal decay**: retrieval score = RRF × e^(−λ×age_days) per tier. Defaults: semantic λ=0.005 (~200d half-life), episodic λ=0.02 (~50d), working λ=0.05 (~14d). Configurable via `MEMENTO_DECAY_SEMANTIC/EPISODIC/WORKING`.
+- **L1 LRU+importance eviction**: replaces FIFO with `last_accessed + 0.3×importance` eviction policy. High-importance memories survive longer in working memory.
+- **Proactive context injection**: every tool call automatically prepends relevant memories to the response. Skip with `MEMENTO_PROACTIVE_INJECT=0`, tune with `MEMENTO_PROACTIVE_TOP_K` (default 3).
+- **Cross-agent WAL watcher**: background task polls `memory_meta` every 30s to detect writes from other Memento instances sharing the same `MEMENTO_DIR`. Invalidates L1 cache on external write.
+
 ## [0.3.1] — 2026-05-06
 
 ### Fixed

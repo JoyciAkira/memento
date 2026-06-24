@@ -13,6 +13,15 @@ class Settings:
         self.ui_enabled = os.environ.get("MEMENTO_UI", "").strip().lower() in ("1", "true")
         self.ui_auth_token = os.environ.get("MEMENTO_UI_AUTH_TOKEN", "").strip()
         self.rule_confirmation = os.environ.get("MEMENTO_RULE_CONFIRMATION", "true").strip().lower() == "true"
+        # Temporal decay: lambda per tier (half-life: semantic~200d, episodic~50d, working~14d)
+        self.decay_lambda: dict = {
+            "semantic": float(os.environ.get("MEMENTO_DECAY_SEMANTIC", "0.005")),
+            "episodic": float(os.environ.get("MEMENTO_DECAY_EPISODIC", "0.02")),
+            "working":  float(os.environ.get("MEMENTO_DECAY_WORKING",  "0.05")),
+        }
+        # Proactive context injection on every tool call
+        self.proactive_inject: bool = os.environ.get("MEMENTO_PROACTIVE_INJECT", "1").strip() not in ("0", "false", "no")
+        self.proactive_top_k: int = int(os.environ.get("MEMENTO_PROACTIVE_TOP_K", "3"))
 
     def _detect_embedding_backend(self) -> str:
         explicit = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()

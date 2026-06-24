@@ -147,6 +147,9 @@ class NeuroGraphProvider:
         self._db_read: aiosqlite.Connection | None = None
         self._write_lock = asyncio.Lock()
         self._read_lock = asyncio.Lock()
+        from memento.settings import settings as _settings
+        self._decay_lambda = _settings.decay_lambda
+        self._last_external_write_at: str | None = None
 
     async def initialize(self):
         if self._initialized:
@@ -189,6 +192,36 @@ class NeuroGraphProvider:
             self.orchestrator = MemoryOrchestrator(self._sync_db)
             self.orchestrator.enable_vsa_index(self.db_path)
             await asyncio.to_thread(self._ensure_vsa_backfilled)
+
+            # Start cross-agent WAL watcher (30s poll)
+            asyncio.ensure_future(self._watch_external_writes())
+
+    async def _watch_external_writes(self) -> None:
+        """Poll every 30s for writes by other processes sharing the same DB (cross-agent WAL)."""
+        while True:
+            try:
+                await asyncio.sleep(30)
+                if not self._initialized or self._db_read is None:
+                    continue
+                async with self._read_lock:
+                    cursor = await self._db_read.execute(
+                        "SELECT MAX(created_at) as latest FROM memory_meta"
+                    )
+                    row = await cursor.fetchone()
+                latest = row["latest"] if row else None
+                if latest and latest != self._last_external_write_at:
+                    if self._last_external_write_at is not None:
+                        # Another process wrote — invalidate L1 so next search re-fetches
+                        try:
+                            self.orchestrator.l1.clear()
+                            logger.info(f"Cross-agent write detected ({latest}), L1 cache invalidated")
+                        except Exception:
+                            pass
+                    self._last_external_write_at = latest
+            except asyncio.CancelledError:
+                break
+            except Exception as e:
+                logger.debug(f"_watch_external_writes error: {e}")
 
     def _ensure_vsa_backfilled(self) -> None:
         try:
@@ -263,6 +296,16 @@ class NeuroGraphProvider:
         if norm_a == 0 or norm_b == 0:
             return 0.0
         return dot_product / (norm_a * norm_b)
+
+    def _decay_score(self, created_at: str, tier: str = "semantic") -> float:
+        """Exponential temporal decay: score multiplier = e^(-lambda * age_days)."""
+        try:
+            created = datetime.fromisoformat(created_at)
+            age_days = max(0.0, (datetime.now() - created).total_seconds() / 86400)
+            lam = self._decay_lambda.get(tier, self._decay_lambda.get("semantic", 0.005))
+            return math.exp(-lam * age_days)
+        except Exception:
+            return 1.0
 
     async def add(self, text: str, user_id: str = "default", metadata: dict = None) -> Dict[str, Any]:
         if not self._initialized:
@@ -427,14 +470,14 @@ class NeuroGraphProvider:
                 placeholders = ",".join(["?"] * len(candidate_ids))
                 if has_query_embedding:
                     cursor = await db.execute(
-                        f"SELECT m.id, m.text, m.created_at, e.embedding FROM memories m "
+                        f"SELECT m.id, m.text, m.created_at, m.memory_tier, e.embedding FROM memories m "
                         f"LEFT JOIN memory_embeddings e ON m.id = e.id "
                         f"WHERE m.user_id = ? {filter_sql} AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
                 else:
                     cursor = await db.execute(
-                        f"SELECT m.id, m.text, m.created_at FROM memories m "
+                        f"SELECT m.id, m.text, m.created_at, m.memory_tier FROM memories m "
                         f"WHERE m.user_id = ? {filter_sql} AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
@@ -442,9 +485,11 @@ class NeuroGraphProvider:
 
             semantic_scores: dict[str, float] = {}
             row_map: dict[str, aiosqlite.Row] = {}
+            tier_map: dict[str, str] = {}
             for row in candidate_rows:
                 row_id = row["id"]
                 row_map[row_id] = row
+                tier_map[row_id] = row["memory_tier"] or "semantic"
                 if not has_query_embedding:
                     semantic_scores[row_id] = 0.0
                     continue
@@ -474,6 +519,13 @@ class NeuroGraphProvider:
             for rank, row in enumerate(recent_sorted, 1):
                 rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 0.5 / (k_rrf + rank)
 
+            # Apply temporal decay: score *= e^(-lambda * age_days) per tier
+            for row_id in list(rrf_scores.keys()):
+                snap = row_map.get(row_id)
+                if snap is not None:
+                    tier = tier_map.get(row_id, "semantic")
+                    rrf_scores[row_id] *= self._decay_score(snap["created_at"], tier)
+
             final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
 
             trace = {
@@ -496,7 +548,7 @@ class NeuroGraphProvider:
                 "final": [{"id": row_id, "score": float(score)} for row_id, score in final_sorted[:50]],
             }
             rows_snapshot: dict[str, dict[str, Any]] = {
-                rid: {"id": r["id"], "text": r["text"], "created_at": r["created_at"]}
+                rid: {"id": r["id"], "text": r["text"], "created_at": r["created_at"], "memory_tier": r["memory_tier"] or "semantic"}
                 for rid, r in row_map.items()
             }
 
