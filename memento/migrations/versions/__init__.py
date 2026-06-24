@@ -7,6 +7,7 @@ from memento.migrations.versions.v007_performance_indexes import up as up_007
 from memento.migrations.versions.v008_kg_schema import up as up_008
 from memento.migrations.versions.v009_memory_tiers import up as up_009
 from memento.migrations.versions.v010_sessions_handoff import up as up_010
+from memento.migrations.versions.v011_created_at_index import up as up_011
 
 def get_all_migrations():
     return [
@@ -19,4 +20,5 @@ def get_all_migrations():
         (8, "kg_schema", up_008),
         (9, "memory_tiers", up_009),
         (10, "sessions_handoff", up_010),
+        (11, "created_at_index", up_011),
     ]

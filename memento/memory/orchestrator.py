@@ -40,12 +40,13 @@ class MemoryOrchestrator:
         self,
         content: str,
         metadata: Optional[Dict[str, Any]] = None,
-        tier: str = "semantic"
+        tier: str = "semantic",
+        importance: float = 0.5,
     ) -> str:
         mem_id = str(uuid.uuid4())
 
         if tier == "working":
-            self.l1.add(mem_id, content, metadata)
+            self.l1.add(mem_id, content, metadata, importance=importance)
         elif tier == "episodic":
             self.l2.add(mem_id, content, metadata)
             if self._vsa_index:

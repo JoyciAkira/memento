@@ -150,17 +150,25 @@ MEMENTO_EMBEDDING_BACKEND=none memento-mcp
 
 ## Environment Variables
 
-| Variable | Description |
-|----------|-------------|
-| `OPENAI_API_KEY` | Required for embeddings and cognitive features |
-| `OPENAI_BASE_URL` | Optional OpenAI-compatible endpoint (e.g. OpenRouter) |
-| `MEM0_MODEL` | LLM model for cognitive features |
-| `MEM0_EMBEDDING_MODEL` | Embeddings model for hybrid search |
-| `MEMENTO_EMBEDDING_BACKEND` | Set to `none` for FTS5-only (no API key) |
-| `MEMENTO_DIR` | Workspace root for `.memento/` state |
-| `MEMENTO_UI` | Enable local web UI (`1`/`true`) |
-| `MEMENTO_UI_PORT` | Local UI port (default `8089`) |
-| `MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS` | Auto-checkpoint frequency (default `25`) |
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `OPENAI_API_KEY` | — | Required for OpenAI embeddings and cognitive features |
+| `OPENAI_BASE_URL` | `https://api.openai.com/v1` | OpenAI-compatible endpoint (e.g. OpenRouter) |
+| `MEM0_MODEL` | `openai/gpt-4o-mini` | LLM model for cognitive features |
+| `MEM0_EMBEDDING_MODEL` | `text-embedding-3-small` | Embeddings model |
+| `MEMENTO_EMBEDDING_BACKEND` | auto-detect | `local` (fastembed), `openai`, or `none` |
+| `MEMENTO_DIR` | cwd | Workspace root for `.memento/` state |
+| `MEMENTO_UI` | `0` | Enable local web UI (`1`/`true`) |
+| `MEMENTO_UI_PORT` | `8089` | Local UI port |
+| `MEMENTO_UI_AUTH_TOKEN` | — | Auth token for local web UI |
+| `MEMENTO_RULE_CONFIRMATION` | `true` | Require confirmation before applying coercion rules |
+| `MEMENTO_PROACTIVE_INJECT` | `1` | Inject relevant memories on every tool call (`0` to disable) |
+| `MEMENTO_PROACTIVE_TOP_K` | `3` | Number of memories to inject proactively |
+| `MEMENTO_DECAY_SEMANTIC` | `0.005` | Decay λ for semantic memories (~200d half-life) |
+| `MEMENTO_DECAY_EPISODIC` | `0.02` | Decay λ for episodic memories (~50d half-life) |
+| `MEMENTO_DECAY_WORKING` | `0.05` | Decay λ for working memories (~14d half-life) |
+| `MEMENTO_WRITE_SEARCH_TRACE` | `0` | Write `last_search.json` trace on every search (`1` to enable) |
+| `MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS` | `25` | Auto-checkpoint frequency |
 
 ---
 

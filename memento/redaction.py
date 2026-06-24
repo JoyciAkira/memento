@@ -4,30 +4,34 @@ from typing import Optional
 def redact_secrets(text: Optional[str]) -> str:
     """
     Sostituisce dati sensibili (password, chiavi API, token) con [REDACTED].
-    Utilizza regex robuste per evitare leak di sicurezza in ambienti open source.
     """
     if not text:
         return ""
 
-    # Pattern per intercettare keyword generiche associate a secret in file JSON/YML/INI
-    # Es: "password": "mypass", "api_key": "sk-1234"
+    # Generic keyword-based secrets (JSON/YAML/INI style)
     generic_secret_pattern = re.compile(
-        r'(?i)\b(password|passwd|pwd|secret|token|api_key|apikey|access_token|auth_token)\b\s*(?:del\s+server\s+è\s+|is\s+|:\s*|=\s*)?([\'"]?)[^\'"\s,]+([\'"]?)'
+        r'(?i)\b(password|passwd|pwd|secret|token|api_key|apikey|access_token|auth_token|'
+        r'client_secret|client_id|bearer|db_password|database_url|private_key)\b'
+        r'\s*(?:del\s+server\s+è\s+|is\s+|:\s*|=\s*)?([\'"]?)[^\'"\s,]+([\'"]?)'
     )
 
-    # Regex per token comuni specifici (OpenAI, Anthropic, AWS, JWT, GitHub)
     specific_patterns = [
-        re.compile(r'sk-(ant-)?[a-zA-Z0-9]{32,80}'),         # OpenAI / Anthropic
-        re.compile(r'(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'), # AWS Access Keys
-        re.compile(r'gh[pousr]_[a-zA-Z0-9]{36}'),            # GitHub Tokens
-        re.compile(r'eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+') # JWT Tokens
+        # OpenAI sk-... and Anthropic sk-ant-api03-...-... (with hyphens)
+        re.compile(r'sk-(?:ant-[a-zA-Z0-9]{2,10}-)?[a-zA-Z0-9\-_]{32,120}'),
+        # AWS Access Keys
+        re.compile(r'(A3T[A-Z0-9]|AKIA|AGPA|AIDA|AROA|AIPA|ANPA|ANVA|ASIA)[A-Z0-9]{16}'),
+        # GitHub Tokens
+        re.compile(r'gh[pousr]_[a-zA-Z0-9]{36}'),
+        # JWT Tokens
+        re.compile(r'eyJ[a-zA-Z0-9_-]+\.eyJ[a-zA-Z0-9_-]+\.[a-zA-Z0-9_-]+'),
+        # Database DSNs: postgres/mysql/mongodb://user:pass@host
+        re.compile(r'(?i)(postgres|postgresql|mysql|mongodb|redis|amqp)://[^:]+:[^@\s]+@[^\s]+'),
+        # Generic Bearer tokens in Authorization headers
+        re.compile(r'(?i)Authorization\s*:\s*Bearer\s+[a-zA-Z0-9\-_\.]+'),
     ]
 
     redacted = text
-    # Oscura i secret generici
     redacted = generic_secret_pattern.sub(r'\1 \2[REDACTED]\3', redacted)
-    
-    # Oscura i token specifici trovati nel testo
     for pattern in specific_patterns:
         redacted = pattern.sub('[REDACTED]', redacted)
 

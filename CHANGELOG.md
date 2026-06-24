@@ -2,6 +2,34 @@
 
 All notable changes to Memento are documented here.
 
+## [0.5.0] — 2026-06-24
+
+### Security
+- **Prompt injection mitigation**: proactive context injection is now wrapped in `<!-- memento:proactive-context -->` delimiters and stripped of instruction-hijacking patterns
+- **`.memento/` directory permissions**: created with `mode=0o700` (owner-only) to prevent local process snooping
+- **Access manager enforcement**: proactive injection respects lockdown state
+- **Extended redaction**: Anthropic key format (`sk-ant-api03-...`), DSNs (`postgres://user:pass@host`), `CLIENT_SECRET`, `DB_PASSWORD`, Bearer tokens
+
+### Performance
+- `datetime.now()` hoisted outside the decay loop (400× fewer calls per search)
+- `MEMENTO_WRITE_SEARCH_TRACE` default flipped to `0` — JSON trace write disabled in production
+- New index `idx_memory_meta_created_at_desc` for O(1) `MAX(created_at)` resolution (WAL watcher + migration v011)
+
+### Added
+- **KG retrieval lane**: fifth RRF lane — entity match in KG → source memory IDs → boosted in ranking (weight 0.8)
+- **L1 importance wiring**: `MemoryGovernor.score()` signal now flows into `L1WorkingMemory.add(importance=...)` on every `provider.add()` call
+- **Provider `close()`**: clean shutdown cancels the WAL watcher task and closes DB connections; guards against multiple watcher spawns
+- **Settings `reload()`**: allows test isolation after `monkeypatch.setenv`
+- **Startup warning**: logs warning when embedding backend resolves to `none`
+- **Environment variables fully documented** in README (17 vars, with defaults)
+
+### Fixed
+- `test_tools_smoke.py`: added `action` payloads for all 12 unified tools
+- `conftest.py`: autouse `_cleanup_workspace_contexts` fixture clears `_contexts` between tests; `settings.reload()` on each test setup/teardown
+
+### Changed
+- `_decay_score()` accepts optional `now: datetime` parameter to avoid repeated `datetime.now()` calls
+
 ## [0.4.0] — 2026-06-24
 
 ### Added

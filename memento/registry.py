@@ -4,6 +4,10 @@ from mcp.types import Tool, TextContent
 # Tools that are explicitly about memory search — skip proactive injection to avoid recursion
 _SEARCH_TOOLS = frozenset({"memento", "memento_search", "memento_remember", "memento_health"})
 
+# Delimiter that downstream agents can recognize as untrusted injected context
+_PROACTIVE_OPEN  = "<!-- memento:proactive-context -->"
+_PROACTIVE_CLOSE = "<!-- /memento:proactive-context -->"
+
 class ToolRegistry:
     def __init__(self):
         self._tools: Dict[str, Tool] = {}
@@ -31,6 +35,16 @@ class ToolRegistry:
             return list(self._tools.values())
         return [t for t in self._tools.values() if not t.description.startswith("[DEPRECATED]")]
 
+    @staticmethod
+    def _sanitize_memory(text: str) -> str:
+        """Strip control tokens that could be used for prompt injection."""
+        import re
+        # Remove instruction-like patterns that could hijack the agent
+        text = re.sub(r'(?i)(ignore\s+(previous|all|prior)\s+instructions?.*)', '[FILTERED]', text)
+        text = re.sub(r'(?i)(system\s*:|<\s*system\s*>|</\s*system\s*>)', '[FILTERED]', text)
+        text = re.sub(r'(?i)(you\s+are\s+now\s+a?\s*\w+\s+assistant)', '[FILTERED]', text)
+        return text
+
     async def _proactive_context(self, name: str, arguments: dict, ctx: Any) -> str:
         """Build a proactive context block by searching memories relevant to the current call."""
         from memento.settings import settings as _settings
@@ -41,6 +55,13 @@ class ToolRegistry:
         provider = getattr(ctx, "provider", None)
         if provider is None:
             return ""
+        # Check access manager — respect lockdown/read-only
+        access_manager = getattr(ctx, "access_manager", None)
+        if access_manager and getattr(access_manager, "_state", "read-write") == "lockdown":
+            return ""
+        # Enforce workspace filter
+        workspace_root = arguments.get("workspace_root")
+        filters = {"workspace_root": workspace_root} if workspace_root else None
         # Build query from meaningful string arguments
         skip_keys = {"workspace_root", "action"}
         query_parts = [
@@ -51,14 +72,16 @@ class ToolRegistry:
             return ""
         query = " ".join(query_parts)[:300]
         try:
-            results = await provider.search(query, limit=_settings.proactive_top_k)
+            results = await provider.search(query, limit=_settings.proactive_top_k, filters=filters)
         except Exception:
             return ""
         if not results:
             return ""
-        lines = [f"[Proactive context — {len(results)} relevant memories]"]
+        lines = [f"{_PROACTIVE_OPEN}", f"[Proactive context — {len(results)} relevant memories]"]
         for r in results:
-            lines.append(f"• {r.get('memory', '')[:200]}")
+            sanitized = self._sanitize_memory(r.get("memory", ""))[:200]
+            lines.append(f"• {sanitized}")
+        lines.append(_PROACTIVE_CLOSE)
         return "\n".join(lines) + "\n\n"
 
     async def execute(self, name: str, arguments: dict, ctx: Any, **kwargs) -> List[TextContent]:

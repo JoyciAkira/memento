@@ -94,8 +94,9 @@ async def test_neurograph_add_injects_workspace_metadata():
 
 
 @pytest.mark.asyncio
-async def test_memento_explain_search(tmp_path):
+async def test_memento_explain_search(tmp_path, monkeypatch):
     import json
+    monkeypatch.setenv("MEMENTO_WRITE_SEARCH_TRACE", "1")
 
     from memento.mcp_server import call_tool
 

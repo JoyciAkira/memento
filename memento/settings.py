@@ -38,5 +38,9 @@ class Settings:
     def has_openai_key(self) -> bool:
         return bool(self.openai_api_key)
 
+    def reload(self) -> None:
+        """Re-read all env vars — useful in tests after monkeypatch.setenv."""
+        self.__init__()
+
 
 settings = Settings()

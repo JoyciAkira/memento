@@ -104,7 +104,11 @@ class NeuroGraphProvider:
     def __init__(self, db_path: str = None):
         if not db_path:
             memento_dir = os.path.join(os.environ.get("MEMENTO_DIR", os.getcwd()), ".memento")
-            os.makedirs(memento_dir, exist_ok=True)
+            os.makedirs(memento_dir, exist_ok=True, mode=0o700)
+            try:
+                os.chmod(memento_dir, 0o700)
+            except Exception:
+                pass
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
             
         self.db_path = db_path
@@ -150,6 +154,7 @@ class NeuroGraphProvider:
         from memento.settings import settings as _settings
         self._decay_lambda = _settings.decay_lambda
         self._last_external_write_at: str | None = None
+        self._watcher_task: asyncio.Task | None = None
 
     async def initialize(self):
         if self._initialized:
@@ -193,8 +198,28 @@ class NeuroGraphProvider:
             self.orchestrator.enable_vsa_index(self.db_path)
             await asyncio.to_thread(self._ensure_vsa_backfilled)
 
-            # Start cross-agent WAL watcher (30s poll)
-            asyncio.ensure_future(self._watch_external_writes())
+            # Start cross-agent WAL watcher (30s poll) — store task for clean shutdown
+            if self._watcher_task is None or self._watcher_task.done():
+                self._watcher_task = asyncio.ensure_future(self._watch_external_writes())
+
+    async def close(self) -> None:
+        """Cancel background tasks and close DB connections."""
+        if self._watcher_task and not self._watcher_task.done():
+            self._watcher_task.cancel()
+            try:
+                await self._watcher_task
+            except asyncio.CancelledError:
+                pass
+        if self._db:
+            try:
+                await self._db.close()
+            except Exception:
+                pass
+        if self._db_read:
+            try:
+                await self._db_read.close()
+            except Exception:
+                pass
 
     async def _watch_external_writes(self) -> None:
         """Poll every 30s for writes by other processes sharing the same DB (cross-agent WAL)."""
@@ -252,7 +277,7 @@ class NeuroGraphProvider:
             logger.debug(f"VSA backfill skipped: {e}")
 
     def _write_search_trace_file(self, trace: dict) -> None:
-        v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "1").strip().lower()
+        v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "0").strip().lower()
         if v in ("0", "false", "no", "off"):
             return
         try:
@@ -297,11 +322,12 @@ class NeuroGraphProvider:
             return 0.0
         return dot_product / (norm_a * norm_b)
 
-    def _decay_score(self, created_at: str, tier: str = "semantic") -> float:
+    def _decay_score(self, created_at: str, tier: str = "semantic", now: datetime | None = None) -> float:
         """Exponential temporal decay: score multiplier = e^(-lambda * age_days)."""
         try:
             created = datetime.fromisoformat(created_at)
-            age_days = max(0.0, (datetime.now() - created).total_seconds() / 86400)
+            _now = now or datetime.now()
+            age_days = max(0.0, (_now - created).total_seconds() / 86400)
             lam = self._decay_lambda.get(tier, self._decay_lambda.get("semantic", 0.005))
             return math.exp(-lam * age_days)
         except Exception:
@@ -350,6 +376,26 @@ class NeuroGraphProvider:
             )
         except Exception as e:
             logger.debug(f"VSA indexing skipped for {memory_id}: {e}")
+
+        # Wire importance from MemoryGovernor into L1 working memory
+        try:
+            from memento.memory.governor import MemoryGovernor
+            _gov = MemoryGovernor()
+            _surprise = float(meta.get("prediction_error", meta.get("surprise_score", 0.0)) or 0.0)
+            _signal = _gov.score(
+                memory_id=memory_id,
+                semantic_similarity=1.0,
+                vsa_resonance=1.0,
+                created_at=created_at,
+                hit_count=0,
+                surprise=_surprise,
+            )
+            _importance = float(_signal.strength)
+            tier = meta.get("memory_tier", "semantic")
+            if tier == "working":
+                self.orchestrator.l1.add(memory_id, redacted_text, meta, importance=_importance)
+        except Exception as e:
+            logger.debug(f"L1 importance wiring skipped: {e}")
 
         try:
             await self._record_autonomous_memory_signal(memory_id, redacted_text, meta)
@@ -519,12 +565,30 @@ class NeuroGraphProvider:
             for rank, row in enumerate(recent_sorted, 1):
                 rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 0.5 / (k_rrf + rank)
 
+            # Fifth RRF lane: KG entity match — memories cited by KG triples for query entities
+            try:
+                kg_entity_ids: list[str] = []
+                if self.kg and query:
+                    _kg_triples = await asyncio.to_thread(
+                        self.kg.kg.query_entity, query, direction="both"
+                    )
+                    for triple in _kg_triples[:20]:
+                        src = triple.get("source_closet") or triple.get("source_file")
+                        if src and len(src) == 36:  # UUID format → memory ID
+                            kg_entity_ids.append(src)
+                for rank, row_id in enumerate(kg_entity_ids, 1):
+                    rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 0.8 / (k_rrf + rank)
+            except Exception:
+                pass
+
             # Apply temporal decay: score *= e^(-lambda * age_days) per tier
+            # Hoist datetime.now() to avoid calling it once per candidate row
+            _now = datetime.now()
             for row_id in list(rrf_scores.keys()):
                 snap = row_map.get(row_id)
                 if snap is not None:
                     tier = tier_map.get(row_id, "semantic")
-                    rrf_scores[row_id] *= self._decay_score(snap["created_at"], tier)
+                    rrf_scores[row_id] *= self._decay_score(snap["created_at"], tier, _now)
 
             final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
 

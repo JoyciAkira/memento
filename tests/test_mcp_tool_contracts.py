@@ -21,6 +21,7 @@ import mcp_contract_helpers as _mcp_contract  # noqa: E402
 async def test_offline_explain_search_reads_last_trace(tmp_path, monkeypatch):
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+    monkeypatch.setenv("MEMENTO_WRITE_SEARCH_TRACE", "1")
 
     ws = tmp_path
     subprocess.run(

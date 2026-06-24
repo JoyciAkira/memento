@@ -154,6 +154,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
 async def run():
     logger.info("Starting Memento MCP server via stdio")
+    from memento.settings import settings as _s
+    if _s.embedding_backend == "none":
+        logger.warning(
+            "Embedding backend is 'none' — semantic search disabled. "
+            "Set MEMENTO_EMBEDDING_BACKEND=local (requires fastembed) or provide OPENAI_API_KEY."
+        )
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
 

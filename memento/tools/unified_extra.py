@@ -602,17 +602,17 @@ async def memento_notifications(arguments: dict, ctx, access_manager) -> list[Te
             config["topics"] = arguments["topics"]
         if "min_confidence" in arguments:
             config["min_confidence"] = arguments["min_confidence"]
-        result = await mgr.configure(config)
+        result = mgr.configure(**{k: v for k, v in config.items()})
         return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
 
     if action == "list":
         include = arguments.get("include_dismissed", False)
-        result = await mgr.get_pending_notifications(include_dismissed=include)
+        result = mgr.get_pending_notifications(include_dismissed=include)
         return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
 
     if action == "dismiss":
         nid = arguments.get("notification_id", "")
-        result = await mgr.dismiss(nid)
+        result = mgr.dismiss(nid)
         return [TextContent(type="text", text=f"Notification {nid} dismissed: {result}")]
 
     return [TextContent(type="text", text=f"Unknown notification action: {action}")]

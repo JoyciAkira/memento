@@ -35,6 +35,7 @@ def _init_source_db(path: str) -> None:
 @pytest.mark.asyncio
 async def test_all_tools_smoke(tmp_path, monkeypatch):
     monkeypatch.setenv("OPENAI_API_KEY", "sk-dummy")
+    monkeypatch.setenv("MEMENTO_WRITE_SEARCH_TRACE", "1")
 
     from memento.workspace_context import _contexts
 
@@ -152,6 +153,18 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             "memento_session_status": {"workspace_root": str(ws)},
             "memento_search_vnext": {"workspace_root": str(ws), "query": "smoke"},
             "memento_explain_retrieval": {"workspace_root": str(ws), "query": "smoke"},
+            # Unified action-based tools (v0.3+)
+            "memento_project": {"workspace_root": str(ws), "action": "summary"},
+            "memento_session": {"workspace_root": str(ws), "action": "status"},
+            "memento_graph": {"workspace_root": str(ws), "action": "summary"},
+            "memento_search": {"workspace_root": str(ws), "action": "basic", "query": "smoke"},
+            "memento_remember": {"workspace_root": str(ws), "action": "add", "text": "smoke unified remember"},
+            "memento_configure": {"workspace_root": str(ws), "action": "access"},
+            "memento_cognitive": {"workspace_root": str(ws), "action": "warnings", "context": "smoke"},
+            "memento_health": {"workspace_root": str(ws), "action": "status"},
+            "memento_coercion": {"workspace_root": str(ws), "action": "list_rules"},
+            "memento_kg": {"workspace_root": str(ws), "action": "health"},
+            "memento_notifications": {"workspace_root": str(ws), "action": "list"},
         }
 
         await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
