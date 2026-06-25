@@ -22,6 +22,9 @@ class Settings:
         # Proactive context injection on every tool call
         self.proactive_inject: bool = os.environ.get("MEMENTO_PROACTIVE_INJECT", "1").strip() not in ("0", "false", "no")
         self.proactive_top_k: int = int(os.environ.get("MEMENTO_PROACTIVE_TOP_K", "3"))
+        # Federation: optional shared KG path (multi-workspace) and socket push
+        self.shared_kg_path: str = os.environ.get("MEMENTO_SHARED_KG_PATH", "").strip()
+        self.federation_socket: str = os.environ.get("MEMENTO_FEDERATION_SOCKET", "").strip()
 
     def _detect_embedding_backend(self) -> str:
         explicit = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()

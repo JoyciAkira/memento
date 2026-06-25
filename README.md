@@ -169,6 +169,8 @@ MEMENTO_EMBEDDING_BACKEND=none memento-mcp
 | `MEMENTO_DECAY_WORKING` | `0.05` | Decay λ for working memories (~14d half-life) |
 | `MEMENTO_WRITE_SEARCH_TRACE` | `0` | Write `last_search.json` trace on every search (`1` to enable) |
 | `MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS` | `25` | Auto-checkpoint frequency |
+| `MEMENTO_SHARED_KG_PATH` | — | Path to a shared KG SQLite file (federation — multiple workspaces share one graph) |
+| `MEMENTO_FEDERATION_SOCKET` | — | Unix socket path for push notifications between agents (replaces 30s WAL polling) |
 
 ---
 

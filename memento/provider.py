@@ -112,7 +112,9 @@ class NeuroGraphProvider:
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
             
         self.db_path = db_path
-        self.kg_db_path = resolve_kg_db_path(db_path)
+        # Use shared KG if MEMENTO_SHARED_KG_PATH is set (federation)
+        from memento.settings import settings as _s_init
+        self.kg_db_path = _s_init.shared_kg_path if _s_init.shared_kg_path else resolve_kg_db_path(db_path)
         self.kg = MementoGraphProvider({"db_path": self.kg_db_path})
         self._goal_store = GoalStore(db_path)
 
@@ -197,6 +199,11 @@ class NeuroGraphProvider:
             if self._watcher_task is None or self._watcher_task.done():
                 self._watcher_task = asyncio.ensure_future(self._watch_external_writes())
 
+            # Federation: start server or connect as client based on socket existence
+            from memento.settings import settings as _sfed
+            if _sfed.federation_socket:
+                await self._start_federation(_sfed.federation_socket)
+
     async def close(self) -> None:
         """Cancel background tasks and close DB connections."""
         if self._watcher_task and not self._watcher_task.done():
@@ -204,6 +211,17 @@ class NeuroGraphProvider:
             try:
                 await self._watcher_task
             except asyncio.CancelledError:
+                pass
+        # Federation cleanup
+        if hasattr(self, "_fed_server") and self._fed_server:
+            try:
+                await self._fed_server.stop()
+            except Exception:
+                pass
+        if hasattr(self, "_fed_client") and self._fed_client:
+            try:
+                await self._fed_client.stop()
+            except Exception:
                 pass
         if self._db:
             try:
@@ -215,6 +233,33 @@ class NeuroGraphProvider:
                 await self._db_read.close()
             except Exception:
                 pass
+
+    async def _start_federation(self, socket_path: str) -> None:
+        """Start federation server (if socket free) or client (if server already running)."""
+        from memento.federation import FederationServer, FederationClient
+        self._fed_server = None
+        self._fed_client = None
+        if os.path.exists(socket_path):
+            # Another instance is already the server — connect as client
+            async def _on_write(event: dict) -> None:
+                try:
+                    self.orchestrator.l1.clear()
+                    logger.info(f"Federation push received ({event.get('type')}), L1 invalidated")
+                    self._last_external_write_at = event.get("ts", "")
+                except Exception:
+                    pass
+            self._fed_client = FederationClient(socket_path, _on_write)
+            self._fed_client.start()
+            logger.info(f"Federation client started → {socket_path}")
+        else:
+            # First instance — become the server
+            self._fed_server = FederationServer(socket_path)
+            try:
+                await self._fed_server.start()
+                logger.info(f"Federation server started ← {socket_path}")
+            except Exception as e:
+                logger.warning(f"Federation server failed to start: {e}")
+                self._fed_server = None
 
     async def _watch_external_writes(self) -> None:
         """Poll every 30s for writes by other processes sharing the same DB (cross-agent WAL)."""
@@ -402,7 +447,14 @@ class NeuroGraphProvider:
                 await asyncio.to_thread(self.kg.add, redacted_text)
             except Exception as e:
                 logger.warning(f"Failed to add to KG: {e}")
-            
+
+        # Federation: broadcast write event to all connected agents
+        try:
+            if hasattr(self, "_fed_server") and self._fed_server:
+                await self._fed_server.broadcast("write", {"ts": created_at, "id": memory_id})
+        except Exception:
+            pass
+
         return {"id": memory_id, "memory": redacted_text, "event": "ADD"}
 
     async def _record_autonomous_memory_signal(

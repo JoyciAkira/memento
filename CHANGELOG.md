@@ -2,6 +2,36 @@
 
 All notable changes to Memento are documented here.
 
+## [1.0.0] — 2026-06-24
+
+### G001 — Audit Cleanup
+- `registry.execute()`: `PermissionError` caught and returned as structured `TextContent`
+- `provider.py`: all env var reads consolidated through `settings` singleton (single source of truth)
+
+### G002 — v0.6 Quality
+- `provider.forget_decayed()`: soft-delete memories whose decay score < threshold after N days
+- `knowledge_graph.add_causal_triple()`: typed causal predicates (`caused_by`, `fixed_by`, `introduced_by`, `blocked_by`, `depends_on`)
+- `knowledge_graph.query_causal()`: filter triples by causal predicate
+- `memento_health action=memory`: enriched with per-memory decay scores, healthy/degraded counts
+- `memento_cognitive action=forget`: trigger `forget_decayed` via MCP
+- `memento_kg action=add_causal/query_causal`: causal KG operations via MCP
+
+### G003 — v0.7 Structured Ingestion
+- `memento/git_ingestion.py`: `ingest_commit()` + `ingest_test_failure()` — structured L3/L2 memories with KG causal triples
+- `memento_remember action=ingest_commit/ingest_test_failure`: MCP actions for structured ingestion
+- `memento_audit_dependencies`: now populates KG with orphan/ghost dependency triples
+
+### G004 — v0.8 Intent-aware Proactive Injection
+- `_build_intent_phrase()`: maps `(tool, action)` pairs to natural language intent templates
+- Replaces raw keyword concatenation with semantically rich intent phrases for better embedding recall
+
+### G005 — v1.0 Federation
+- `memento/federation.py`: `FederationServer` + `FederationClient` — Unix socket push notifications replace 30s WAL polling
+- `MEMENTO_SHARED_KG_PATH`: share a single KG SQLite file across multiple workspaces
+- `MEMENTO_FEDERATION_SOCKET`: enable push-based cross-agent notifications (first instance = server, others = clients)
+- `provider.add()` broadcasts write events to all connected federation clients
+- 19 env vars fully documented in README
+
 ## [0.5.0] — 2026-06-24
 
 ### Security
