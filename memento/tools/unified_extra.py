@@ -171,6 +171,27 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
         await tracker.record_hits(memory_ids)
         return [TextContent(type="text", text=f"Recorded hits for {len(memory_ids)} memories.")]
 
+    if action == "ingest_commit":
+        if not access_manager.can_write():
+            raise PermissionError(f"Cannot ingest. Access: {access_manager.state}")
+        from memento.git_ingestion import ingest_commit
+        commit_hash = arguments.get("commit_hash", "HEAD")
+        result = await ingest_commit(ctx.provider, ctx.workspace_root, commit_hash)
+        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+
+    if action == "ingest_test_failure":
+        if not access_manager.can_write():
+            raise PermissionError(f"Cannot ingest. Access: {access_manager.state}")
+        from memento.git_ingestion import ingest_test_failure
+        result = await ingest_test_failure(
+            provider=ctx.provider,
+            test_name=arguments.get("test_name", "unknown"),
+            error_message=arguments.get("error_message", ""),
+            file_path=arguments.get("file_path", ""),
+            workspace=ctx.workspace_root,
+        )
+        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+
     return [TextContent(type="text", text=f"Unknown action: {action}")]
 
 

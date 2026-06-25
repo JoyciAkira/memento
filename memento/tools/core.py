@@ -293,6 +293,24 @@ async def memento_audit_dependencies(arguments: dict, ctx, access_manager) -> li
 
     try:
         results = await analyze_dependencies(workspace_root)
+        # Populate KG with dependency relationships
+        try:
+            kg = ctx.provider.kg.kg
+            for dep in (results.get("orphans") or []):
+                kg.add_causal_triple(
+                    subject=dep,
+                    predicate="depends_on",
+                    obj="workspace",
+                    source_memory_id=None,
+                )
+            for dep in (results.get("ghosts") or []):
+                kg.add_triple(
+                    subject="workspace",
+                    predicate="missing_dep",
+                    obj=dep,
+                )
+        except Exception as e:
+            logger.debug(f"KG population from audit skipped: {e}")
         formatted_results = json.dumps(results, indent=2, ensure_ascii=False)
         return [TextContent(type="text", text=f"Dependency Audit Results:\n{formatted_results}")]
     except Exception as e:
