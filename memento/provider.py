@@ -116,26 +116,21 @@ class NeuroGraphProvider:
         self.kg = MementoGraphProvider({"db_path": self.kg_db_path})
         self._goal_store = GoalStore(db_path)
 
-        requested_backend = os.environ.get("MEMENTO_EMBEDDING_BACKEND", "").strip().lower()
-        has_openai_key = bool(os.environ.get("OPENAI_API_KEY", "").strip())
-        if requested_backend:
-            self.embedding_backend = requested_backend
-        else:
-            self.embedding_backend = "openai" if has_openai_key else "none"
+        from memento.settings import settings as _s
+        self.embedding_backend = _s.embedding_backend
+        self.embed_model = _s.embedding_model
 
         self.llm_client = None
         if self.embedding_backend == "openai":
-            api_key = os.environ.get("OPENAI_API_KEY", "").strip()
-            if not api_key:
+            if not _s.openai_api_key:
                 logger.warning("OPENAI_API_KEY not set; embedding backend disabled.")
                 self.embedding_backend = "none"
-                self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "none")
+                self.embed_model = "none"
             else:
-                base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
-                self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "text-embedding-3-small")
-                self.llm_client = AsyncOpenAI(api_key=api_key, base_url=base_url)
+                self.embed_model = _s.embedding_model
+                self.llm_client = AsyncOpenAI(api_key=_s.openai_api_key, base_url=_s.openai_base_url)
         else:
-            self.embed_model = os.environ.get("MEM0_EMBEDDING_MODEL", "none")
+            self.embed_model = _s.embedding_model
         self._local_embedder = None
         if self.embedding_backend == "local":
             try:

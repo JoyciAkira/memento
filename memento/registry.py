@@ -89,7 +89,12 @@ class ToolRegistry:
         if name not in self._handlers:
             raise ValueError(f"Unknown tool: {name}")
         handler = self._handlers[name]
-        result = await handler(arguments, ctx, **kwargs)
+        try:
+            result = await handler(arguments, ctx, **kwargs)
+        except PermissionError as e:
+            return [TextContent(type="text", text=f"Permission denied: {e}")]
+        except Exception:
+            raise
         # Prepend proactive memory context to the first TextContent item
         # Skip if the response is JSON (starts with { or [) to avoid breaking parsers
         try:
