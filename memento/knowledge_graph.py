@@ -218,6 +218,33 @@ class KnowledgeGraph:
             )
         return triple_id
 
+    # Causal predicates: caused_by, fixed_by, introduced_by, blocked_by, depends_on
+    CAUSAL_PREDICATES = frozenset({"caused_by", "fixed_by", "introduced_by", "blocked_by", "depends_on"})
+
+    def add_causal_triple(
+        self,
+        subject: str,
+        predicate: str,
+        obj: str,
+        source_memory_id: str = None,
+        confidence: float = 1.0,
+    ) -> str:
+        """Add a causal relationship. predicate must be one of CAUSAL_PREDICATES."""
+        if predicate not in self.CAUSAL_PREDICATES:
+            raise ValueError(f"predicate must be one of {self.CAUSAL_PREDICATES}, got '{predicate}'")
+        return self.add_triple(
+            subject=subject,
+            predicate=predicate,
+            obj=obj,
+            confidence=confidence,
+            source_closet=source_memory_id,
+        )
+
+    def query_causal(self, entity: str, direction: str = "both") -> list:
+        """Return all causal triples involving entity."""
+        triples = self.query_entity(entity, direction=direction)
+        return [t for t in triples if t.get("predicate") in self.CAUSAL_PREDICATES]
+
     def invalidate(self, subject: str, predicate: str, obj: str, ended: str = None):
         sub_id = self._entity_id(subject)
         obj_id = self._entity_id(obj)

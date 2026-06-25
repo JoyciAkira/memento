@@ -360,6 +360,19 @@ async def memento_cognitive(arguments: dict, ctx, access_manager) -> list[TextCo
         result = await ctx.cognitive_engine.generate_tasks()
         return [TextContent(type="text", text=result)]
 
+    if action == "forget":
+        if not access_manager.can_write():
+            raise PermissionError(f"Cannot forget memories. Access: {access_manager.state}")
+        min_age_days = float(arguments.get("min_age_days", 30.0))
+        decay_threshold = float(arguments.get("decay_threshold", 0.1))
+        dry_run = bool(arguments.get("dry_run", False))
+        result = await ctx.provider.forget_decayed(
+            min_age_days=min_age_days,
+            decay_threshold=decay_threshold,
+            dry_run=dry_run,
+        )
+        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+
     return [TextContent(type="text", text=f"Unknown cognitive action: {action}")]
 
 
@@ -421,6 +434,30 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
         from memento.quality_metrics import QualityMetrics
         metrics = QualityMetrics(db_path)
         result = await metrics.memory_stats()
+        # Enrich with per-memory decay scores
+        try:
+            from memento.settings import settings as _s
+            from datetime import datetime
+            import math
+            memories = await ctx.provider.get_all(limit=50)
+            now = datetime.now()
+            scored = []
+            for m in memories:
+                tier = "semantic"
+                try:
+                    created = datetime.fromisoformat(m["created_at"])
+                    age_days = max(0.0, (now - created).total_seconds() / 86400)
+                    lam = _s.decay_lambda.get(tier, 0.005)
+                    decay = round(math.exp(-lam * age_days), 4)
+                except Exception:
+                    decay = 1.0
+                scored.append({"id": m["id"][:8], "age_days": round((now - datetime.fromisoformat(m["created_at"])).days, 1), "decay_score": decay, "text": m["memory"][:60]})
+            scored.sort(key=lambda x: x["decay_score"])
+            result["decaying_memories"] = scored[:20]
+            result["healthy_memories"] = len([s for s in scored if s["decay_score"] > 0.5])
+            result["degraded_memories"] = len([s for s in scored if s["decay_score"] <= 0.5])
+        except Exception:
+            pass
         return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
 
     if action == "kg":
@@ -558,6 +595,26 @@ async def memento_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
         from memento.cross_workspace import CrossWorkspaceManager
         mgr = CrossWorkspaceManager(ctx.db_path)
         result = await mgr.get_sync_stats()
+        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+
+    if action == "add_causal":
+        if not access_manager.can_write():
+            raise PermissionError(f"Cannot write KG. Access: {access_manager.state}")
+        subject = arguments.get("subject", "")
+        predicate = arguments.get("predicate", "")
+        obj = arguments.get("object", "")
+        source_memory_id = arguments.get("source_memory_id")
+        confidence = float(arguments.get("confidence", 1.0))
+        triple_id = ctx.provider.kg.kg.add_causal_triple(
+            subject=subject, predicate=predicate, obj=obj,
+            source_memory_id=source_memory_id, confidence=confidence,
+        )
+        return [TextContent(type="text", text=json.dumps({"triple_id": triple_id, "subject": subject, "predicate": predicate, "object": obj}))]
+
+    if action == "query_causal":
+        entity = arguments.get("entity", "")
+        direction = arguments.get("direction", "both")
+        result = ctx.provider.kg.kg.query_causal(entity, direction=direction)
         return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
 
     return [TextContent(type="text", text=f"Unknown KG action: {action}")]

@@ -666,6 +666,61 @@ class NeuroGraphProvider:
 
         return results
 
+    async def forget_decayed(
+        self,
+        min_age_days: float = 30.0,
+        decay_threshold: float = 0.1,
+        user_id: str = "default",
+        dry_run: bool = False,
+    ) -> Dict[str, Any]:
+        """Soft-delete memories whose decay score has fallen below threshold."""
+        if not self._initialized:
+            await self.initialize()
+
+        async with self._read_lock:
+            db = self._db_read
+            assert db is not None
+            cursor = await db.execute(
+                "SELECT id, text, created_at, memory_tier FROM memories WHERE user_id = ?",
+                (user_id,),
+            )
+            rows = await cursor.fetchall()
+
+        now = datetime.now()
+        to_delete: list[str] = []
+        for row in rows:
+            try:
+                age = (now - datetime.fromisoformat(row["created_at"])).days
+            except Exception:
+                continue
+            if age < min_age_days:
+                continue
+            tier = row["memory_tier"] or "semantic"
+            score = self._decay_score(row["created_at"], tier, now)
+            if score < decay_threshold:
+                to_delete.append(row["id"])
+
+        if not dry_run and to_delete:
+            reason = f"decay_score<{decay_threshold} after {min_age_days}d"
+            deleted_at = now.isoformat()
+            async with self._write_lock:
+                db = self._db
+                assert db is not None
+                for mid in to_delete:
+                    await db.execute(
+                        "UPDATE memory_meta SET is_deleted=1, deleted_at=?, delete_reason=? WHERE id=?",
+                        (deleted_at, reason, mid),
+                    )
+                await db.commit()
+
+        return {
+            "candidates": len(to_delete),
+            "deleted": len(to_delete) if not dry_run else 0,
+            "dry_run": dry_run,
+            "threshold": decay_threshold,
+            "min_age_days": min_age_days,
+        }
+
     async def get_all(self, user_id: str = "default", limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
         if not self._initialized:
             await self.initialize()
