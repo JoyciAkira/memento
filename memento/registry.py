@@ -45,8 +45,52 @@ class ToolRegistry:
         text = re.sub(r'(?i)(you\s+are\s+now\s+a?\s*\w+\s+assistant)', '[FILTERED]', text)
         return text
 
+    @staticmethod
+    def _build_intent_phrase(name: str, arguments: dict) -> str:
+        """
+        Build a semantically rich intent phrase from tool name + arguments.
+        Maps tool+action patterns to natural language for better embedding recall.
+        """
+        action = arguments.get("action", "")
+        skip_keys = {"workspace_root", "action"}
+
+        # Intent templates per tool family
+        intent_map = {
+            ("memento_project", "set_state"): "updating project state vision milestone",
+            ("memento_project", "set_goals"): "setting project goals objectives",
+            ("memento_project", "summary"): "project overview status summary",
+            ("memento_session", "begin"): "starting new work session context",
+            ("memento_session", "resume"): "resuming previous session context memory",
+            ("memento_configure", "enforcement"): "goal enforcement alignment rules",
+            ("memento_configure", "autonomy"): "autonomous agent background tasks",
+            ("memento_cognitive", "dream"): "synthesizing patterns insights from memories",
+            ("memento_cognitive", "align"): "checking code alignment with project goals",
+            ("memento_cognitive", "forget"): "forgetting old decayed memories cleanup",
+            ("memento_kg", "add_causal"): "causal relationship dependency tracking",
+            ("memento_remember", "ingest_commit"): "git commit code change ingestion",
+            ("memento_remember", "ingest_test_failure"): "test failure error debugging",
+        }
+
+        template = intent_map.get((name, action), "")
+
+        # Collect meaningful string values from arguments
+        value_parts = [
+            str(v) for k, v in arguments.items()
+            if k not in skip_keys and isinstance(v, str) and len(v) > 3
+        ]
+
+        parts = []
+        if template:
+            parts.append(template)
+        parts.extend(value_parts)
+
+        if not parts:
+            return ""
+
+        return " ".join(parts)[:400]
+
     async def _proactive_context(self, name: str, arguments: dict, ctx: Any) -> str:
-        """Build a proactive context block by searching memories relevant to the current call."""
+        """Build a proactive context block using intent-aware semantic search."""
         from memento.settings import settings as _settings
         if not _settings.proactive_inject:
             return ""
@@ -62,15 +106,10 @@ class ToolRegistry:
         # Enforce workspace filter
         workspace_root = arguments.get("workspace_root")
         filters = {"workspace_root": workspace_root} if workspace_root else None
-        # Build query from meaningful string arguments
-        skip_keys = {"workspace_root", "action"}
-        query_parts = [
-            str(v) for k, v in arguments.items()
-            if k not in skip_keys and isinstance(v, str) and len(v) > 3
-        ]
-        if not query_parts:
+        # Build intent phrase (semantic) instead of raw keyword concatenation
+        query = self._build_intent_phrase(name, arguments)
+        if not query:
             return ""
-        query = " ".join(query_parts)[:300]
         try:
             results = await provider.search(query, limit=_settings.proactive_top_k, filters=filters)
         except Exception:
