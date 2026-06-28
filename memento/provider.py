@@ -531,20 +531,20 @@ class NeuroGraphProvider:
 
             try:
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, bm25(memories) as fts_score FROM memories WHERE user_id = ? AND memories MATCH ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, bm25(memories) as fts_score FROM memories WHERE user_id IN (?, 'system') AND memories MATCH ? {filter_sql} LIMIT 200",
                     (user_id, fts_query, *filter_params),
                 )
                 fts_rows = await cursor.fetchall()
             except Exception as e:
                 logger.warning(f"FTS MATCH failed: {e}. Fallback to LIKE.")
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, 1000000 as fts_score FROM memories WHERE user_id = ? AND text LIKE ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, 1000000 as fts_score FROM memories WHERE user_id IN (?, 'system') AND text LIKE ? {filter_sql} LIMIT 200",
                     (user_id, f"%{query}%", *filter_params),
                 )
                 fts_rows = await cursor.fetchall()
 
             cursor = await db.execute(
-                f"SELECT id, text, created_at FROM memories WHERE user_id = ? {filter_sql} ORDER BY created_at DESC LIMIT 200",
+                f"SELECT id, text, created_at FROM memories WHERE user_id IN (?, 'system') {filter_sql} ORDER BY created_at DESC LIMIT 200",
                 (user_id, *filter_params),
             )
             recent_rows = await cursor.fetchall()
@@ -567,13 +567,13 @@ class NeuroGraphProvider:
                     cursor = await db.execute(
                         f"SELECT m.id, m.text, m.created_at, m.memory_tier, e.embedding FROM memories m "
                         f"LEFT JOIN memory_embeddings e ON m.id = e.id "
-                        f"WHERE m.user_id = ? {filter_sql} AND m.id IN ({placeholders})",
+                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
                 else:
                     cursor = await db.execute(
                         f"SELECT m.id, m.text, m.created_at, m.memory_tier FROM memories m "
-                        f"WHERE m.user_id = ? {filter_sql} AND m.id IN ({placeholders})",
+                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
                 candidate_rows = await cursor.fetchall()

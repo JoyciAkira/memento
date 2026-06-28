@@ -104,6 +104,20 @@ class AutonomousAgent:
             level = AutonomyLevel(level)
         self._level = level
         self._interval = DEFAULT_INTERVALS.get(level, 0)
+        # Allow tuning cadence without code changes. MEMENTO_AUTONOMY_INTERVAL
+        # overrides the per-level default (seconds); ignored when level is OFF
+        # or the value is not a positive integer.
+        if self._interval > 0:
+            override = os.environ.get("MEMENTO_AUTONOMY_INTERVAL")
+            if override:
+                try:
+                    secs = int(override)
+                    if secs > 0:
+                        self._interval = secs
+                except ValueError:
+                    logger.warning(
+                        "Invalid MEMENTO_AUTONOMY_INTERVAL=%r, ignoring", override
+                    )
         logger.info(f"Autonomous agent level set to: {level.value} (interval={self._interval}s)")
 
     # --- lifecycle ---
