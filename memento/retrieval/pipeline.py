@@ -53,6 +53,7 @@ async def retrieve_bundle(
     embed_fn: EmbedFn,
     trace: bool,
     db: aiosqlite.Connection | None = None,
+    vsa_index: Any | None = None,
 ) -> ContextBundle:
     filter_sql, filter_params = _build_filter(filters)
 
@@ -79,6 +80,7 @@ async def retrieve_bundle(
             query=query,
             limit=200,
             filters=filters,
+            vsa_index=vsa_index,
         )
 
         seen: set[str] = set()

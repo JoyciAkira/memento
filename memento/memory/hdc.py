@@ -1,7 +1,22 @@
 import hashlib
 from typing import Dict, Tuple, List
 
+import numpy as np
+
 Dimensionality = 65536
+
+
+def _bits_from_int(value: int, d: int) -> "np.ndarray":
+    """Little-endian bit array (uint8 0/1) of length d from an integer."""
+    nbytes = (d + 7) // 8
+    buf = np.frombuffer(int(value).to_bytes(nbytes, "little"), dtype=np.uint8)
+    return np.unpackbits(buf, bitorder="little")[:d]
+
+
+def _int_from_bits(bits: "np.ndarray", d: int) -> int:
+    """Inverse of _bits_from_int: pack a 0/1 bit array back into an integer."""
+    packed = np.packbits(bits.astype(np.uint8), bitorder="little")
+    return int.from_bytes(packed.tobytes(), "little") & ((1 << d) - 1)
 
 class BitVector:
     def __init__(self, value: int, d: int):
@@ -64,17 +79,18 @@ class HDCEncoder:
             raise ValueError("Cannot bundle empty list")
         if len(vectors) == 1:
             return BitVector(int(vectors[0]), self.d)
-        threshold = len(vectors) // 2
-        result = 0
-        for bit in range(self.d):
-            count = 0
-            bit_mask = 1 << bit
-            for v in vectors:
-                if int(v) & bit_mask:
-                    count += 1
-            if count > threshold or (count == threshold and ((bit + len(vectors)) & 1)):
-                result |= bit_mask
-        return BitVector(result & self._mask, self.d)
+        # Majority vote across vectors, computed vector-wise with numpy instead
+        # of iterating all d bits in Python. Tie-break is identical to the
+        # previous bit-by-bit implementation: on an exact tie, set the bit iff
+        # (bit_index + len(vectors)) is odd.
+        n = len(vectors)
+        threshold = n // 2
+        acc = np.zeros(self.d, dtype=np.int32)
+        for v in vectors:
+            acc += _bits_from_int(int(v), self.d)
+        tie = ((np.arange(self.d) + n) & 1).astype(bool)
+        res = (acc > threshold) | ((acc == threshold) & tie)
+        return BitVector(_int_from_bits(res, self.d) & self._mask, self.d)
 
     def permute(self, v: int | BitVector, steps: int = 1) -> BitVector:
         steps = steps % self.d

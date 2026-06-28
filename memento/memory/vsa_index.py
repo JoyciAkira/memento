@@ -18,6 +18,12 @@ class VSAIndex:
         self.hdc = hdc or HDCEncoder()
         self._entity_cache: Dict[str, List[str]] = {}
         self._vector_cache: Dict[str, int] = {}
+        # Lazily-built numpy bit matrix mirroring _vector_cache for vectorized
+        # similarity. Rebuilt whenever the cache membership changes.
+        self._matrix = None
+        self._matrix_ids: List[str] = []
+        self._matrix_token: Optional[int] = None
+        self._popcount = None  # uint16[256] popcount lookup, built lazily
 
     def extract_entities(self, text: str) -> List[str]:
         words = re.findall(r"[A-Za-z0-9_][A-Za-z0-9_+.#/-]{2,}", (text or "").lower())
@@ -129,16 +135,66 @@ class VSAIndex:
     def query_by_entity(self, entity: str, top_k: int = 10) -> List[str]:
         return [mid for mid, _ in self.query(entity, top_k=top_k)]
 
+    def _batch_hv_similarity(self, qv: int):
+        """Return [(mem_id, hv_similarity), ...] for every cached vector, using
+        a vectorized numpy Hamming computation over packed bytes (XOR + popcount
+        lookup). Returns None to signal the caller to fall back to the scalar
+        path (e.g. numpy unavailable). Scores are identical to the scalar version."""
+        try:
+            import numpy as np
+
+            d = self.hdc.d
+            nbytes = (d + 7) // 8
+            ids = list(self._vector_cache.keys())
+            token = len(ids)
+            # Rebuild the packed byte matrix only when cache membership changed.
+            if self._matrix is None or self._matrix_token != token or self._matrix_ids != ids:
+                if not ids:
+                    return []
+                self._matrix = np.stack([
+                    np.frombuffer(int(self._vector_cache[i]).to_bytes(nbytes, "little"), dtype=np.uint8)
+                    for i in ids
+                ])
+                self._matrix_ids = ids
+                self._matrix_token = token
+                if self._popcount is None:
+                    self._popcount = np.array([bin(b).count("1") for b in range(256)], dtype=np.uint16)
+            qbytes = np.frombuffer(int(qv).to_bytes(nbytes, "little"), dtype=np.uint8)
+            # Hamming distance per row via popcount of XOR, then similarity.
+            dist = self._popcount[np.bitwise_xor(self._matrix, qbytes)].sum(axis=1)
+            sims = (d - dist) / d
+            return list(zip(self._matrix_ids, (float(s) for s in sims)))
+        except Exception as e:
+            logger.debug(f"Vectorized VSA similarity unavailable, scalar fallback: {e}")
+            return None
+
     def query(self, query: str, top_k: int = 10) -> List[tuple[str, float]]:
         try:
             if not self._vector_cache:
                 self.load_from_db()
             entities = self.extract_entities(query)
             qv = self.hdc.encode_text(query, entities)
-            scored = [
-                (mem_id, self._score(qv, hv, entities, self._entity_cache.get(mem_id, [])))
-                for mem_id, hv in self._vector_cache.items()
-            ]
+            # Hamming similarity of the query against every cached vector,
+            # computed in one vectorized numpy pass instead of len(cache)
+            # Python-level popcounts. Falls back to the per-vector path if the
+            # matrix cannot be built. Identical scores to the scalar version.
+            hv_scores = self._batch_hv_similarity(int(qv))
+            if hv_scores is not None:
+                q_ent = set(entities)
+                scored = []
+                for mem_id, hv_score in hv_scores:
+                    m_ent = self._entity_cache.get(mem_id, [])
+                    if not q_ent or not m_ent:
+                        scored.append((mem_id, hv_score))
+                        continue
+                    m = set(m_ent)
+                    overlap = len(q_ent & m) / max(1, len(q_ent | m))
+                    scored.append((mem_id, 0.7 * hv_score + 0.3 * overlap))
+            else:
+                scored = [
+                    (mem_id, self._score(qv, hv, entities, self._entity_cache.get(mem_id, [])))
+                    for mem_id, hv in self._vector_cache.items()
+                ]
             scored.sort(key=lambda x: x[1], reverse=True)
             return scored[:top_k]
         except Exception as e:

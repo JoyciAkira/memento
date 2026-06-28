@@ -838,6 +838,7 @@ class NeuroGraphProvider:
                 embed_fn=self._get_embedding,
                 trace=trace,
                 db=db_read,
+                vsa_index=getattr(self.orchestrator, "_vsa_index", None),
             )
             if bundle.get("results"):
                 from memento.memory.governor import MemoryGovernor

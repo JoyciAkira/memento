@@ -12,10 +12,17 @@ async def lane_vsa(
     query: str,
     limit: int,
     filters: dict[str, Any] | None = None,
+    vsa_index: Any | None = None,
 ) -> list[tuple[str, float]]:
     def _run() -> list[tuple[str, float]]:
-        idx = VSAIndex(db_path)
-        idx.load_from_db()
+        # Reuse a live, already-loaded VSAIndex when the caller provides one
+        # (the provider keeps one warm and updated on every add). Building a
+        # fresh VSAIndex + load_from_db() on every search re-derives all concept
+        # vectors from scratch and dominates search latency.
+        idx = vsa_index
+        if idx is None:
+            idx = VSAIndex(db_path)
+            idx.load_from_db()
         ranked = idx.query(query, top_k=limit)
         if not filters:
             return ranked
