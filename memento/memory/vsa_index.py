@@ -160,12 +160,23 @@ class VSAIndex:
                 if self._popcount is None:
                     self._popcount = np.array([bin(b).count("1") for b in range(256)], dtype=np.uint16)
             qbytes = np.frombuffer(int(qv).to_bytes(nbytes, "little"), dtype=np.uint8)
-            # Hamming distance per row via popcount of XOR, then similarity.
+            # Exact Hamming over all rows: popcount of XOR, then similarity.
+            # (An approximate bit-sampling LSH prefilter was evaluated and
+            # rejected — these bundle() hypervectors are near-orthogonal, so even
+            # true neighbours differ on ~45-50% of bits and LSH recall collapsed
+            # to <0.2. The exact scan stays; see benchmarks/vsa_scale.py.)
             dist = self._popcount[np.bitwise_xor(self._matrix, qbytes)].sum(axis=1)
             sims = (d - dist) / d
             return list(zip(self._matrix_ids, (float(s) for s in sims)))
-        except Exception as e:
-            logger.debug(f"Vectorized VSA similarity unavailable, scalar fallback: {e}")
+        except ImportError as e:
+            # numpy genuinely unavailable — expected graceful degradation.
+            logger.debug(f"Vectorized VSA similarity unavailable (numpy): {e}")
+            return None
+        except Exception:
+            # A real bug in the matrix/LSH path. Surface it loudly (so tests and
+            # operators see it) but still fall back to the scalar scan so a
+            # production query never hard-fails.
+            logger.warning("Vectorized VSA similarity failed; falling back to scalar", exc_info=True)
             return None
 
     def query(self, query: str, top_k: int = 10) -> List[tuple[str, float]]:
