@@ -152,6 +152,23 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         except Exception:
             pass
 
+async def _autostart_default_daemon() -> None:
+    """Start the autonomous daemon for the default workspace at server startup,
+    so Memento begins working without waiting for the first tool call. The
+    default workspace is resolved exactly like call_tool's fallback
+    (MEMENTO_DIR, else the project root of the server's cwd). Best-effort:
+    never raises, so a problem here cannot prevent the server from starting.
+    Workspaces other than the default are still started lazily in call_tool."""
+    try:
+        workspace_root = os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
+        ctx = get_workspace_context(workspace_root)
+        if ctx.autonomy.get("level", "off") != "off" and not ctx.autonomous_agent.is_running:
+            ctx.start_autonomous_agent()
+            logger.info(f"Autonomous daemon auto-started for default workspace: {workspace_root}")
+    except Exception as e:
+        logger.debug(f"Daemon auto-start skipped: {e}")
+
+
 async def run():
     logger.info("Starting Memento MCP server via stdio")
     from memento.settings import settings as _s
@@ -160,6 +177,8 @@ async def run():
             "Embedding backend is 'none' — semantic search disabled. "
             "Set MEMENTO_EMBEDDING_BACKEND=local (requires fastembed) or provide OPENAI_API_KEY."
         )
+    # Event loop is running here, so the daemon's loop task can be created.
+    await _autostart_default_daemon()
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
 

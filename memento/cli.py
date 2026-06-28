@@ -89,6 +89,42 @@ async def _handle_search(args: argparse.Namespace) -> None:
     print(json.dumps(results, indent=2, default=str))
 
 
+async def _handle_recall(args: argparse.Namespace) -> None:
+    """Best-effort context recall for client hooks (e.g. Claude Code
+    UserPromptSubmit). Prints a concise Markdown block of the top relevant
+    memories so the hook can inject it into the conversation. On no match or
+    any error it prints nothing and exits 0 — a hook must never block or noise
+    up the prompt."""
+    query = (args.query or "").strip()
+    if not query:
+        return
+    limit = getattr(args, "limit", None) or 5
+    try:
+        ctx = await _get_provider()
+        results: List[Dict[str, Any]] = await ctx.provider.search(
+            query=query, user_id="default", limit=limit
+        )
+    except Exception:
+        return
+    if not results:
+        return
+
+    lines = ["## Relevant memory (Memento)"]
+    for r in results[:limit]:
+        text = (r.get("memory") or r.get("text") or "").strip().replace("\n", " ")
+        if not text:
+            continue
+        if len(text) > 240:
+            text = text[:237] + "..."
+        tier = r.get("memory_tier") or r.get("tier")
+        prefix = f"[{tier}] " if tier else ""
+        lines.append(f"- {prefix}{text}")
+    if len(lines) == 1:  # header only, no usable rows
+        return
+    print("\n".join(lines))
+
+
+
 async def _handle_status(_args: argparse.Namespace) -> None:
     workspace_root = os.getcwd()
     memento_dir = os.path.join(workspace_root, ".memento")
@@ -363,6 +399,15 @@ def _build_parser() -> argparse.ArgumentParser:
         help="The search query.",
     )
 
+    recall_parser = subparsers.add_parser(
+        "recall",
+        help="Print top relevant memories as Markdown for client hooks (best-effort).",
+    )
+    recall_parser.add_argument("query", type=str, help="The query / user prompt.")
+    recall_parser.add_argument(
+        "--limit", type=int, default=5, help="Max memories to include (default 5)."
+    )
+
     subparsers.add_parser(
         "status",
         help="Show workspace status and configuration.",
@@ -430,6 +475,7 @@ def main() -> None:
     handler_map: dict[str, Any] = {
         "capture": _handle_capture,
         "search": _handle_search,
+        "recall": _handle_recall,
         "status": _handle_status,
         "doctor": _handle_doctor,
         "coerce": _handle_coerce,
@@ -452,6 +498,14 @@ def main() -> None:
         logger.debug("CLI error", exc_info=True)
         print(f"Error: {exc}")
         sys.exit(1)
+
+    # The CLI is one-shot: the WorkspaceContext opens aiosqlite worker threads
+    # (and may arm the autonomous daemon) whose teardown can hang for tens of
+    # seconds at interpreter exit. Flush our output and hard-exit to skip it —
+    # critical for the recall hook, which must return promptly on every prompt.
+    sys.stdout.flush()
+    sys.stderr.flush()
+    os._exit(0)
 
 
 if __name__ == "__main__":
