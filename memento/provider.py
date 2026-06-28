@@ -317,7 +317,9 @@ class NeuroGraphProvider:
             logger.debug(f"VSA backfill skipped: {e}")
 
     def _write_search_trace_file(self, trace: dict) -> None:
-        v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "0").strip().lower()
+        # Trace is written by default so memento_explain_search has a trace to
+        # read after a search; set MEMENTO_WRITE_SEARCH_TRACE=0 to opt out.
+        v = os.environ.get("MEMENTO_WRITE_SEARCH_TRACE", "1").strip().lower()
         if v in ("0", "false", "no", "off"):
             return
         try:
