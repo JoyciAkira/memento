@@ -17,7 +17,7 @@ class SessionManager:
     async def ensure_session(self) -> str:
         return await self.store.ensure_active_session()
 
-    async def create_checkpoint(self, *, session_id: str, reason: str) -> dict[str, Any]:
+    async def create_checkpoint(self, *, session_id: str, reason: str, lossless: bool = True) -> dict[str, Any]:
         await self.provider.initialize()
 
         goals = await self.provider.list_goals(context=None, active_only=True, limit=50, offset=0)
@@ -25,6 +25,14 @@ class SessionManager:
             l1 = self.provider.orchestrator.l1.dump()
         except Exception:
             l1 = []
+        try:
+            l2 = self.provider.orchestrator.l2.dump()
+        except Exception:
+            l2 = []
+        try:
+            l3 = self.provider.orchestrator.l3.dump()
+        except Exception:
+            l3 = []
 
         git_context = build_auto_context(self.workspace_root)
         recent_events = await self.store.get_recent_events(session_id=session_id, limit=25)
@@ -61,6 +69,24 @@ class SessionManager:
         except Exception:
             pass
 
+        # Include KG + decision log for a lossless enterprise handoff (best-effort).
+        try:
+            from memento.knowledge_graph import KnowledgeGraphStore
+            kg = KnowledgeGraphStore(self.db_path)
+            kg_summary = await kg.get_summary()
+            if kg_summary:
+                snapshot["kg_summary"] = kg_summary
+        except Exception:
+            pass
+        try:
+            agent = getattr(self.provider, "autonomous_agent", None)
+            if agent is not None:
+                decisions = agent.get_decisions() if hasattr(agent, "get_decisions") else None
+                if decisions:
+                    snapshot["decisions"] = decisions
+        except Exception:
+            pass
+
         # Compute session diff from previous session
         session_diff = ""
         try:
@@ -82,8 +108,18 @@ class SessionManager:
         except Exception:
             pass
 
+        # Capture L2/L3 tiers if available (lossless working/episodic/semantic memory).
+        try:
+            snapshot["l2"] = l2
+        except Exception:
+            pass
+        try:
+            snapshot["l3"] = l3
+        except Exception:
+            pass
+
         snapshot["session_diff"] = session_diff
-        prompt = render_handoff_prompt(session_id=session_id, snapshot=snapshot)
+        prompt = render_handoff_prompt(session_id=session_id, snapshot=snapshot, lossless=lossless)
         if session_diff:
             prompt += "\n" + session_diff
         await self.store.update_checkpoint(session_id=session_id, checkpoint_data=snapshot, handoff_prompt=prompt)
@@ -108,6 +144,14 @@ class SessionManager:
         except Exception:
             pass
 
+        # Surface the full lossless handoff package so resume loses no context.
+        handoff_prompt = row.handoff_prompt or ""
         new_id = await self.store.create_child_session(parent_session_id=session_id)
-        return {"resumed_from": session_id, "new_session_id": new_id}
+        return {
+            "resumed_from": session_id,
+            "new_session_id": new_id,
+            "lossless": True,
+            "handoff_prompt": handoff_prompt,
+            "snapshot": data,
+        }
 
