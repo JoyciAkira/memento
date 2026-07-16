@@ -22,6 +22,10 @@ class Settings:
         # Proactive context injection on every tool call
         self.proactive_inject: bool = os.environ.get("MEMENTO_PROACTIVE_INJECT", "1").strip() not in ("0", "false", "no")
         self.proactive_top_k: int = int(os.environ.get("MEMENTO_PROACTIVE_TOP_K", "3"))
+        # Token-friendly compaction strategy for the injected context block.
+        # One of: truncate | caveman | graphify | ponytail
+        self.proactive_strategy: str = os.environ.get("MEMENTO_PROACTIVE_STRATEGY", "caveman").strip().lower()
+        self.proactive_max_tokens: int = int(os.environ.get("MEMENTO_PROACTIVE_MAX_TOKENS", "60"))
         # Federation: optional shared KG path (multi-workspace) and socket push
         self.shared_kg_path: str = os.environ.get("MEMENTO_SHARED_KG_PATH", "").strip()
         self.federation_socket: str = os.environ.get("MEMENTO_FEDERATION_SOCKET", "").strip()
