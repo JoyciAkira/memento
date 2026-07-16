@@ -172,6 +172,11 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
                     "type": "string",
                     "description": "Reason for handoff checkpoint.",
                 },
+                "lossless": {
+                    "type": "boolean",
+                    "description": "Lossless handoff/resume (default true) — include all L1/L2/L3, full tool-call replay, KG, decisions. Set false for a compact summary.",
+                    "default": True,
+                },
                 "limit": {
                     "type": "integer",
                     "default": 20,
@@ -204,8 +209,14 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
         session_id = arguments.get("session_id")
         if not session_id:
             return [TextContent(type="text", text="Error: session_id is required for resume.")]
+        lossless = arguments.get("lossless", True)
         out = await ctx.session_manager.resume_from(session_id=str(session_id))
-        return [TextContent(type="text", text=json.dumps(out, ensure_ascii=False))]
+        if not lossless:
+            out = {
+                "resumed_from": out.get("resumed_from"),
+                "new_session_id": out.get("new_session_id"),
+            }
+        return [TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))]
 
     # -- handoff -------------------------------------------------------------
     if action == "handoff":
@@ -213,7 +224,8 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
             raise PermissionError(f"Cannot read handoff. Current access state is: {access_manager.state}")
         sid = await ctx.session_manager.ensure_session()
         reason = arguments.get("reason") or "manual"
-        await ctx.session_manager.create_checkpoint(session_id=sid, reason=str(reason))
+        lossless = arguments.get("lossless", True)
+        await ctx.session_manager.create_checkpoint(session_id=sid, reason=str(reason), lossless=bool(lossless))
         row = await ctx.session_manager.store.get_session(sid)
         prompt = row.handoff_prompt if row else None
         return [TextContent(type="text", text=prompt or "")]
