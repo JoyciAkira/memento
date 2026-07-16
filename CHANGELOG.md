@@ -2,6 +2,20 @@
 
 All notable changes to Memento are documented here.
 
+## [1.2.0] — 2026-07-16
+
+### Token-friendly Proactive Injection
+- New pluggable, deterministic, dependency-free compaction engine (`memento/compaction.py`) for the context Memento injects on every tool call.
+- Strategies: `truncate` (legacy, refined), `caveman`, `graphify`, `ponytail`.
+- `caveman` ports the **MIT-licensed** `caveman-compress` rule-based tersification (strips articles/filler/hedging, preserves code/URLs/paths verbatim). `graphify`/`ponytail` are deterministic compression primitives (no LLM).
+- Replaces the hardcoded `[:200]` truncation in `registry._proactive_context` with a token budget (`MEMENTO_PROACTIVE_MAX_TOKENS`, default 60). Default strategy `MEMENTO_PROACTIVE_STRATEGY=caveman`.
+- New MCP tool `memento_compact` reuses the same engine on arbitrary text.
+
+### Enterprise Handoff / Resume (zero context loss)
+- `render_handoff_prompt` is **lossless by default**: includes all L1 items, all tool-call events (with arguments + results), L2/L3 tiers, KG summary, decisions. Adds `KNOWN BLOCKERS` and `NEXT STEPS` (super-intelligent) plus a `TOOL-CALL REPLAY` index.
+- `session_manager.create_checkpoint` captures L2/L3, KG, decision log; `resume_from` returns the full lossless handoff package.
+- `memento_session` `resume`/`handoff` accept a `lossless` flag (default true).
+
 ## [1.1.0] — 2026-07-16
 
 ### Auto-Active Memento
