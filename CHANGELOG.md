@@ -2,6 +2,20 @@
 
 All notable changes to Memento are documented here.
 
+## [1.1.0] — 2026-07-16
+
+### Auto-Active Memento
+- Daemon **autostart** + **auto-context injection**: Memento becomes active automatically on session start (no manual activation step).
+- `memento` CLI gains session-start hooks (`assets/memento-session-start-hook.sh`, `assets/memento-recall-hook.sh`).
+
+### Retrieval Quality
+- **Relevance-ranked multi-tier fusion** in `orchestrator.search` — end-to-end memory accuracy benchmark raised from 0.333 to **1.0** (`benchmarks/e2e_memory_accuracy.py`, sealed).
+
+### Performance (VSA / HDC)
+- `hdc.bundle()` vectorized and the warm VSA index is reused during search (no per-query rebuild).
+- `vsa_index._batch_hv_similarity` hardened: narrowed the blanket `except` so a real bug surfaces as a warning instead of silently degrading to the scalar path.
+- **Sealed scale benchmark** `benchmarks/vsa_scale.py`: exact VSA Hamming search characterized at N=1k/5k/20k; an approximate **bit-sampling LSH prefilter was evaluated and rejected** (bundle() hypervectors are near-orthogonal, LSH recall collapsed <0.2), so search stays exact.
+
 ## [1.0.0] — 2026-06-24
 
 ### G001 — Audit Cleanup
