@@ -116,10 +116,13 @@ class ToolRegistry:
             return ""
         if not results:
             return ""
+        from memento.compaction import compact_memory
         lines = [f"{_PROACTIVE_OPEN}", f"[Proactive context — {len(results)} relevant memories]"]
         for r in results:
-            sanitized = self._sanitize_memory(r.get("memory", ""))[:200]
-            lines.append(f"• {sanitized}")
+            sanitized = self._sanitize_memory(r.get("memory", ""))
+            compressed = compact_memory(sanitized, _settings.proactive_strategy, _settings.proactive_max_tokens)
+            if compressed:
+                lines.append(f"• {compressed}")
         lines.append(_PROACTIVE_CLOSE)
         return "\n".join(lines) + "\n\n"
 
