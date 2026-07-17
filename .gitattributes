@@ -1,0 +1,17 @@
+# Protect binary assets from text-mode mangling (never let git rewrite them
+# through a text decode, which would corrupt .so / .db / wheels).
+*.so binary
+*.dylib binary
+*.pyd binary
+*.db binary
+*.sqlite binary
+*.sqlite3 binary
+*.whl binary
+*.egg binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.gz binary
+*.zip binary
+*.pdf binary

@@ -110,6 +110,9 @@ class KnowledgeGraph:
 
     def _conn(self):
         if self._connection is None:
+            # Enterprise self-heal: back up a corrupted KG db and recreate fresh.
+            from memento.db_guard import ensure_healthy_db
+            ensure_healthy_db(self.db_path, label="kg")
             self._connection = sqlite3.connect(self.db_path, timeout=10, check_same_thread=False)
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.row_factory = sqlite3.Row

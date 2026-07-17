@@ -167,6 +167,22 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
     has_db = os.path.isfile(db_path)
     _print_check("Database file", has_db, db_path if has_db else "not found")
 
+    # Check 2b: Database integrity (self-heal awareness)
+    from memento.db_guard import is_corrupted, ensure_healthy_db
+    memory_ok = not is_corrupted(db_path)
+    _print_check("Memory DB integrity", memory_ok, "ok" if memory_ok else "CORRUPTED")
+    kg_path = os.path.join(memento_dir, "neurograph_kg.sqlite")
+    if os.path.isfile(kg_path):
+        kg_ok = not is_corrupted(kg_path)
+        _print_check("KG DB integrity", kg_ok, "ok" if kg_ok else "CORRUPTED")
+
+    # Optional repair: back up corrupted DBs; next Memento start recreates fresh.
+    if getattr(_args, "repair", False):
+        ensure_healthy_db(db_path, label="memory")
+        if os.path.isfile(kg_path):
+            ensure_healthy_db(kg_path, label="kg")
+        print("\n[repair] corrupted DBs backed up; fresh store will be recreated on next Memento start.")
+
     # Check 3: Settings
     has_settings = os.path.isfile(settings_path)
     _print_check("Settings file", has_settings, settings_path if has_settings else "not found")
@@ -416,6 +432,11 @@ def _build_parser() -> argparse.ArgumentParser:
     subparsers.add_parser(
         "doctor",
         help="Run environment health check.",
+    ).add_argument(
+        "--repair",
+        action="store_true",
+        default=False,
+        help="Back up any corrupted DB and recreate a fresh store on next Memento start.",
     )
 
     coerce_parser = subparsers.add_parser(
