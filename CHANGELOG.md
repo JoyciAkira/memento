@@ -2,6 +2,15 @@
 
 All notable changes to Memento are documented here.
 
+## [1.2.1] — 2026-07-16
+
+### Enterprise DB Self-Healing & Corruption Resilience
+- New `memento/db_guard.py`: detects SQLite corruption (`PRAGMA integrity_check`), backs the corrupted file up to a timestamped `.corrupted-<ts>` copy (db + `-wal`/`-shm`), and lets the next connection recreate a fresh store while preserving the original for `sqlite3 "<file>" ".recover"`.
+- Wired into `provider.initialize` (memory + KG DBs) and `knowledge_graph._conn()` so corruption is detected and self-healed on startup instead of failing with `database disk image is malformed`.
+- `memento doctor` now reports Memory/KG DB integrity and gains a `--repair` flag (backs up corrupted DBs for recreation on next start).
+- `.gitattributes` marks binary assets (`.so`/`.db`/`.sqlite`/`.whl`/…) as binary so git never text-mangles them.
+- Tests: `tests/test_db_guard.py` (6 pass).
+
 ## [1.2.0] — 2026-07-16
 
 ### Token-friendly Proactive Injection
