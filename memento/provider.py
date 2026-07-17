@@ -159,6 +159,13 @@ class NeuroGraphProvider:
         async with self._write_lock:
             if self._initialized:
                 return
+            # Enterprise self-heal: detect a corrupted DB, back it up, and let the
+            # subsequent connect recreate a fresh store instead of crashing.
+            from memento.db_guard import ensure_healthy_db
+            ensure_healthy_db(self.db_path, label="memory")
+            if getattr(self, "kg_db_path", None):
+                ensure_healthy_db(self.kg_db_path, label="kg")
+
             from memento.migrations.runner import MigrationRunner
             from memento.migrations.versions import get_all_migrations
 
