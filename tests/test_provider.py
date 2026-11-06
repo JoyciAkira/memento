@@ -10,6 +10,7 @@ def test_provider_initialization(tmp_path):
     provider = MementoGraphProvider()
     assert provider.kg is not None
     assert os.path.exists(provider.kg.db_path)
+    provider.close()
 
 
 def test_provider_add_and_get_all(tmp_path):
@@ -28,6 +29,7 @@ def test_provider_add_and_get_all(tmp_path):
     all_edges = provider.get_all()
     assert len(all_edges) == 2
     assert any(e["source"] == "user" and e["target"] == "python" for e in all_edges)
+    provider.close()
 
 
 def test_provider_search_and_delete(tmp_path):
@@ -51,6 +53,7 @@ def test_provider_search_and_delete(tmp_path):
     results_after = provider.search("alice")
     assert len(results_after) == 1
     assert results_after[0]["target"] == "charlie"
+    provider.close()
 
 
 @pytest.mark.asyncio
@@ -77,6 +80,7 @@ async def test_neurograph_search_with_filters():
             res_frontend = await p.search("Test", filters={"module": "frontend"})
             assert len(res_frontend) == 1
             assert "memory 2" in res_frontend[0]["memory"]
+            await p.close()
 
 
 @pytest.mark.asyncio
@@ -99,6 +103,7 @@ async def test_neurograph_add_injects_workspace_metadata():
             assert row is not None
             assert "workspace_root" in row[0]
             assert os.path.basename(ws) in row[0]
+            await p.close()
 
 
 @pytest.mark.asyncio

@@ -24,6 +24,12 @@ async def test_neuro_provider_lifecycle():
         all_mem = await provider.get_all(user_id="default")
         assert len(all_mem) > 0
 
+        await provider.close()
+        assert provider._db is None
+        assert provider._db_read is None
+        assert provider._sync_db is None
+        assert provider.kg.kg._connection is None
+
 
 @pytest.mark.asyncio
 async def test_neuro_provider_works_without_openai_api_key(tmp_path, monkeypatch):
@@ -34,6 +40,7 @@ async def test_neuro_provider_works_without_openai_api_key(tmp_path, monkeypatch
     await p.add("offline memory", user_id="default")
     res = await p.search("offline", user_id="default")
     assert res
+    await p.close()
 
 
 @pytest.mark.asyncio
@@ -49,6 +56,7 @@ async def test_search_trace_file_not_written_when_disabled(tmp_path, monkeypatch
 
     trace_path = tmp_path / "traces" / "last_search.json"
     assert not trace_path.is_file()
+    await p.close()
 
 
 @pytest.mark.asyncio
@@ -69,3 +77,4 @@ async def test_concurrent_writes_and_reads_no_deadlock(tmp_path, monkeypatch):
             assert isinstance(r, list)
 
     await asyncio.gather(writers(), readers())
+    await p.close()

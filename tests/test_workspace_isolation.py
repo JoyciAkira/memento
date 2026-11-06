@@ -17,3 +17,6 @@ async def test_workspace_context_isolation():
         # Test caching
         ctx1_cached = get_workspace_context(ws1)
         assert ctx1 is ctx1_cached
+
+        await ctx1.provider.close()
+        await ctx2.provider.close()

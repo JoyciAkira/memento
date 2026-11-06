@@ -33,6 +33,7 @@ async def test_consolidate_method_on_engine():
             if consolidator._consolidation_log
             else True
         )
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -56,6 +57,7 @@ async def test_consolidate_predict_only():
         )
         assert result.memory_id == ""
         assert result.was_surprising is False
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -83,12 +85,13 @@ async def test_consolidate_batch():
         assert len(results) == 2
         assert results[0].was_surprising is True
         assert results[1].was_surprising is True
+        await provider.close()
 
 
-def test_get_consolidator_initializes_once():
+@pytest.mark.asyncio
+async def test_get_consolidator_initializes_once():
     from memento.provider import NeuroGraphProvider
     from memento.cognitive_engine import CognitiveEngine
-    import asyncio
 
     os.environ["OPENAI_API_KEY"] = "sk-or-v2-placeholder-key-for-tests"
     os.environ["OPENAI_BASE_URL"] = "https://openrouter.ai/api/v1"
@@ -96,15 +99,13 @@ def test_get_consolidator_initializes_once():
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_ce4.db")
+        provider = NeuroGraphProvider(db_path=db_path)
+        await provider.initialize()
+        try:
+            engine = CognitiveEngine(provider)
 
-        async def setup():
-            p = NeuroGraphProvider(db_path=db_path)
-            await p.initialize()
-            return p
-
-        provider = asyncio.run(setup())
-        engine = CognitiveEngine(provider)
-
-        c1 = engine.get_consolidator(provider.orchestrator)
-        c2 = engine.get_consolidator(provider.orchestrator)
-        assert c1 is c2
+            c1 = engine.get_consolidator(provider.orchestrator)
+            c2 = engine.get_consolidator(provider.orchestrator)
+            assert c1 is c2
+        finally:
+            await provider.close()

@@ -26,6 +26,7 @@ async def test_reflected_search_integration():
         assert "strategy" in result
         assert isinstance(result["confidence"], float)
         assert 0.0 <= result["confidence"] <= 1.0
+        await provider.close()
 
 
 def test_cognitive_engine_initializes_with_hdc():

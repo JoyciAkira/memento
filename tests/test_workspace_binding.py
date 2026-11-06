@@ -31,3 +31,7 @@ async def test_mcp_server_workspace_prefers_memento_dir(monkeypatch):
         importlib.reload(ms)
         res = await ms.call_tool("memento_status", {})
         assert ws in res[0].text
+
+        from memento.workspace_context import get_workspace_context
+
+        await get_workspace_context(ws).provider.close()

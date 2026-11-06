@@ -23,6 +23,7 @@ async def test_orchestrator_initialized_after_init():
         assert hasattr(provider.orchestrator, "l1")
         assert hasattr(provider.orchestrator, "l2")
         assert hasattr(provider.orchestrator, "l3")
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -58,6 +59,7 @@ async def test_orchestrator_add_to_different_tiers():
         l3_results = orch.search("semantic", tier="semantic")
         assert len(l3_results) == 1
         assert l3_results[0]["memory"] == "L3 semantic content"
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -86,6 +88,7 @@ async def test_orchestrator_search_all_tiers():
         assert len(results) == 3
         tiers = {r["memory_tier"] for r in results}
         assert tiers == {"working", "episodic", "semantic"}
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -121,6 +124,7 @@ async def test_orchestrator_vsa_index_integration():
 
         orch.disable_vsa_index()
         assert orch._vsa_index is None
+        await provider.close()
 
 
 @pytest.mark.asyncio
@@ -147,3 +151,4 @@ async def test_orchestrator_vsa_search_relation():
 
         results = orch.search_relation("fastapi", "web framework")
         assert len(results) >= 1
+        await provider.close()

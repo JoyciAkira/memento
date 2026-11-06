@@ -107,6 +107,10 @@ class MementoGraphProvider:
             if source and target and relationship:
                 self.kg.invalidate(subject=source, predicate=relationship, obj=target)
 
+    def close(self) -> None:
+        """Release the persistent knowledge-graph connection."""
+        self.kg.close()
+
 
 class NeuroGraphProvider:
     """
@@ -189,6 +193,7 @@ class NeuroGraphProvider:
         self._initialized = False
         self._db: aiosqlite.Connection | None = None
         self._db_read: aiosqlite.Connection | None = None
+        self._sync_db: sqlite3.Connection | None = None
         self._write_lock = asyncio.Lock()
         self._read_lock = asyncio.Lock()
         from memento.settings import settings as _settings
@@ -286,9 +291,22 @@ class NeuroGraphProvider:
                 await self._db.close()
             except Exception:
                 pass
+            self._db = None
         if self._db_read:
             try:
                 await self._db_read.close()
+            except Exception:
+                pass
+            self._db_read = None
+        if self._sync_db is not None:
+            try:
+                self._sync_db.close()
+            except Exception:
+                pass
+            self._sync_db = None
+        if self.kg:
+            try:
+                self.kg.close()
             except Exception:
                 pass
 

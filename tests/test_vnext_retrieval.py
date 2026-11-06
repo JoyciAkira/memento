@@ -61,6 +61,7 @@ async def test_vnext_pipeline_returns_traces_and_results():
         assert any(t["lane"] == "vsa" for t in bundle["traces"])
         assert any(t["lane"] == "recency" for t in bundle["traces"])
         assert "strength" in bundle["results"][0]
+        await p.close()
 
 
 @pytest.mark.asyncio
@@ -79,6 +80,7 @@ async def test_vnext_pipeline_no_trace():
         assert bundle["query"] == "hello"
         assert len(bundle["results"]) >= 1
         assert bundle["traces"] == []
+        await p.close()
 
 
 @pytest.mark.asyncio
@@ -103,3 +105,4 @@ async def test_vnext_pipeline_with_filters():
         assert all(
             "backend" in r["memory"] or r["memory"] == "" for r in bundle["results"]
         )
+        await p.close()

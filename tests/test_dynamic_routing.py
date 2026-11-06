@@ -15,6 +15,7 @@ async def test_get_active_goals_queries_goals_storage(monkeypatch):
         ctx = get_workspace_context(ws)
         monkeypatch.setattr(ctx.provider, "list_goals", fake_list_goals)
         out = await ms.get_active_goals(ctx, context="frontend/app.py")
+        await ctx.provider.close()
 
     assert out.startswith("[ACTIVE GOALS]\n- ")
     assert "Goal A" in out
@@ -50,6 +51,7 @@ async def test_search_memory_applies_module_filter_from_active_context(monkeypat
             },
         )
         assert "Backend memory hit" in res[0].text
+        await ctx.provider.close()
 
 
 @pytest.mark.asyncio
@@ -92,6 +94,7 @@ async def test_universal_router_focus_area_routes_and_passes_module_filter(monke
         text = res[0].text
         assert "Focus Context: frontend" in text
         assert "Found frontend bug" in text
+        await ctx.provider.close()
 
 
 @pytest.mark.asyncio
@@ -147,3 +150,4 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(
         assert "[ACTIVE GOALS]" in res[0].text
         ctx.enforcement_config.clear()
         ctx.enforcement_config.update(prev)
+        await ctx.provider.close()

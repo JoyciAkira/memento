@@ -192,6 +192,10 @@ async def test_migrate_workspace_memories_tool(monkeypatch):
         )
         assert "copied_total" in res[0].text
 
+        from memento.workspace_context import get_workspace_context
+
+        await get_workspace_context(ws1).provider.close()
+
 
 @pytest.mark.asyncio
 async def test_memento_tool_coercion():
@@ -225,3 +229,8 @@ async def test_mcp_server_dynamic_workspace_routing():
         # Verify db paths in output
         assert os.path.join(ws1, ".memento", "neurograph_memory.db") in res1[0].text
         assert os.path.join(ws2, ".memento", "neurograph_memory.db") in res2[0].text
+
+        from memento.workspace_context import get_workspace_context
+
+        await get_workspace_context(ws1).provider.close()
+        await get_workspace_context(ws2).provider.close()
