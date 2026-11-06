@@ -26,6 +26,17 @@ async def _cleanup_workspace_contexts():
     from memento.workspace_context import _contexts
 
     for ctx in list(_contexts.values()):
+        # A running watchdog can read coverage's temporary data file while
+        # pytest-cov tries to rename it, which fails on Windows.
+        if ctx.daemon and ctx.daemon.is_running:
+            try:
+                ctx.daemon.stop()
+            except Exception:
+                pass
+        try:
+            ctx.stop_autonomous_agent()
+        except Exception:
+            pass
         try:
             await ctx.provider.close()
         except Exception:
