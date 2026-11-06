@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import pathlib
 import subprocess
 import sys
@@ -31,10 +32,16 @@ async def test_offline_explain_search_reads_last_trace(tmp_path, monkeypatch):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
+    await call_tool(
+        "memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"}
+    )
     await call_tool(
         "memento_add_memory",
-        {"workspace_root": str(ws), "text": "contract trace anchor C7K", "metadata": {}},
+        {
+            "workspace_root": str(ws),
+            "text": "contract trace anchor C7K",
+            "metadata": {},
+        },
     )
     await call_tool(
         "memento_search_memory",
@@ -64,10 +71,16 @@ async def test_offline_vnext_roundtrip_json_keys(tmp_path, monkeypatch):
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
-    await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
+    await call_tool(
+        "memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"}
+    )
     await call_tool(
         "memento_add_memory",
-        {"workspace_root": str(ws), "text": "vnext contract token VN99", "metadata": {}},
+        {
+            "workspace_root": str(ws),
+            "text": "vnext contract token VN99",
+            "metadata": {},
+        },
     )
     out_v = await call_tool(
         "memento_search_vnext",
@@ -79,3 +92,57 @@ async def test_offline_vnext_roundtrip_json_keys(tmp_path, monkeypatch):
         {"workspace_root": str(ws), "query": "VN99"},
     )
     _mcp_contract.validate_tool_response_contract("memento_explain_retrieval", out_e)
+
+
+@pytest.mark.asyncio
+async def test_offline_code_tool_graph_and_links(tmp_path, monkeypatch):
+    pytest.importorskip("tree_sitter")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
+
+    ws = tmp_path
+    subprocess.run(
+        ["git", "init"],
+        cwd=str(ws),
+        check=False,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+    )
+    (ws / "a.py").write_text("def helper(x):\n    return x\n", encoding="utf-8")
+
+    from memento.code_index import CodeIndex
+    from memento.ledger import FileLedger
+
+    ledger = FileLedger(str(ws))
+    ledger.sync()
+    CodeIndex(str(ws), ledger=ledger).update()
+
+    await call_tool(
+        "memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"}
+    )
+    await call_tool(
+        "memento_add_memory",
+        {
+            "workspace_root": str(ws),
+            "text": "helper is used in a.py",
+            "metadata": {},
+        },
+    )
+
+    out = await call_tool(
+        "memento_code",
+        {"workspace_root": str(ws), "action": "graph", "symbol": "helper"},
+    )
+    _mcp_contract.validate_tool_response_contract("memento_code", out)
+    payload = json.loads(out[0].text)
+    assert payload["action"] == "graph"
+    assert payload["result"]["nodes"]
+
+    out = await call_tool(
+        "memento_code",
+        {"workspace_root": str(ws), "action": "links", "query": "helper"},
+    )
+    _mcp_contract.validate_tool_response_contract("memento_code", out)
+    payload = json.loads(out[0].text)
+    assert payload["result"]["memories"]
+    assert payload["result"]["memories"][0]["links"]

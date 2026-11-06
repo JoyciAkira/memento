@@ -12,6 +12,10 @@ from memento.retrieval.types import ContextBundle, LaneTrace
 
 EmbedFn = Callable[[str], Awaitable[list[float]]]
 
+# Soft-deleted memories keep their FTS row (tombstones live in memory_meta), so
+# every lane and the final hydration must exclude them explicitly.
+_NOT_DELETED_SQL = " AND id NOT IN (SELECT id FROM memory_meta WHERE is_deleted = 1)"
+
 
 def rrf_fuse(
     *,
@@ -54,10 +58,14 @@ async def retrieve_bundle(
     trace: bool,
     db: aiosqlite.Connection | None = None,
     vsa_index: Any | None = None,
+    code_memory_ids: list[str] | None = None,
 ) -> ContextBundle:
     filter_sql, filter_params = _build_filter(filters)
+    filter_sql += _NOT_DELETED_SQL
 
-    async def _run(db_conn: aiosqlite.Connection) -> tuple[list[dict[str, Any]], list[LaneTrace]]:
+    async def _run(
+        db_conn: aiosqlite.Connection,
+    ) -> tuple[list[dict[str, Any]], list[LaneTrace]]:
         db_conn.row_factory = aiosqlite.Row
 
         fts_ranked = await lane_fts(
@@ -85,7 +93,10 @@ async def retrieve_bundle(
 
         seen: set[str] = set()
         candidate_ids: list[str] = []
-        for doc_id, _ in list(fts_ranked) + list(vsa_ranked) + list(recent_ranked):
+        for doc_id in list(code_memory_ids or []) + [
+            doc_id
+            for doc_id, _ in list(fts_ranked) + list(vsa_ranked) + list(recent_ranked)
+        ]:
             if doc_id in seen:
                 continue
             seen.add(doc_id)
@@ -101,10 +112,24 @@ async def retrieve_bundle(
             embed_fn=embed_fn,
         )
 
+        lanes = {
+            "fts": fts_ranked,
+            "dense": dense_ranked,
+            "vsa": vsa_ranked,
+            "recency": recent_ranked,
+        }
+        if code_memory_ids:
+            lanes["code"] = [(doc_id, 1.0) for doc_id in code_memory_ids]
         fused = rrf_fuse(
-            lanes={"fts": fts_ranked, "dense": dense_ranked, "vsa": vsa_ranked, "recency": recent_ranked},
+            lanes=lanes,
             k=60,
-            lane_weights={"fts": 1.0, "dense": 1.0, "vsa": 1.2, "recency": 0.5},
+            lane_weights={
+                "fts": 1.0,
+                "dense": 1.0,
+                "vsa": 1.2,
+                "recency": 0.5,
+                "code": 0.9,
+            },
             limit=limit,
         )
 
@@ -123,41 +148,54 @@ async def retrieve_bundle(
                 r = row_map.get(doc_id)
                 if not r:
                     continue
-                results.append({
-                    "id": r["id"],
-                    "memory": r["text"],
-                    "created_at": r["created_at"],
-                    "score": score,
-                })
+                results.append(
+                    {
+                        "id": r["id"],
+                        "memory": r["text"],
+                        "created_at": r["created_at"],
+                        "score": score,
+                    }
+                )
 
         local_traces: list[LaneTrace] = []
         if trace:
-            local_traces.extend([
-                {
-                    "lane": "fts",
-                    "considered": len(fts_ranked),
-                    "returned": min(10, len(fts_ranked)),
-                    "top": [{"id": i, "score": s} for i, s in fts_ranked[:10]],
-                },
-                {
-                    "lane": "dense",
-                    "considered": len(dense_ranked),
-                    "returned": min(10, len(dense_ranked)),
-                    "top": [{"id": i, "score": s} for i, s in dense_ranked[:10]],
-                },
-                {
-                    "lane": "vsa",
-                    "considered": len(vsa_ranked),
-                    "returned": min(10, len(vsa_ranked)),
-                    "top": [{"id": i, "score": s} for i, s in vsa_ranked[:10]],
-                },
-                {
-                    "lane": "recency",
-                    "considered": len(recent_ranked),
-                    "returned": min(10, len(recent_ranked)),
-                    "top": [{"id": i, "score": s} for i, s in recent_ranked[:10]],
-                },
-            ])
+            local_traces.extend(
+                [
+                    {
+                        "lane": "fts",
+                        "considered": len(fts_ranked),
+                        "returned": min(10, len(fts_ranked)),
+                        "top": [{"id": i, "score": s} for i, s in fts_ranked[:10]],
+                    },
+                    {
+                        "lane": "dense",
+                        "considered": len(dense_ranked),
+                        "returned": min(10, len(dense_ranked)),
+                        "top": [{"id": i, "score": s} for i, s in dense_ranked[:10]],
+                    },
+                    {
+                        "lane": "vsa",
+                        "considered": len(vsa_ranked),
+                        "returned": min(10, len(vsa_ranked)),
+                        "top": [{"id": i, "score": s} for i, s in vsa_ranked[:10]],
+                    },
+                    {
+                        "lane": "recency",
+                        "considered": len(recent_ranked),
+                        "returned": min(10, len(recent_ranked)),
+                        "top": [{"id": i, "score": s} for i, s in recent_ranked[:10]],
+                    },
+                ]
+            )
+            if code_memory_ids:
+                local_traces.append(
+                    {
+                        "lane": "code",
+                        "considered": len(code_memory_ids),
+                        "returned": min(10, len(code_memory_ids)),
+                        "top": [{"id": i, "score": 1.0} for i in code_memory_ids[:10]],
+                    }
+                )
         return results, local_traces
 
     if db is not None:

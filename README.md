@@ -54,7 +54,7 @@ Semantic entity-relationship graph on top of the Knowledge Graph. Track files, c
 
 ## Unified Tool API (v0.3.x)
 
-Memento exposes **14 action-based tools** via MCP. Each tool uses an `action` parameter instead of separate tools per operation:
+Memento exposes **16 action-based tools** via MCP. Each tool uses an `action` parameter instead of separate tools per operation:
 
 | Tool | Actions | Purpose |
 |------|---------|---------|
@@ -64,11 +64,13 @@ Memento exposes **14 action-based tools** via MCP. Each tool uses an `action` pa
 | `memento_graph` | `add_entity`, `add_relation`, `query`, `impact`, `summary` | Project Memory Graph |
 | `memento_search` | `basic`, `advanced`, `explain` | FTS, vNext pipeline, routing trace |
 | `memento_remember` | `add`, `consolidate`, `share`, `evaluate`, `hit` | Memory write operations |
+| `memento_compact` | (standalone) | Token-friendly text compaction |
 | `memento_configure` | `enforcement`, `coercion`, `daemon`, `autonomy`, `consolidation_scheduler`, `kg_scheduler`, `dependency_tracker`, `superpowers`, `access` | All configuration |
 | `memento_cognitive` | `dream`, `align`, `warnings`, `tasks` | Cognitive engine operations |
 | `memento_health` | `status`, `health`, `memory`, `kg`, `quality`, `relevance`, `cache`, `explain` | Diagnostics |
 | `memento_coercion` | `list_presets`, `apply_preset`, `list_rules`, `add_rule`, `remove_rule`, `install_hooks` | Active Coercion management |
 | `memento_kg` | `extract`, `health`, `cross_workspace_stats` | Knowledge Graph operations |
+| `memento_code` | `graph`, `links`, `stats` | Code symbol graph and memory grounding |
 | `memento_notifications` | `configure`, `list`, `dismiss` | Proactive notifications |
 | `memento_audit_dependencies` | (standalone) | Dependency audit |
 | `memento_migrate_workspace_memories` | (standalone) | Workspace memory migration |

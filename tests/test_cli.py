@@ -14,7 +14,7 @@ class TestCLIHelp:
         with pytest.raises(SystemExit) as exc_info:
             from memento.cli import main
 
-            main()
+            main(hard_exit=False)
         assert exc_info.value.code == 0
 
     def test_cli_capture_help(self, monkeypatch, capsys):
@@ -22,7 +22,7 @@ class TestCLIHelp:
         with pytest.raises(SystemExit) as exc_info:
             from memento.cli import main
 
-            main()
+            main(hard_exit=False)
         assert exc_info.value.code == 0
 
     def test_cli_search_help(self, monkeypatch, capsys):
@@ -30,7 +30,7 @@ class TestCLIHelp:
         with pytest.raises(SystemExit) as exc_info:
             from memento.cli import main
 
-            main()
+            main(hard_exit=False)
         assert exc_info.value.code == 0
 
     def test_cli_capture_no_args(self, monkeypatch, capsys):
@@ -38,7 +38,7 @@ class TestCLIHelp:
         with pytest.raises(SystemExit) as exc_info:
             from memento.cli import main
 
-            main()
+            main(hard_exit=False)
         assert exc_info.value.code != 0
 
 
@@ -47,7 +47,7 @@ class TestCLIDoctor:
         monkeypatch.setattr("sys.argv", ["memento", "doctor"])
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         captured = capsys.readouterr()
         assert "Memento Doctor" in captured.out
         assert "Embedding backend" in captured.out
@@ -56,7 +56,7 @@ class TestCLIDoctor:
         monkeypatch.setattr("sys.argv", ["memento", "doctor"])
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         captured = capsys.readouterr()
         assert "Version" in captured.out
 
@@ -66,7 +66,7 @@ class TestCLICoerce:
         monkeypatch.setattr("sys.argv", ["memento", "coerce", "--list"])
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         captured = capsys.readouterr()
         assert "python-dev-basics" in captured.out
         assert "typescript-strict" in captured.out
@@ -81,7 +81,7 @@ class TestCLICoerce:
         )
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         captured = capsys.readouterr()
         assert "Applied preset" in captured.out
         settings_path = tmp_path / ".memento" / "settings.json"
@@ -101,13 +101,12 @@ class TestCLICoerce:
         )
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         # Apply second preset
         monkeypatch.setattr(
             "sys.argv", ["memento", "coerce", "--apply", "typescript-strict"]
         )
-        main()
-        captured = capsys.readouterr()
+        main(hard_exit=False)
         settings_path = tmp_path / ".memento" / "settings.json"
         data = json.loads(settings_path.read_text())
         rules = data["active_coercion"]["rules"]
@@ -118,13 +117,11 @@ class TestCLICoerce:
 
     def test_coerce_apply_unknown_preset_fails(self, monkeypatch, tmp_path):
         monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
-        monkeypatch.setattr(
-            "sys.argv", ["memento", "coerce", "--apply", "nonexistent"]
-        )
+        monkeypatch.setattr("sys.argv", ["memento", "coerce", "--apply", "nonexistent"])
         from memento.cli import main
 
         with pytest.raises(SystemExit):
-            main()
+            main(hard_exit=False)
 
     def test_coerce_status(self, monkeypatch, capsys, tmp_path):
         monkeypatch.setattr("os.getcwd", lambda: str(tmp_path))
@@ -134,11 +131,11 @@ class TestCLICoerce:
         )
         from memento.cli import main
 
-        main()
+        main(hard_exit=False)
         capsys.readouterr()  # clear
         # Now check status
         monkeypatch.setattr("sys.argv", ["memento", "coerce", "--status"])
-        main()
+        main(hard_exit=False)
         captured = capsys.readouterr()
         assert "Active Coercion" in captured.out
         assert "no_print_py" in captured.out or "rules" in captured.out
@@ -150,14 +147,16 @@ class TestCLIUpdateHelp:
         with pytest.raises(SystemExit) as exc_info:
             from memento.cli import main
 
-            main()
+            main(hard_exit=False)
         assert exc_info.value.code == 0
 
     def test_update_dry_run(self, monkeypatch, capsys):
         monkeypatch.setattr("sys.argv", ["memento", "update", "--dry-run"])
-        from unittest.mock import patch, MagicMock
+        from unittest.mock import patch
+
         with patch("memento.updater._get_version", return_value="0.1.0"):
             from memento.cli import main
-            main()
+
+            main(hard_exit=False)
         captured = capsys.readouterr()
         assert "dry-run" in captured.out.lower() or "dry_run" in captured.out.lower()

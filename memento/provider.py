@@ -18,11 +18,20 @@ from memento.knowledge_graph import KnowledgeGraph
 
 logger = logging.getLogger(__name__)
 
+VALID_MEMORY_TIERS = frozenset({"working", "episodic", "semantic"})
+_NOT_DELETED_SQL = "id NOT IN (SELECT id FROM memory_meta WHERE is_deleted = 1)"
+_NOT_DELETED_M_SQL = "m.id NOT IN (SELECT id FROM memory_meta WHERE is_deleted = 1)"
+_HIT_BOOST_WEIGHT = 0.2
+_MAX_HIT_BOOST = 1.5
+_ACCESS_TRACK_LIMIT = 10
+
+
 class MementoGraphProvider:
     """
     A GraphStore provider for mem0ai that uses Memento's local SQLite KnowledgeGraph.
     This allows Mem0 to use a local, zero-cost, PageRank-optimized graph database.
     """
+
     def __init__(self, config: Optional[Dict[str, Any]] = None):
         self.config = config or {}
         db_path = self.config.get("db_path")
@@ -32,56 +41,60 @@ class MementoGraphProvider:
     def add(self, *args, **kwargs) -> None:
         edges = args[0] if len(args) > 0 else kwargs.get("edges", [])
         if not edges and len(args) > 1:
-             edges = args[1]
-             
+            edges = args[1]
+
         for edge in edges:
             if not isinstance(edge, dict):
                 continue
             source = edge.get("source")
             target = edge.get("target")
             relationship = edge.get("relationship")
-            
+
             if not all([source, target, relationship]):
                 logger.warning(f"Skipping invalid edge: {edge}")
                 continue
-                
+
             self.kg.add_triple(
                 subject=source,
                 predicate=relationship,
                 obj=target,
-                source_file="mem0_integration"
+                source_file="mem0_integration",
             )
-            
+
     def get_all(self, **kwargs) -> List[Dict[str, Any]]:
         """Get all edges in Mem0 format."""
         triples = self.kg.timeline()
         mem0_edges = []
         for t in triples:
-            if t["current"]: 
-                mem0_edges.append({
-                    "source": t["subject"],
-                    "relationship": t["predicate"],
-                    "target": t["object"]
-                })
+            if t["current"]:
+                mem0_edges.append(
+                    {
+                        "source": t["subject"],
+                        "relationship": t["predicate"],
+                        "target": t["object"],
+                    }
+                )
         return mem0_edges
 
     def search(self, *args, **kwargs) -> List[Dict[str, Any]]:
         query = args[0] if len(args) > 0 else kwargs.get("query", "")
         limit = kwargs.get("limit", 100)
-        
+
         results = self.kg.query_entity(str(query), direction="both")
-        
+
         mem0_edges = []
         for r in results:
             if not r["current"]:
                 continue
-                
-            mem0_edges.append({
-                "source": r["subject"],
-                "relationship": r["predicate"],
-                "target": r["object"]
-            })
-                
+
+            mem0_edges.append(
+                {
+                    "source": r["subject"],
+                    "relationship": r["predicate"],
+                    "target": r["object"],
+                }
+            )
+
         return mem0_edges[:limit]
 
     def delete(self, edges: List[Dict[str, Any]], **kwargs) -> None:
@@ -90,9 +103,10 @@ class MementoGraphProvider:
             source = edge.get("source")
             target = edge.get("target")
             relationship = edge.get("relationship")
-            
+
             if source and target and relationship:
                 self.kg.invalidate(subject=source, predicate=relationship, obj=target)
+
 
 class NeuroGraphProvider:
     """
@@ -101,24 +115,50 @@ class NeuroGraphProvider:
     scritture serializzate su `_write_lock`, letture su `_read_lock` (compatibile WAL con
     INSERT concorrenti). I/O trace e query KG non tengono lock SQLite.
     """
+
     def __init__(self, db_path: str = None):
         if not db_path:
-            memento_dir = os.path.join(os.environ.get("MEMENTO_DIR", os.getcwd()), ".memento")
+            memento_dir = os.path.join(
+                os.environ.get("MEMENTO_DIR", os.getcwd()), ".memento"
+            )
             os.makedirs(memento_dir, exist_ok=True, mode=0o700)
             try:
                 os.chmod(memento_dir, 0o700)
             except Exception:
                 pass
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
-            
+
         self.db_path = db_path
         # Use shared KG if MEMENTO_SHARED_KG_PATH is set (federation)
         from memento.settings import settings as _s_init
-        self.kg_db_path = _s_init.shared_kg_path if _s_init.shared_kg_path else resolve_kg_db_path(db_path)
+
+        self.kg_db_path = (
+            _s_init.shared_kg_path
+            if _s_init.shared_kg_path
+            else resolve_kg_db_path(db_path)
+        )
         self.kg = MementoGraphProvider({"db_path": self.kg_db_path})
         self._goal_store = GoalStore(db_path)
 
+        # Code grounding is optional: it only reads the code index DB and does
+        # nothing when the workspace has never been synced.
+        self.code_grounder = None
+        if db_path and str(db_path) != ":memory:":
+            try:
+                from memento.code_grounding import MemoryGrounder
+
+                db_dir = os.path.dirname(os.path.abspath(str(db_path)))
+                project_root = (
+                    os.path.dirname(db_dir)
+                    if os.path.basename(db_dir) == ".memento"
+                    else db_dir
+                )
+                self.code_grounder = MemoryGrounder(project_root)
+            except Exception as exc:  # pragma: no cover - defensive
+                logger.debug(f"Code grounding disabled: {exc}")
+
         from memento.settings import settings as _s
+
         self.embedding_backend = _s.embedding_backend
         self.embed_model = _s.embedding_model
 
@@ -130,13 +170,16 @@ class NeuroGraphProvider:
                 self.embed_model = "none"
             else:
                 self.embed_model = _s.embedding_model
-                self.llm_client = AsyncOpenAI(api_key=_s.openai_api_key, base_url=_s.openai_base_url)
+                self.llm_client = AsyncOpenAI(
+                    api_key=_s.openai_api_key, base_url=_s.openai_base_url
+                )
         else:
             self.embed_model = _s.embedding_model
         self._local_embedder = None
         if self.embedding_backend == "local":
             try:
                 from memento.local_embeddings import LocalEmbeddingBackend
+
                 self._local_embedder = LocalEmbeddingBackend()
                 self.embed_model = "BAAI/bge-small-en-v1.5"
             except ImportError:
@@ -149,6 +192,7 @@ class NeuroGraphProvider:
         self._write_lock = asyncio.Lock()
         self._read_lock = asyncio.Lock()
         from memento.settings import settings as _settings
+
         self._decay_lambda = _settings.decay_lambda
         self._last_external_write_at: str | None = None
         self._watcher_task: asyncio.Task | None = None
@@ -162,6 +206,7 @@ class NeuroGraphProvider:
             # Enterprise self-heal: detect a corrupted DB, back it up, and let the
             # subsequent connect recreate a fresh store instead of crashing.
             from memento.db_guard import ensure_healthy_db
+
             ensure_healthy_db(self.db_path, label="memory")
             if getattr(self, "kg_db_path", None):
                 ensure_healthy_db(self.kg_db_path, label="kg")
@@ -174,7 +219,9 @@ class NeuroGraphProvider:
                 runner.register(version, name, fn)
 
             await asyncio.to_thread(runner.run)
-            await asyncio.to_thread(migrate_kg_tables_if_needed, self.db_path, self.kg_db_path)
+            await asyncio.to_thread(
+                migrate_kg_tables_if_needed, self.db_path, self.kg_db_path
+            )
 
             self._db = await aiosqlite.connect(self.db_path)
             self._db.row_factory = aiosqlite.Row
@@ -196,6 +243,7 @@ class NeuroGraphProvider:
             self._initialized = True
 
             from memento.memory.orchestrator import MemoryOrchestrator
+
             self._sync_db = sqlite3.connect(self.db_path)
             self._sync_db.row_factory = sqlite3.Row
             self.orchestrator = MemoryOrchestrator(self._sync_db)
@@ -204,10 +252,13 @@ class NeuroGraphProvider:
 
             # Start cross-agent WAL watcher (30s poll) — store task for clean shutdown
             if self._watcher_task is None or self._watcher_task.done():
-                self._watcher_task = asyncio.ensure_future(self._watch_external_writes())
+                self._watcher_task = asyncio.ensure_future(
+                    self._watch_external_writes()
+                )
 
             # Federation: start server or connect as client based on socket existence
             from memento.settings import settings as _sfed
+
             if _sfed.federation_socket:
                 await self._start_federation(_sfed.federation_socket)
 
@@ -244,6 +295,7 @@ class NeuroGraphProvider:
     async def _start_federation(self, socket_path: str) -> None:
         """Start federation server (if socket free) or client (if server already running)."""
         from memento.federation import FederationServer, FederationClient
+
         self._fed_server = None
         self._fed_client = None
         if os.path.exists(socket_path):
@@ -251,10 +303,13 @@ class NeuroGraphProvider:
             async def _on_write(event: dict) -> None:
                 try:
                     self.orchestrator.l1.clear()
-                    logger.info(f"Federation push received ({event.get('type')}), L1 invalidated")
+                    logger.info(
+                        f"Federation push received ({event.get('type')}), L1 invalidated"
+                    )
                     self._last_external_write_at = event.get("ts", "")
                 except Exception:
                     pass
+
             self._fed_client = FederationClient(socket_path, _on_write)
             self._fed_client.start()
             logger.info(f"Federation client started → {socket_path}")
@@ -286,7 +341,9 @@ class NeuroGraphProvider:
                         # Another process wrote — invalidate L1 so next search re-fetches
                         try:
                             self.orchestrator.l1.clear()
-                            logger.info(f"Cross-agent write detected ({latest}), L1 cache invalidated")
+                            logger.info(
+                                f"Cross-agent write detected ({latest}), L1 cache invalidated"
+                            )
                         except Exception:
                             pass
                     self._last_external_write_at = latest
@@ -349,8 +406,7 @@ class NeuroGraphProvider:
             return []
         try:
             response = await self.llm_client.embeddings.create(
-                input=text,
-                model=self.embed_model
+                input=text, model=self.embed_model
             )
             return response.data[0].embedding
         except Exception as e:
@@ -371,21 +427,51 @@ class NeuroGraphProvider:
             return 0.0
         return dot_product / (norm_a * norm_b)
 
-    def _decay_score(self, created_at: str, tier: str = "semantic", now: datetime | None = None) -> float:
-        """Exponential temporal decay: score multiplier = e^(-lambda * age_days)."""
+    def _decay_score(
+        self,
+        created_at: str,
+        tier: str = "semantic",
+        now: datetime | None = None,
+        last_accessed_at: str | None = None,
+        hit_count: int = 0,
+    ) -> float:
+        """Exponential temporal decay weighted by the last real access.
+
+        Age is measured from the most recent of ``created_at`` and
+        ``last_accessed_at`` so memories that keep being recalled stay
+        relevant. ``hit_count`` adds a bounded logarithmic boost (max 1.5x)
+        that rewards frequently retrieved memories without letting popularity
+        override recency.
+        """
         try:
-            created = datetime.fromisoformat(created_at)
+            reference = datetime.fromisoformat(created_at)
+            if last_accessed_at:
+                try:
+                    accessed = datetime.fromisoformat(last_accessed_at)
+                    if accessed > reference:
+                        reference = accessed
+                except (TypeError, ValueError):
+                    pass
             _now = now or datetime.now()
-            age_days = max(0.0, (_now - created).total_seconds() / 86400)
-            lam = self._decay_lambda.get(tier, self._decay_lambda.get("semantic", 0.005))
-            return math.exp(-lam * age_days)
+            age_days = max(0.0, (_now - reference).total_seconds() / 86400)
+            lam = self._decay_lambda.get(
+                tier, self._decay_lambda.get("semantic", 0.005)
+            )
+            score = math.exp(-lam * age_days)
+            boost = min(
+                _MAX_HIT_BOOST,
+                1.0 + _HIT_BOOST_WEIGHT * math.log1p(max(0, int(hit_count))),
+            )
+            return score * boost
         except Exception:
             return 1.0
 
-    async def add(self, text: str, user_id: str = "default", metadata: dict = None) -> Dict[str, Any]:
+    async def add(
+        self, text: str, user_id: str = "default", metadata: dict = None
+    ) -> Dict[str, Any]:
         if not self._initialized:
             await self.initialize()
-            
+
         # Redact secrets before embedding
         redacted_text = redact_secrets(text)
         memory_id = str(uuid.uuid4())
@@ -398,8 +484,12 @@ class NeuroGraphProvider:
             meta.setdefault("workspace_root", abs_root)
             meta.setdefault("workspace_name", os.path.basename(abs_root))
 
+        memory_tier = str(meta.get("memory_tier", "semantic")).strip().lower()
+        if memory_tier not in VALID_MEMORY_TIERS:
+            memory_tier = "semantic"
+
         meta_str = json.dumps(meta) if meta else "{}"
-        
+
         embedding = await self._get_embedding(redacted_text)
         emb_str = json.dumps(embedding) if embedding else "[]"
 
@@ -407,8 +497,9 @@ class NeuroGraphProvider:
             db = self._db
             assert db is not None
             await db.execute(
-                "INSERT INTO memories (id, user_id, text, created_at, metadata) VALUES (?, ?, ?, ?, ?)",
-                (memory_id, user_id, redacted_text, created_at, meta_str),
+                "INSERT INTO memories (id, user_id, text, created_at, metadata, memory_tier) "
+                "VALUES (?, ?, ?, ?, ?, ?)",
+                (memory_id, user_id, redacted_text, created_at, meta_str, memory_tier),
             )
             await db.execute(
                 "INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)",
@@ -421,7 +512,7 @@ class NeuroGraphProvider:
                 self.orchestrator._vsa_index.index_memory,
                 memory_id,
                 redacted_text,
-                {**meta, "memory_tier": meta.get("memory_tier", "semantic")},
+                {**meta, "memory_tier": memory_tier},
             )
         except Exception as e:
             logger.debug(f"VSA indexing skipped for {memory_id}: {e}")
@@ -429,8 +520,11 @@ class NeuroGraphProvider:
         # Wire importance from MemoryGovernor into L1 working memory
         try:
             from memento.memory.governor import MemoryGovernor
+
             _gov = MemoryGovernor()
-            _surprise = float(meta.get("prediction_error", meta.get("surprise_score", 0.0)) or 0.0)
+            _surprise = float(
+                meta.get("prediction_error", meta.get("surprise_score", 0.0)) or 0.0
+            )
             _signal = _gov.score(
                 memory_id=memory_id,
                 semantic_similarity=1.0,
@@ -440,9 +534,10 @@ class NeuroGraphProvider:
                 surprise=_surprise,
             )
             _importance = float(_signal.strength)
-            tier = meta.get("memory_tier", "semantic")
-            if tier == "working":
-                self.orchestrator.l1.add(memory_id, redacted_text, meta, importance=_importance)
+            if memory_tier == "working":
+                self.orchestrator.l1.add(
+                    memory_id, redacted_text, meta, importance=_importance
+                )
         except Exception as e:
             logger.debug(f"L1 importance wiring skipped: {e}")
 
@@ -457,10 +552,24 @@ class NeuroGraphProvider:
             except Exception as e:
                 logger.warning(f"Failed to add to KG: {e}")
 
+        if self.code_grounder is not None:
+            try:
+                knowledge_graph = self.kg.kg if self.kg else None
+                await asyncio.to_thread(
+                    self.code_grounder.link_memory,
+                    memory_id,
+                    redacted_text,
+                    knowledge_graph,
+                )
+            except Exception as e:
+                logger.debug(f"Code grounding skipped for {memory_id}: {e}")
+
         # Federation: broadcast write event to all connected agents
         try:
             if hasattr(self, "_fed_server") and self._fed_server:
-                await self._fed_server.broadcast("write", {"ts": created_at, "id": memory_id})
+                await self._fed_server.broadcast(
+                    "write", {"ts": created_at, "id": memory_id}
+                )
         except Exception:
             pass
 
@@ -475,7 +584,9 @@ class NeuroGraphProvider:
         from memento.memory.governor import MemoryGovernor
 
         governor = MemoryGovernor()
-        surprise = float(metadata.get("prediction_error", metadata.get("surprise_score", 0.0)) or 0.0)
+        surprise = float(
+            metadata.get("prediction_error", metadata.get("surprise_score", 0.0)) or 0.0
+        )
         signal = governor.score(
             memory_id=memory_id,
             semantic_similarity=1.0,
@@ -484,7 +595,9 @@ class NeuroGraphProvider:
             hit_count=0,
             surprise=surprise,
         )
-        decision = governor.decide(signal, novelty=1.0 if metadata.get("source") == "daemon" else 0.0)
+        decision = governor.decide(
+            signal, novelty=1.0 if metadata.get("source") == "daemon" else 0.0
+        )
         now = datetime.now().isoformat()
         async with self._write_lock:
             db = self._db
@@ -504,11 +617,47 @@ class NeuroGraphProvider:
                     last_accessed_at = CASE WHEN ? THEN ? ELSE last_accessed_at END
                 WHERE id = ?
                 """,
-                (now, 1 if decision.should_prefetch else 0, 1 if decision.should_inject else 0, now, memory_id),
+                (
+                    now,
+                    1 if decision.should_prefetch else 0,
+                    1 if decision.should_inject else 0,
+                    now,
+                    memory_id,
+                ),
             )
             await db.commit()
 
-    async def search(self, query: str, user_id: str = "default", limit: int = 100, filters: dict = None) -> List[Dict[str, Any]]:
+    async def _record_accesses(self, memory_ids: list[str]) -> None:
+        """Best-effort hit tracking for the memories actually surfaced.
+
+        Decay is measured from ``last_accessed_at``, so memories that keep being
+        retrieved must have that timestamp refreshed. Only the top results count
+        as accesses: a long result list should not mark every candidate as used.
+        """
+        if not memory_ids:
+            return
+        ids = list(dict.fromkeys(memory_ids))[:_ACCESS_TRACK_LIMIT]
+        if not ids:
+            return
+        now = datetime.now().isoformat()
+        placeholders = ",".join(["?"] * len(ids))
+        async with self._write_lock:
+            db = self._db
+            assert db is not None
+            await db.execute(
+                f"UPDATE memory_meta SET hit_count = COALESCE(hit_count, 0) + 1, "
+                f"last_accessed_at = ? WHERE id IN ({placeholders})",
+                (now, *ids),
+            )
+            await db.commit()
+
+    async def search(
+        self,
+        query: str,
+        user_id: str = "default",
+        limit: int = 100,
+        filters: dict = None,
+    ) -> List[Dict[str, Any]]:
         if not self._initialized:
             await self.initialize()
 
@@ -520,11 +669,21 @@ class NeuroGraphProvider:
             assert db is not None
             db.row_factory = aiosqlite.Row
             terms = re.findall(r"[A-Za-z0-9_]{3,}", query or "")
-            fts_query = " OR ".join([f"{t}*" for t in terms]) if terms else (query or "").strip()
+            fts_query = (
+                " OR ".join([f"{t}*" for t in terms])
+                if terms
+                else (query or "").strip()
+            )
             if not fts_query:
                 fts_query = "*"
 
-            allowed_filter_keys = {"workspace_root", "workspace_name", "room", "module", "type"}
+            allowed_filter_keys = {
+                "workspace_root",
+                "workspace_name",
+                "room",
+                "module",
+                "type",
+            }
             filter_clauses: list[str] = []
             filter_params: list[Any] = []
             if isinstance(filters, dict):
@@ -534,32 +693,48 @@ class NeuroGraphProvider:
                     filter_clauses.append("json_extract(metadata, ?) = ?")
                     filter_params.extend([f"$.{k}", v])
 
-            filter_sql = f" AND {' AND '.join(filter_clauses)}" if filter_clauses else ""
+            filter_sql = (
+                f" AND {' AND '.join(filter_clauses)}" if filter_clauses else ""
+            )
 
             try:
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, bm25(memories) as fts_score FROM memories WHERE user_id IN (?, 'system') AND memories MATCH ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, bm25(memories) as fts_score FROM memories "
+                    f"WHERE user_id IN (?, 'system') AND memories MATCH ? {filter_sql} "
+                    f"AND {_NOT_DELETED_SQL} LIMIT 200",
                     (user_id, fts_query, *filter_params),
                 )
                 fts_rows = await cursor.fetchall()
             except Exception as e:
                 logger.warning(f"FTS MATCH failed: {e}. Fallback to LIKE.")
                 cursor = await db.execute(
-                    f"SELECT id, text, created_at, 1000000 as fts_score FROM memories WHERE user_id IN (?, 'system') AND text LIKE ? {filter_sql} LIMIT 200",
+                    f"SELECT id, text, created_at, 1000000 as fts_score FROM memories "
+                    f"WHERE user_id IN (?, 'system') AND text LIKE ? {filter_sql} "
+                    f"AND {_NOT_DELETED_SQL} LIMIT 200",
                     (user_id, f"%{query}%", *filter_params),
                 )
                 fts_rows = await cursor.fetchall()
 
             cursor = await db.execute(
-                f"SELECT id, text, created_at FROM memories WHERE user_id IN (?, 'system') {filter_sql} ORDER BY created_at DESC LIMIT 200",
+                f"SELECT id, text, created_at FROM memories WHERE user_id IN (?, 'system') "
+                f"{filter_sql} AND {_NOT_DELETED_SQL} ORDER BY created_at DESC LIMIT 200",
                 (user_id, *filter_params),
             )
             recent_rows = await cursor.fetchall()
 
             candidate_ids: list[str] = []
             seen: set[str] = set()
-            for row in list(fts_rows) + list(recent_rows):
-                row_id = row["id"]
+            code_memory_ids: list[str] = []
+            if self.code_grounder is not None and query:
+                try:
+                    code_memory_ids = await asyncio.to_thread(
+                        self.code_grounder.memory_ids_for_query, query, 40
+                    )
+                except Exception as exc:
+                    logger.debug(f"Code grounding candidates skipped: {exc}")
+            for row_id in list(code_memory_ids) + [
+                row["id"] for row in list(fts_rows) + list(recent_rows)
+            ]:
                 if row_id in seen:
                     continue
                 seen.add(row_id)
@@ -572,15 +747,23 @@ class NeuroGraphProvider:
                 placeholders = ",".join(["?"] * len(candidate_ids))
                 if has_query_embedding:
                     cursor = await db.execute(
-                        f"SELECT m.id, m.text, m.created_at, m.memory_tier, e.embedding FROM memories m "
+                        f"SELECT m.id, m.text, m.created_at, m.memory_tier, e.embedding, "
+                        f"mm.hit_count AS hit_count, mm.last_accessed_at AS last_accessed_at "
+                        f"FROM memories m "
                         f"LEFT JOIN memory_embeddings e ON m.id = e.id "
-                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND m.id IN ({placeholders})",
+                        f"LEFT JOIN memory_meta mm ON mm.id = m.id "
+                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND {_NOT_DELETED_M_SQL} "
+                        f"AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
                 else:
                     cursor = await db.execute(
-                        f"SELECT m.id, m.text, m.created_at, m.memory_tier FROM memories m "
-                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND m.id IN ({placeholders})",
+                        f"SELECT m.id, m.text, m.created_at, m.memory_tier, "
+                        f"mm.hit_count AS hit_count, mm.last_accessed_at AS last_accessed_at "
+                        f"FROM memories m "
+                        f"LEFT JOIN memory_meta mm ON mm.id = m.id "
+                        f"WHERE m.user_id IN (?, 'system') {filter_sql} AND {_NOT_DELETED_M_SQL} "
+                        f"AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
                 candidate_rows = await cursor.fetchall()
@@ -611,15 +794,23 @@ class NeuroGraphProvider:
 
             fts_sorted = sorted(fts_rows, key=lambda x: x["fts_score"])
             for rank, row in enumerate(fts_sorted, 1):
-                rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 1.0 / (k_rrf + rank)
+                rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 1.0 / (
+                    k_rrf + rank
+                )
 
-            semantic_sorted = sorted(semantic_scores.items(), key=lambda x: x[1], reverse=True)
+            semantic_sorted = sorted(
+                semantic_scores.items(), key=lambda x: x[1], reverse=True
+            )
             for rank, (row_id, score) in enumerate(semantic_sorted, 1):
                 rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 1.0 / (k_rrf + rank)
 
-            recent_sorted = sorted(recent_rows, key=lambda x: x["created_at"], reverse=True)
+            recent_sorted = sorted(
+                recent_rows, key=lambda x: x["created_at"], reverse=True
+            )
             for rank, row in enumerate(recent_sorted, 1):
-                rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 0.5 / (k_rrf + rank)
+                rrf_scores[row["id"]] = rrf_scores.get(row["id"], 0) + 0.5 / (
+                    k_rrf + rank
+                )
 
             # Fifth RRF lane: KG entity match — memories cited by KG triples for query entities
             try:
@@ -633,9 +824,16 @@ class NeuroGraphProvider:
                         if src and len(src) == 36:  # UUID format → memory ID
                             kg_entity_ids.append(src)
                 for rank, row_id in enumerate(kg_entity_ids, 1):
-                    rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 0.8 / (k_rrf + rank)
+                    rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 0.8 / (
+                        k_rrf + rank
+                    )
             except Exception:
                 pass
+
+            # Code-grounding lane: memories explicitly linked to the symbols
+            # named in the query, ignoring links whose file hash is stale.
+            for rank, row_id in enumerate(code_memory_ids, 1):
+                rrf_scores[row_id] = rrf_scores.get(row_id, 0) + 0.9 / (k_rrf + rank)
 
             # Apply temporal decay: score *= e^(-lambda * age_days) per tier
             # Hoist datetime.now() to avoid calling it once per candidate row
@@ -644,9 +842,17 @@ class NeuroGraphProvider:
                 snap = row_map.get(row_id)
                 if snap is not None:
                     tier = tier_map.get(row_id, "semantic")
-                    rrf_scores[row_id] *= self._decay_score(snap["created_at"], tier, _now)
+                    rrf_scores[row_id] *= self._decay_score(
+                        snap["created_at"],
+                        tier,
+                        _now,
+                        last_accessed_at=snap["last_accessed_at"],
+                        hit_count=snap["hit_count"] or 0,
+                    )
 
-            final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[:limit]
+            final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[
+                :limit
+            ]
 
             trace = {
                 "query": query,
@@ -664,11 +870,23 @@ class NeuroGraphProvider:
                         {"id": row["id"], "score": float(0.5 / (k_rrf + rank))}
                         for rank, row in enumerate(recent_sorted[:20], 1)
                     ],
+                    "code": [
+                        {"id": row_id, "score": float(0.9 / (k_rrf + rank))}
+                        for rank, row_id in enumerate(code_memory_ids[:20], 1)
+                    ],
                 },
-                "final": [{"id": row_id, "score": float(score)} for row_id, score in final_sorted[:50]],
+                "final": [
+                    {"id": row_id, "score": float(score)}
+                    for row_id, score in final_sorted[:50]
+                ],
             }
             rows_snapshot: dict[str, dict[str, Any]] = {
-                rid: {"id": r["id"], "text": r["text"], "created_at": r["created_at"], "memory_tier": r["memory_tier"] or "semantic"}
+                rid: {
+                    "id": r["id"],
+                    "text": r["text"],
+                    "created_at": r["created_at"],
+                    "memory_tier": r["memory_tier"] or "semantic",
+                }
                 for rid, r in row_map.items()
             }
 
@@ -682,7 +900,9 @@ class NeuroGraphProvider:
                     for row_id, _ in final_sorted
                     if row_id in rows_snapshot
                 ]
-                batch_relations = await asyncio.to_thread(self.kg.query_entities_batch, all_names)
+                batch_relations = await asyncio.to_thread(
+                    self.kg.query_entities_batch, all_names
+                )
                 for row_id, score in final_sorted:
                     snap = rows_snapshot.get(row_id)
                     if not snap:
@@ -698,7 +918,9 @@ class NeuroGraphProvider:
                         res["relations"] = batch_relations[entity_id]
                     results.append(res)
             except Exception:
-                logger.debug("KG batch query failed, returning results without relations")
+                logger.debug(
+                    "KG batch query failed, returning results without relations"
+                )
                 for row_id, score in final_sorted:
                     snap = rows_snapshot.get(row_id)
                     if not snap:
@@ -725,6 +947,26 @@ class NeuroGraphProvider:
                     }
                 )
 
+        if self.code_grounder is not None and results:
+            try:
+                links = await asyncio.to_thread(
+                    self.code_grounder.links_for_memories,
+                    [r["id"] for r in results],
+                )
+                for result in results:
+                    own = links.get(result["id"])
+                    if own:
+                        result["code_links"] = own
+            except Exception as e:
+                logger.debug(f"Code grounding lookup skipped: {e}")
+
+        try:
+            await self._record_accesses(
+                [r["id"] for r in results[:_ACCESS_TRACK_LIMIT]]
+            )
+        except Exception as e:
+            logger.debug(f"Access tracking skipped: {e}")
+
         return results
 
     async def forget_decayed(
@@ -742,7 +984,11 @@ class NeuroGraphProvider:
             db = self._db_read
             assert db is not None
             cursor = await db.execute(
-                "SELECT id, text, created_at, memory_tier FROM memories WHERE user_id = ?",
+                "SELECT m.id, m.created_at, m.memory_tier, "
+                "mm.hit_count AS hit_count, mm.last_accessed_at AS last_accessed_at, "
+                "mm.is_deleted AS is_deleted "
+                "FROM memories m LEFT JOIN memory_meta mm ON mm.id = m.id "
+                "WHERE m.user_id = ?",
                 (user_id,),
             )
             rows = await cursor.fetchall()
@@ -756,8 +1002,16 @@ class NeuroGraphProvider:
                 continue
             if age < min_age_days:
                 continue
+            if row["is_deleted"]:
+                continue
             tier = row["memory_tier"] or "semantic"
-            score = self._decay_score(row["created_at"], tier, now)
+            score = self._decay_score(
+                row["created_at"],
+                tier,
+                now,
+                last_accessed_at=row["last_accessed_at"],
+                hit_count=row["hit_count"] or 0,
+            )
             if score < decay_threshold:
                 to_delete.append(row["id"])
 
@@ -782,10 +1036,96 @@ class NeuroGraphProvider:
             "min_age_days": min_age_days,
         }
 
-    async def get_all(self, user_id: str = "default", limit: int = 50, offset: int = 0) -> List[Dict[str, Any]]:
+    async def tier_report(
+        self,
+        user_id: Optional[str] = None,
+        min_age_days: float = 30.0,
+        decay_threshold: float = 0.1,
+        limit: int = 10,
+    ) -> Dict[str, Any]:
+        """Summarize tier distribution, decay state, and the next GC candidates."""
         if not self._initialized:
             await self.initialize()
-            
+
+        where = "WHERE m.user_id = ?" if user_id else ""
+        params = (user_id,) if user_id else ()
+        async with self._read_lock:
+            db = self._db_read
+            assert db is not None
+            cursor = await db.execute(
+                "SELECT COALESCE(NULLIF(TRIM(m.memory_tier), ''), 'unset') AS tier, "
+                "COUNT(*) AS total, "
+                "SUM(CASE WHEN mm.is_deleted = 1 THEN 1 ELSE 0 END) AS deleted "
+                "FROM memories m LEFT JOIN memory_meta mm ON mm.id = m.id "
+                f"{where} GROUP BY 1 ORDER BY 2 DESC",
+                params,
+            )
+            tier_rows = await cursor.fetchall()
+            cursor = await db.execute(
+                "SELECT m.id, m.created_at, m.memory_tier, mm.hit_count AS hit_count, "
+                "mm.last_accessed_at AS last_accessed_at, mm.is_deleted AS is_deleted "
+                "FROM memories m LEFT JOIN memory_meta mm ON mm.id = m.id "
+                f"{where}",
+                params,
+            )
+            rows = await cursor.fetchall()
+
+        now = datetime.now()
+        decaying = 0
+        candidates: List[Dict[str, Any]] = []
+        for row in rows:
+            if row["is_deleted"]:
+                continue
+            try:
+                created = datetime.fromisoformat(row["created_at"])
+            except Exception:
+                continue
+            tier = row["memory_tier"] or "semantic"
+            score = self._decay_score(
+                row["created_at"],
+                tier,
+                now,
+                last_accessed_at=row["last_accessed_at"],
+                hit_count=row["hit_count"] or 0,
+            )
+            if score < 1.0:
+                decaying += 1
+            age_days = (now - created).total_seconds() / 86400
+            if age_days >= min_age_days and score < decay_threshold:
+                candidates.append(
+                    {
+                        "id": row["id"],
+                        "tier": tier,
+                        "score": round(score, 6),
+                        "age_days": round(age_days, 1),
+                    }
+                )
+        candidates.sort(key=lambda item: item["score"])
+
+        return {
+            "user_id": user_id or "all",
+            "total": sum(row["total"] for row in tier_rows),
+            "distribution": [
+                {
+                    "tier": row["tier"],
+                    "total": row["total"],
+                    "deleted": row["deleted"] or 0,
+                }
+                for row in tier_rows
+            ],
+            "decaying": decaying,
+            "candidates": len(candidates),
+            "next": candidates[: max(0, limit)],
+            "threshold": decay_threshold,
+            "min_age_days": min_age_days,
+        }
+
+    async def get_all(
+        self, user_id: str = "default", limit: int = 50, offset: int = 0
+    ) -> List[Dict[str, Any]]:
+        if not self._initialized:
+            await self.initialize()
+
         safe_limit = min(limit, 100)
         async with self._read_lock:
             db = self._db_read
@@ -797,7 +1137,10 @@ class NeuroGraphProvider:
             )
             rows = await cursor.fetchall()
 
-        results = [{"id": r["id"], "memory": r["text"], "created_at": r["created_at"]} for r in rows]
+        results = [
+            {"id": r["id"], "memory": r["text"], "created_at": r["created_at"]}
+            for r in rows
+        ]
         return results
 
     async def consolidate(
@@ -833,6 +1176,15 @@ class NeuroGraphProvider:
         if not self._initialized:
             await self.initialize()
 
+        code_memory_ids: list[str] = []
+        if self.code_grounder is not None and query:
+            try:
+                code_memory_ids = await asyncio.to_thread(
+                    self.code_grounder.memory_ids_for_query, query, 40
+                )
+            except Exception as exc:
+                logger.debug(f"Code grounding candidates skipped: {exc}")
+
         async with self._read_lock:
             db_read = self._db_read
             assert db_read is not None
@@ -846,12 +1198,25 @@ class NeuroGraphProvider:
                 trace=trace,
                 db=db_read,
                 vsa_index=getattr(self.orchestrator, "_vsa_index", None),
+                code_memory_ids=code_memory_ids,
             )
             if bundle.get("results"):
                 from memento.memory.governor import MemoryGovernor
 
                 bundle["results"] = MemoryGovernor().annotate_results(bundle["results"])
-            return bundle
+        if self.code_grounder is not None and bundle.get("results"):
+            try:
+                links = await asyncio.to_thread(
+                    self.code_grounder.links_for_memories,
+                    [r["id"] for r in bundle["results"]],
+                )
+                for result in bundle["results"]:
+                    own = links.get(result["id"])
+                    if own:
+                        result["code_links"] = own
+            except Exception as exc:
+                logger.debug(f"Code grounding lookup skipped: {exc}")
+        return bundle
 
     async def soft_delete_memory(
         self,
@@ -964,7 +1329,9 @@ class NeuroGraphProvider:
         now = datetime.now().isoformat()
         batch_id = str(uuid.uuid4())
 
-        clean_goals = [g.strip() for g in (goals or []) if isinstance(g, str) and g.strip()]
+        clean_goals = [
+            g.strip() for g in (goals or []) if isinstance(g, str) and g.strip()
+        ]
         if not clean_goals:
             raise ValueError("goals must be a non-empty list of strings")
 
@@ -1005,7 +1372,12 @@ class NeuroGraphProvider:
 
             await db.commit()
 
-        return {"batch_id": batch_id, "inserted_ids": inserted_ids, "mode": mode, "context": context}
+        return {
+            "batch_id": batch_id,
+            "inserted_ids": inserted_ids,
+            "mode": mode,
+            "context": context,
+        }
 
     async def list_goals(
         self,
@@ -1069,6 +1441,7 @@ class NeuroGraphProvider:
         if not self._initialized:
             await self.initialize()
         from memento.kg_extraction import KGExtractionEngine
+
         engine = KGExtractionEngine(
             db_path=self.db_path,
             kg=self.kg.kg,

@@ -18,6 +18,16 @@ Usage::
     memento coerce --list                           # list preset packs
     memento coerce --apply typescript-strict        # apply a preset
     memento coerce --status                         # show active rules
+    memento gc --prune-stale                        # archive decayed memories
+    memento gc --prune-stale --dry-run              # preview without archiving
+    memento tiers                                   # tier distribution and decay state
+    memento sync                                    # record file events and rebuild the cache
+    memento sync --replay-only                     # rebuild the cache from the ledger only
+    memento index                                   # update the code symbol index
+    memento hooks --install                         # install the pre-commit sync hook
+    memento sync --watch                            # keep ledger and index updated live
+    memento graph --symbol handle_sync              # show definitions and references
+    memento ground                                  # link memories to indexed symbols
 """
 
 from __future__ import annotations
@@ -124,6 +134,193 @@ async def _handle_recall(args: argparse.Namespace) -> None:
     print("\n".join(lines))
 
 
+async def _handle_gc(args: argparse.Namespace) -> None:
+    """Archive memories whose decay score fell below the threshold."""
+    if not args.prune_stale and not args.dry_run:
+        print("Error: specify --prune-stale, or --dry-run to preview candidates.")
+        sys.exit(1)
+
+    ctx = await _get_provider()
+    result = await ctx.provider.forget_decayed(
+        min_age_days=args.min_age_days,
+        decay_threshold=args.threshold,
+        user_id=args.user,
+        dry_run=args.dry_run,
+    )
+
+    if args.json:
+        print(json.dumps(result, indent=2, ensure_ascii=False))
+        return
+
+    mode = "dry run" if result.get("dry_run") else "pruned"
+    print(
+        f"GC ({mode}): {result.get('candidates', 0)} candidate(s), "
+        f"{result.get('deleted', 0)} archived "
+        f"(min_age_days={result.get('min_age_days')}, threshold={result.get('threshold')})"
+    )
+
+
+async def _handle_tiers(args: argparse.Namespace) -> None:
+    """Report tier distribution, decayed memories, and next GC candidates."""
+    ctx = await _get_provider()
+    report = await ctx.provider.tier_report(
+        user_id=args.user,
+        min_age_days=args.min_age_days,
+        decay_threshold=args.threshold,
+        limit=args.limit,
+    )
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+
+    print(f"Memory tiers (user={report['user_id']}, total={report['total']})")
+    for row in report["distribution"]:
+        print(f"  {row['tier']:<10} {row['total']:>7}  ({row['deleted']} archived)")
+
+    print(f"\nDecay: {report['decaying']} memories below full weight")
+    print(
+        f"Next GC candidates: {report['candidates']} "
+        f"(threshold={report['threshold']}, min_age_days={report['min_age_days']})"
+    )
+    for candidate in report["next"]:
+        print(
+            f"  {candidate['id'][:8]}  {candidate['tier']:<9} "
+            f"score={candidate['score']:.4f}  age={candidate['age_days']}d"
+        )
+
+
+def _handle_sync(args: argparse.Namespace) -> None:
+    """Record file events, rebuild the cache, and update the code index."""
+    if getattr(args, "watch", False):
+        if args.replay_only:
+            print("Error: --watch cannot be combined with --replay-only.")
+            sys.exit(1)
+        from memento.watch import SyncWatcher
+
+        watcher = SyncWatcher(
+            os.getcwd(),
+            interval=args.interval,
+            debounce=args.debounce,
+            ground=not args.no_ground,
+            ground_interval=args.ground_interval,
+        )
+
+        def report_cycle(report: Dict[str, Any]) -> None:
+            if args.json:
+                print(json.dumps(report, ensure_ascii=False), flush=True)
+                return
+            if args.quiet:
+                return
+            grounding = report.get("grounding") or {}
+            if grounding.get("memories_scanned"):
+                print(
+                    f"grounded: {grounding['memories_linked']} memories, "
+                    f"{grounding['links']} link(s), "
+                    f"{grounding['kg_triples']} KG triple(s)",
+                    flush=True,
+                )
+            if report.get("trigger") == "grounding":
+                return
+            index = report.get("index", {})
+            print(
+                f"synced: {report['events_appended']} event(s), "
+                f"{index.get('indexed', 0)} indexed, "
+                f"{index.get('symbols', 0)} symbol(s)",
+                flush=True,
+            )
+
+        watcher.run(max_cycles=args.max_cycles, on_report=report_cycle)
+        return
+
+    from memento.ledger import FileLedger
+
+    ledger = FileLedger(os.getcwd())
+    report = ledger.sync(scan=not args.replay_only)
+
+    if getattr(args, "compact", False):
+        report["compaction"] = ledger.compact()
+
+    if not getattr(args, "no_index", False):
+        from memento.code_index import CodeIndex
+
+        report["index"] = CodeIndex(os.getcwd(), ledger=ledger).update()
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+
+    action = "replayed" if args.replay_only else "synced"
+    print(
+        f"Ledger {action}: {report['events_appended']} new event(s), "
+        f"{report['cache_files']} file(s) in cache"
+    )
+    print(
+        f"  ledger : {report['ledger_dir']} ({'git' if report['git_backed'] else 'no git'})"
+    )
+    print(f"  cache  : {report['cache_path']}")
+    if not args.replay_only:
+        print(
+            f"  scanned: {report['scanned']} file(s) — {report['added']} added, "
+            f"{report['modified']} modified, {report['deleted']} deleted"
+        )
+    if "index" in report:
+        index = report["index"]
+        print(
+            f"  index  : {index['indexed']} indexed, {index['removed']} removed, "
+            f"{index['symbols']} symbol(s), {index['references']} reference(s) "
+            f"[{index['parser']}]"
+        )
+    if report.get("compaction", {}).get("compacted"):
+        print(f"  compact: snapshot {report['compaction']['snapshot_files']} file(s)")
+
+
+def _handle_index(args: argparse.Namespace) -> None:
+    """Update the tree-sitter code index using the ledger's file hashes."""
+    from memento.code_index import CodeIndex
+
+    report = CodeIndex(os.getcwd()).update(rebuild=args.rebuild)
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+
+    print(
+        f"Code index: {report['indexed']} indexed, {report['removed']} removed, "
+        f"{report['unchanged']} unchanged, {report['skipped']} skipped "
+        f"({report['symbols']} symbols, {report['references']} references, "
+        f"{report['parser']})"
+    )
+    print(f"  cache: {report['cache_path']}")
+    if report["scanned"] == 0:
+        print("  No ledger cache yet: run 'memento sync' first.")
+
+
+def _handle_hooks(args: argparse.Namespace) -> None:
+    """Inspect or install the Memento pre-commit hook."""
+    from memento.git_hooks import hook_status, install_pre_commit_hook
+
+    if args.install:
+        path = install_pre_commit_hook(os.getcwd())
+        if args.json:
+            print(json.dumps({"installed": True, "path": path}, indent=2))
+        else:
+            print(f"Installed pre-commit hook: {path}")
+        return
+
+    status = hook_status(os.getcwd())
+    if args.json:
+        print(json.dumps(status, indent=2, ensure_ascii=False))
+        return
+
+    if not status["installed"]:
+        detail = status.get("reason") or status.get("path") or "not installed"
+        print(f"No pre-commit hook installed ({detail})")
+        return
+    print(f"pre-commit hook: {status['path']}")
+    print(f"  coercion: {'yes' if status['coercion'] else 'no'}")
+    print(f"  ledger  : {'yes' if status['ledger'] else 'no'}")
+
 
 async def _handle_status(_args: argparse.Namespace) -> None:
     workspace_root = os.getcwd()
@@ -169,6 +366,7 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
 
     # Check 2b: Database integrity (self-heal awareness)
     from memento.db_guard import is_corrupted, ensure_healthy_db
+
     memory_ok = not is_corrupted(db_path)
     _print_check("Memory DB integrity", memory_ok, "ok" if memory_ok else "CORRUPTED")
     kg_path = os.path.join(memento_dir, "neurograph_kg.sqlite")
@@ -181,11 +379,15 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
         ensure_healthy_db(db_path, label="memory")
         if os.path.isfile(kg_path):
             ensure_healthy_db(kg_path, label="kg")
-        print("\n[repair] corrupted DBs backed up; fresh store will be recreated on next Memento start.")
+        print(
+            "\n[repair] corrupted DBs backed up; fresh store will be recreated on next Memento start."
+        )
 
     # Check 3: Settings
     has_settings = os.path.isfile(settings_path)
-    _print_check("Settings file", has_settings, settings_path if has_settings else "not found")
+    _print_check(
+        "Settings file", has_settings, settings_path if has_settings else "not found"
+    )
 
     # Check 4: Embedding backend
     api_key = os.environ.get("OPENAI_API_KEY", "").strip()
@@ -219,7 +421,11 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
             rules_count = len(coercion.get("rules", []))
         except Exception:
             pass
-    _print_check("Active Coercion", True, f"{'enabled' if coercion_enabled else 'disabled'}, {rules_count} rules")
+    _print_check(
+        "Active Coercion",
+        True,
+        f"{'enabled' if coercion_enabled else 'disabled'}, {rules_count} rules",
+    )
 
     # Check 7: Pre-commit hook
     git_dir = os.path.join(project_root, ".git")
@@ -230,7 +436,11 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
             with open(hook_path, "r") as f:
                 hook_content = f.read()
             is_memento = "memento" in hook_content
-            _print_check("Pre-commit hook", is_memento, "Memento hook installed" if is_memento else "Non-Memento hook found")
+            _print_check(
+                "Pre-commit hook",
+                is_memento,
+                "Memento hook installed" if is_memento else "Non-Memento hook found",
+            )
         except Exception:
             _print_check("Pre-commit hook", False, "unable to read")
     else:
@@ -239,6 +449,7 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
     # Check 8: Version
     try:
         import memento
+
         version = getattr(memento, "__version__", "unknown")
     except Exception:
         version = "unknown"
@@ -246,7 +457,9 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
 
     print()
     if not has_dir:
-        print("Tip: Run 'memento capture --text \"hello\"' to initialize the .memento directory.")
+        print(
+            "Tip: Run 'memento capture --text \"hello\"' to initialize the .memento directory."
+        )
     if not has_hook and has_dir:
         print("Tip: Install pre-commit hook via MCP tool 'memento_install_git_hooks'.")
 
@@ -266,6 +479,7 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
     if args.status:
         workspace_root = os.getcwd()
         from memento.tools.utils import find_project_root
+
         project_root = find_project_root(workspace_root)
         settings_path = os.path.join(project_root, ".memento", "settings.json")
         if not os.path.isfile(settings_path):
@@ -298,6 +512,7 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
 
         workspace_root = os.getcwd()
         from memento.tools.utils import find_project_root
+
         project_root = find_project_root(workspace_root)
         memento_dir = os.path.join(project_root, ".memento")
         os.makedirs(memento_dir, exist_ok=True)
@@ -317,7 +532,11 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
             existing_rules = []
 
         # Merge by rule ID (same logic as MCP tool)
-        by_id = {r.get("id"): r for r in existing_rules if isinstance(r, dict) and isinstance(r.get("id"), str)}
+        by_id = {
+            r.get("id"): r
+            for r in existing_rules
+            if isinstance(r, dict) and isinstance(r.get("id"), str)
+        }
         for r in PRESETS[preset]:
             if isinstance(r, dict) and isinstance(r.get("id"), str):
                 by_id[r["id"]] = r
@@ -334,6 +553,107 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
         return
 
     print("Use --apply PRESET, --list, or --status. Run 'memento coerce --help'.")
+
+
+def _handle_graph(args: argparse.Namespace) -> None:
+    """Show symbol definitions and reference edges from the code index."""
+    from memento.code_index import CodeIndex
+
+    report = CodeIndex(os.getcwd()).graph(
+        symbol=args.symbol, file=args.file, limit=args.limit
+    )
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+
+    stats = report["stats"]
+    print(
+        f"Code graph: {stats['files']} file(s), {stats['symbols']} symbol(s), "
+        f"{stats['references']} reference(s), "
+        f"{stats['memory_links']} current memory link(s)"
+    )
+    if args.symbol:
+        print(f"\nSymbol: {args.symbol}")
+        for node in report["nodes"]:
+            print(
+                f"  {node['path']}:{node['start_line']}  {node['kind']} "
+                f"{node['name']}  (memories: {node.get('memory_links', 0)})"
+            )
+        for edge in report["edges"]:
+            source = edge["src_symbol"] or edge["path"]
+            print(
+                f"  {source} --{edge['kind']}--> {edge['target']} "
+                f"({edge['path']}:{edge['line']})"
+            )
+    elif args.file:
+        print(f"\nFile: {args.file}")
+        for node in report["nodes"]:
+            print(f"  {node['start_line']:>4}  {node['kind']:<10} {node['name']}")
+        for edge in report["edges"]:
+            source = edge["src_symbol"] or "<module>"
+            print(
+                f"  {source} --{edge['kind']}--> {edge['target']} (line {edge['line']})"
+            )
+    else:
+        print("\nMost referenced targets:")
+        for target in report["top_targets"][:20]:
+            print(f"  {target['count']:>4}  {target['kind']:<9} {target['target']}")
+        print("\nTop symbols:")
+        for node in report["nodes"][:20]:
+            print(
+                f"  {node['path']}:{node['start_line']}  {node['kind']} "
+                f"{node['name']} ({node.get('incoming', 0)} refs)"
+            )
+
+
+def _handle_ground(args: argparse.Namespace) -> None:
+    """Link memories to indexed code symbols using ledger hashes."""
+    import sqlite3
+
+    from memento.code_grounding import MemoryGrounder
+    from memento.kg_storage import resolve_kg_db_path
+    from memento.knowledge_graph import KnowledgeGraph
+    from memento.ledger import FileLedger
+
+    project_root = FileLedger(os.getcwd()).project_root
+    db_path = os.path.join(project_root, ".memento", "neurograph_memory.db")
+    if not os.path.exists(db_path):
+        print(f"Error: memory database not found: {db_path}")
+        sys.exit(1)
+
+    conn = sqlite3.connect(db_path)
+    try:
+        sql = (
+            "SELECT m.id, m.text FROM memories m "
+            "WHERE m.id NOT IN (SELECT id FROM memory_meta WHERE is_deleted = 1)"
+        )
+        params: tuple = ()
+        if args.limit and args.limit > 0:
+            sql += " LIMIT ?"
+            params = (args.limit,)
+        rows = conn.execute(sql, params).fetchall()
+    finally:
+        conn.close()
+
+    kg = KnowledgeGraph(resolve_kg_db_path(db_path))
+    grounder = MemoryGrounder(project_root)
+    report = grounder.link_all(rows, rebuild=args.rebuild, kg=kg)
+
+    if args.json:
+        print(json.dumps(report, indent=2, ensure_ascii=False))
+        return
+
+    if not report.get("index_available"):
+        print(f"Error: {report.get('error', 'code index unavailable')}")
+        sys.exit(1)
+    print(
+        f"Grounding: {report['memories_scanned']} memories scanned, "
+        f"{report['memories_linked']} linked, {report['links']} link(s), "
+        f"{report['kg_triples']} KG triple(s) "
+        f"({report['duration_seconds']}s)"
+    )
+    print(f"  cache: {report['cache_path']}")
 
 
 def _handle_update(args: argparse.Namespace) -> None:
@@ -378,7 +698,9 @@ def _handle_update(args: argparse.Namespace) -> None:
         if result["killed"] > 0:
             print(f"  Restarted {result['killed']} memento-mcp process(es).")
         else:
-            print("  No running memento-mcp processes found. Restart your IDE manually.")
+            print(
+                "  No running memento-mcp processes found. Restart your IDE manually."
+            )
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -462,6 +784,230 @@ def _build_parser() -> argparse.ArgumentParser:
         help="Show active coercion rules.",
     )
 
+    gc_parser = subparsers.add_parser(
+        "gc",
+        help="Prune stale memories using exponential temporal decay.",
+    )
+    gc_parser.add_argument(
+        "--prune-stale",
+        action="store_true",
+        default=False,
+        help="Archive memories whose decay score fell below --threshold.",
+    )
+    gc_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        default=False,
+        help="Report candidates without archiving them.",
+    )
+    gc_parser.add_argument(
+        "--min-age-days",
+        type=float,
+        default=30.0,
+        help="Never prune memories younger than N days (default 30).",
+    )
+    gc_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.1,
+        help="Decay score below which a memory is stale (default 0.1).",
+    )
+    gc_parser.add_argument(
+        "--user",
+        type=str,
+        default="default",
+        help="User/namespace to prune (default 'default').",
+    )
+    gc_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    tiers_parser = subparsers.add_parser(
+        "tiers",
+        help="Show tier distribution, decay state, and next GC candidates.",
+    )
+    tiers_parser.add_argument(
+        "--user",
+        type=str,
+        default=None,
+        help="Limit to one user/namespace (default: all).",
+    )
+    tiers_parser.add_argument(
+        "--min-age-days",
+        type=float,
+        default=30.0,
+        help="Minimum age for GC candidacy (default 30).",
+    )
+    tiers_parser.add_argument(
+        "--threshold",
+        type=float,
+        default=0.1,
+        help="Decay score below which a memory is a GC candidate (default 0.1).",
+    )
+    tiers_parser.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="How many next candidates to print (default 10).",
+    )
+    tiers_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    sync_parser = subparsers.add_parser(
+        "sync",
+        help="Record file changes in the shadow ledger and rebuild the SQLite cache.",
+    )
+    sync_parser.add_argument(
+        "--replay-only",
+        action="store_true",
+        default=False,
+        help="Rebuild the cache from existing events without scanning the workspace.",
+    )
+    sync_parser.add_argument(
+        "--no-index",
+        action="store_true",
+        default=False,
+        help="Skip the tree-sitter code index update.",
+    )
+    sync_parser.add_argument(
+        "--compact",
+        action="store_true",
+        default=False,
+        help="Fold pending ledger events into a snapshot after syncing.",
+    )
+    sync_parser.add_argument(
+        "--watch",
+        action="store_true",
+        default=False,
+        help="Keep syncing while workspace files change (Ctrl+C to stop).",
+    )
+    sync_parser.add_argument(
+        "--interval",
+        type=float,
+        default=0.5,
+        help="Watch polling interval in seconds (default 0.5).",
+    )
+    sync_parser.add_argument(
+        "--debounce",
+        type=float,
+        default=0.8,
+        help="Quiet period before a watched change is synced (default 0.8).",
+    )
+    sync_parser.add_argument(
+        "--max-cycles",
+        type=int,
+        default=0,
+        help="Stop after N sync cycles (default 0 = run until interrupted).",
+    )
+    sync_parser.add_argument(
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Suppress per-cycle output in watch mode.",
+    )
+    sync_parser.add_argument(
+        "--no-ground",
+        action="store_true",
+        default=False,
+        help="Skip linking newly created memories to code symbols.",
+    )
+    sync_parser.add_argument(
+        "--ground-interval",
+        type=float,
+        default=5.0,
+        help="Seconds between checks for new memories (default 5).",
+    )
+    sync_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    index_parser = subparsers.add_parser(
+        "index",
+        help="Update the tree-sitter code index from ledger hashes.",
+    )
+    index_parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        default=False,
+        help="Drop the existing index and re-parse every supported file.",
+    )
+    index_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    hooks_parser = subparsers.add_parser(
+        "hooks",
+        help="Inspect or install the Memento pre-commit hook.",
+    )
+    hooks_parser.add_argument(
+        "--install",
+        action="store_true",
+        default=False,
+        help="Install or refresh the pre-commit hook in the current repository.",
+    )
+    hooks_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    graph_parser = subparsers.add_parser(
+        "graph",
+        help="Show symbol definitions and reference edges from the code index.",
+    )
+    graph_parser.add_argument(
+        "--symbol", type=str, default=None, help="Focus on one symbol name."
+    )
+    graph_parser.add_argument(
+        "--file", type=str, default=None, help="Focus on one workspace-relative file."
+    )
+    graph_parser.add_argument(
+        "--limit", type=int, default=50, help="Max nodes/edges to return (default 50)."
+    )
+    graph_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
+    ground_parser = subparsers.add_parser(
+        "ground",
+        help="Link memories to indexed code symbols using ledger hashes.",
+    )
+    ground_parser.add_argument(
+        "--rebuild",
+        action="store_true",
+        default=False,
+        help="Drop all existing memory links and rebuild them.",
+    )
+    ground_parser.add_argument(
+        "--limit",
+        type=int,
+        default=0,
+        help="Only scan the first N memories (default 0 = all).",
+    )
+    ground_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a JSON report.",
+    )
+
     update_parser = subparsers.add_parser(
         "update",
         help="Update Memento to the latest version via pip.",
@@ -482,10 +1028,13 @@ def _build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def main(*, hard_exit: bool = True) -> None:
+    """Synchronous entry point registered as ``memento`` console script.
 
-
-def main() -> None:
-    """Synchronous entry point registered as ``memento`` console script."""
+    ``hard_exit=False`` lets tests invoke the CLI in-process without
+    terminating the interpreter. The console script keeps the default fast
+    exit so one-shot hooks never wait on lingering worker threads.
+    """
     parser = _build_parser()
     args = parser.parse_args()
 
@@ -500,6 +1049,13 @@ def main() -> None:
         "status": _handle_status,
         "doctor": _handle_doctor,
         "coerce": _handle_coerce,
+        "gc": _handle_gc,
+        "tiers": _handle_tiers,
+        "sync": _handle_sync,
+        "index": _handle_index,
+        "hooks": _handle_hooks,
+        "graph": _handle_graph,
+        "ground": _handle_ground,
         "update": _handle_update,
     }
 
@@ -526,7 +1082,8 @@ def main() -> None:
     # critical for the recall hook, which must return promptly on every prompt.
     sys.stdout.flush()
     sys.stderr.flush()
-    os._exit(0)
+    if hard_exit:
+        os._exit(0)
 
 
 if __name__ == "__main__":

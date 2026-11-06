@@ -36,7 +36,7 @@ _VNEXT_MEDIAN_MAX_S = 0.12
 _VNEXT_P95_MAX_S = 0.40
 _VNEXT_MAX_SINGLE_S = 0.90
 
-_EXPECTED_TOOL_COUNT = 14
+_EXPECTED_TOOL_COUNT = 16
 
 
 def _p95(sorted_durations: list[float]) -> float:
@@ -48,7 +48,9 @@ def _p95(sorted_durations: list[float]) -> float:
 
 def test_b1_exact_registered_tool_surface():
     names = {t.name for t in registry.get_tools()}
-    assert len(names) == _EXPECTED_TOOL_COUNT, f"attesi {_EXPECTED_TOOL_COUNT} tool, trovati {len(names)}"
+    assert (
+        len(names) == _EXPECTED_TOOL_COUNT
+    ), f"attesi {_EXPECTED_TOOL_COUNT} tool, trovati {len(names)}"
     for required in (
         "memento",
         "memento_search",
@@ -61,6 +63,7 @@ def test_b1_exact_registered_tool_surface():
         "memento_health",
         "memento_coercion",
         "memento_kg",
+        "memento_code",
         "memento_notifications",
         "memento_audit_dependencies",
         "memento_migrate_workspace_memories",
@@ -119,12 +122,12 @@ async def test_b2_provider_search_latency_strict(tmp_path, monkeypatch):
         f"mediana search troppo alta: {med * 1000:.2f}ms "
         f"(limite {_SEARCH_MEDIAN_MAX_S * 1000:.0f}ms, n={_SEARCH_ITERATIONS})"
     )
-    assert p95 < _SEARCH_P95_MAX_S, (
-        f"p95 search troppo alta: {p95 * 1000:.2f}ms (limite {_SEARCH_P95_MAX_S * 1000:.0f}ms)"
-    )
-    assert worst < _SEARCH_MAX_SINGLE_S, (
-        f"picco search troppo alto: {worst * 1000:.2f}ms (limite {_SEARCH_MAX_SINGLE_S * 1000:.0f}ms)"
-    )
+    assert (
+        p95 < _SEARCH_P95_MAX_S
+    ), f"p95 search troppo alta: {p95 * 1000:.2f}ms (limite {_SEARCH_P95_MAX_S * 1000:.0f}ms)"
+    assert (
+        worst < _SEARCH_MAX_SINGLE_S
+    ), f"picco search troppo alto: {worst * 1000:.2f}ms (limite {_SEARCH_MAX_SINGLE_S * 1000:.0f}ms)"
 
 
 @pytest.mark.asyncio
@@ -140,7 +143,9 @@ async def test_b2_vnext_bundle_latency_strict(tmp_path, monkeypatch):
         await p.add(f"vnext bench row {i} alpha beta gamma", user_id="default")
 
     for _ in range(_VNEXT_WARMUP):
-        await p.search_vnext_bundle("alpha beta", user_id="default", limit=8, trace=False)
+        await p.search_vnext_bundle(
+            "alpha beta", user_id="default", limit=8, trace=False
+        )
 
     durations: list[float] = []
     for _ in range(_VNEXT_ITERATIONS):
@@ -162,12 +167,12 @@ async def test_b2_vnext_bundle_latency_strict(tmp_path, monkeypatch):
         f"mediana vnext troppo alta: {med * 1000:.2f}ms "
         f"(limite {_VNEXT_MEDIAN_MAX_S * 1000:.0f}ms)"
     )
-    assert p95 < _VNEXT_P95_MAX_S, (
-        f"p95 vnext troppo alta: {p95 * 1000:.2f}ms (limite {_VNEXT_P95_MAX_S * 1000:.0f}ms)"
-    )
-    assert worst < _VNEXT_MAX_SINGLE_S, (
-        f"picco vnext troppo alto: {worst * 1000:.2f}ms (limite {_VNEXT_MAX_SINGLE_S * 1000:.0f}ms)"
-    )
+    assert (
+        p95 < _VNEXT_P95_MAX_S
+    ), f"p95 vnext troppo alta: {p95 * 1000:.2f}ms (limite {_VNEXT_P95_MAX_S * 1000:.0f}ms)"
+    assert (
+        worst < _VNEXT_MAX_SINGLE_S
+    ), f"picco vnext troppo alto: {worst * 1000:.2f}ms (limite {_VNEXT_MAX_SINGLE_S * 1000:.0f}ms)"
 
 
 @pytest.mark.asyncio

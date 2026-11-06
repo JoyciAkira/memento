@@ -99,3 +99,59 @@ def test_get_all_migrations_includes_v009():
     version_map = {v: n for v, n, _ in migrations}
     assert 9 in version_map
     assert version_map[9] == "memory_tiers"
+
+
+def test_get_all_migrations_includes_v012():
+    migrations = get_all_migrations()
+    version_map = {v: n for v, n, _ in migrations}
+    assert 12 in version_map
+    assert version_map[12] == "backfill_memory_tiers"
+
+
+def test_v012_backfills_memory_tiers(tmp_path):
+    db_path = str(tmp_path / "backfill.db")
+    runner = MigrationRunner(db_path)
+    for version, name, fn in get_all_migrations():
+        if version == 12:
+            continue
+        runner.register(version, name, fn)
+    runner.run()
+
+    conn = sqlite3.connect(db_path)
+    rows = [
+        ("explicit", '{"memory_tier": "Episodic"}'),
+        ("test-failure", '{"type": "test_failure"}'),
+        ("health", '{"type": "autonomous_health_report", "level": "observe"}'),
+        ("commit", '{"type": "git_commit"}'),
+        ("empty-meta", "{}"),
+        ("invalid-json", "not-json"),
+        ("null-meta", None),
+    ]
+    for mem_id, metadata in rows:
+        conn.execute(
+            "INSERT INTO memories (id, user_id, text, created_at, metadata, memory_tier) "
+            "VALUES (?, 'default', 'content', '2026-01-01T00:00:00', ?, NULL)",
+            (mem_id, metadata),
+        )
+    conn.execute(
+        "INSERT INTO memories (id, user_id, text, created_at, metadata, memory_tier) "
+        "VALUES ('already-set', 'default', 'content', '2026-01-01T00:00:00', '{}', 'working')"
+    )
+    conn.commit()
+
+    from memento.migrations.versions.v012_backfill_memory_tiers import up as up_012
+
+    up_012(conn)
+    up_012(conn)  # idempotent
+
+    tiers = dict(conn.execute("SELECT id, memory_tier FROM memories").fetchall())
+    conn.close()
+
+    assert tiers["explicit"] == "episodic"
+    assert tiers["test-failure"] == "episodic"
+    assert tiers["health"] == "episodic"
+    assert tiers["commit"] == "semantic"
+    assert tiers["empty-meta"] == "semantic"
+    assert tiers["invalid-json"] == "semantic"
+    assert tiers["null-meta"] == "semantic"
+    assert tiers["already-set"] == "working"

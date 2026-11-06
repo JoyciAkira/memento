@@ -23,8 +23,12 @@ jobs:
       - name: Install (uv)
         run: uv sync --frozen --extra test
       - name: Run Tests
+        shell: bash
         run: |
-          uv run pytest tests/ -v --cov=memento --cov-report=xml
+          set -o pipefail
+          uv run pytest tests/ -v --cov=memento --cov-report=xml 2>&1 | tee pytest.log
+          # Fail if pytest exited before printing its complete summary (e.g. os._exit).
+          grep -Eq '[0-9]+ (passed|failed|error|errors|skipped)' pytest.log
 
   test-windows:
     runs-on: windows-latest
@@ -39,8 +43,12 @@ jobs:
       - name: Install (uv)
         run: uv sync --frozen --extra test
       - name: Run Tests
+        shell: bash
         run: |
-          uv run pytest tests/ -v --cov=memento --cov-report=xml
+          set -o pipefail
+          uv run pytest tests/ -v --cov=memento --cov-report=xml 2>&1 | tee pytest.log
+          # Fail if pytest exited before printing its complete summary (e.g. os._exit).
+          grep -Eq '[0-9]+ (passed|failed|error|errors|skipped)' pytest.log
 
   test-macos:
     runs-on: macos-latest
@@ -55,8 +63,12 @@ jobs:
       - name: Install (uv)
         run: uv sync --frozen --extra test
       - name: Run Tests
+        shell: bash
         run: |
-          uv run pytest tests/ -v --cov=memento --cov-report=xml
+          set -o pipefail
+          uv run pytest tests/ -v --cov=memento --cov-report=xml 2>&1 | tee pytest.log
+          # Fail if pytest exited before printing its complete summary (e.g. os._exit).
+          grep -Eq '[0-9]+ (passed|failed|error|errors|skipped)' pytest.log
   lint:
     runs-on: ubuntu-latest
     steps:

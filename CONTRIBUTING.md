@@ -29,6 +29,14 @@ uv run python benchmarks/run_benchmarks.py
 
 Questo comando esegue `tests/test_mcp_benchmarks.py` (prestazioni e B6 offline esteso), `tests/test_mcp_tool_contracts.py` (roundtrip JSON/trace) e `tests/test_tools_smoke.py` (tutti i tool + validazione strutturale sui tool con contratto definito in `tests/mcp_contract_helpers.py`). Lo smoke salta `memento_explain_search` nel ciclo principale e lo riesegue in coda dopo una `search_memory` mirata, perché `last_search.json` viene sovrascritto ad ogni ricerca. La suite completa di benchmark include caricamenti massivi (migliaia di `add`) e può richiedere diversi minuti.
 
+**MCP stdio end-to-end (`memento_code`):**
+
+```bash
+uv run --extra test pytest -q tests/test_mcp_stdio_code.py
+```
+
+Questo test avvia un vero processo `python -m memento.mcp_server` e comunica via stdio. Crea un workspace temporaneo con indice del codice e autonomia `off`, quindi verifica `memento_code` (`graph`, `links`, `stats`), inclusi limiti, errori e link diventati stale dopo la modifica di un file. Non richiede `OPENAI_API_KEY` né rete; viene saltato se `tree_sitter` non è installato.
+
 ## Project Structure
 
 ```

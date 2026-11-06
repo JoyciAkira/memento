@@ -97,11 +97,20 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
                 "workspace_root": str(ws),
                 "query": _SMOKE_EXPLAIN_ANCHOR,
             },
-            "memento_get_warnings": {"workspace_root": str(ws), "context": "Using sqlite and asyncio"},
+            "memento_get_warnings": {
+                "workspace_root": str(ws),
+                "context": "Using sqlite and asyncio",
+            },
             "memento_generate_tasks": {"workspace_root": str(ws)},
-            "memento_toggle_dependency_tracker": {"workspace_root": str(ws), "enabled": True},
+            "memento_toggle_dependency_tracker": {
+                "workspace_root": str(ws),
+                "enabled": True,
+            },
             "memento_audit_dependencies": {"workspace_root": str(ws)},
-            "memento_toggle_active_coercion": {"workspace_root": str(ws), "enabled": True},
+            "memento_toggle_active_coercion": {
+                "workspace_root": str(ws),
+                "enabled": True,
+            },
             "memento_list_active_coercion_presets": {"workspace_root": str(ws)},
             "memento_apply_active_coercion_preset": {
                 "workspace_root": str(ws),
@@ -116,10 +125,19 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
                 "regex": "\\bprint\\(",
                 "message": "no print",
             },
-            "memento_remove_active_coercion_rule": {"workspace_root": str(ws), "rule_id": "no_print"},
+            "memento_remove_active_coercion_rule": {
+                "workspace_root": str(ws),
+                "rule_id": "no_print",
+            },
             "memento_install_git_hooks": {"workspace_root": str(ws)},
-            "memento_toggle_precognition": {"workspace_root": str(ws), "enabled": False},
-            "memento_check_goal_alignment": {"workspace_root": str(ws), "content": "test"},
+            "memento_toggle_precognition": {
+                "workspace_root": str(ws),
+                "enabled": False,
+            },
+            "memento_check_goal_alignment": {
+                "workspace_root": str(ws),
+                "content": "test",
+            },
             "memento_synthesize_dreams": {"workspace_root": str(ws), "context": "test"},
             "memento_migrate_workspace_memories": {
                 "workspace_root": str(ws),
@@ -128,24 +146,47 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             },
             "memento": {"workspace_root": str(ws), "query": "list"},
             "memento_consolidate_memories": {"workspace_root": str(ws)},
-            "memento_toggle_consolidation_scheduler": {"workspace_root": str(ws), "enabled": False},
+            "memento_toggle_consolidation_scheduler": {
+                "workspace_root": str(ws),
+                "enabled": False,
+            },
             "memento_extract_kg": {"workspace_root": str(ws)},
-            "memento_toggle_kg_extraction_scheduler": {"workspace_root": str(ws), "enabled": False},
+            "memento_toggle_kg_extraction_scheduler": {
+                "workspace_root": str(ws),
+                "enabled": False,
+            },
             "memento_get_relevance_stats": {"workspace_root": str(ws)},
             "memento_record_memory_hit": {"workspace_root": str(ws), "memory_ids": []},
-            "memento_warm_predictive_cache": {"workspace_root": str(ws), "text": "test"},
+            "memento_warm_predictive_cache": {
+                "workspace_root": str(ws),
+                "text": "test",
+            },
             "memento_get_predictive_cache_stats": {"workspace_root": str(ws)},
             "memento_system_health": {"workspace_root": str(ws)},
             "memento_memory_stats": {"workspace_root": str(ws)},
             "memento_kg_health": {"workspace_root": str(ws)},
             "memento_get_quality_report": {"workspace_root": str(ws)},
-            "memento_record_quality_evaluation": {"workspace_root": str(ws), "memory_id": "test", "score": 0.5},
-            "memento_share_memory_to_workspace": {"workspace_root": str(ws), "memory_id": "nonexistent", "target_workspace": str(ws2)},
+            "memento_record_quality_evaluation": {
+                "workspace_root": str(ws),
+                "memory_id": "test",
+                "score": 0.5,
+            },
+            "memento_share_memory_to_workspace": {
+                "workspace_root": str(ws),
+                "memory_id": "nonexistent",
+                "target_workspace": str(ws2),
+            },
             "memento_get_cross_workspace_stats": {"workspace_root": str(ws)},
             "memento_configure_notifications": {"workspace_root": str(ws)},
             "memento_get_pending_notifications": {"workspace_root": str(ws)},
-            "memento_dismiss_notification": {"workspace_root": str(ws), "notification_id": "nonexistent"},
-            "memento_set_goals": {"workspace_root": str(ws), "goals": ["smoke: keep CI green"]},
+            "memento_dismiss_notification": {
+                "workspace_root": str(ws),
+                "notification_id": "nonexistent",
+            },
+            "memento_set_goals": {
+                "workspace_root": str(ws),
+                "goals": ["smoke: keep CI green"],
+            },
             "memento_list_goals": {"workspace_root": str(ws)},
             "memento_begin_session": {"workspace_root": str(ws)},
             "memento_handoff": {"workspace_root": str(ws)},
@@ -157,17 +198,32 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
             "memento_project": {"workspace_root": str(ws), "action": "summary"},
             "memento_session": {"workspace_root": str(ws), "action": "status"},
             "memento_graph": {"workspace_root": str(ws), "action": "summary"},
-            "memento_search": {"workspace_root": str(ws), "action": "basic", "query": "smoke"},
-            "memento_remember": {"workspace_root": str(ws), "action": "add", "text": "smoke unified remember"},
+            "memento_search": {
+                "workspace_root": str(ws),
+                "action": "basic",
+                "query": "smoke",
+            },
+            "memento_remember": {
+                "workspace_root": str(ws),
+                "action": "add",
+                "text": "smoke unified remember",
+            },
             "memento_configure": {"workspace_root": str(ws), "action": "access"},
-            "memento_cognitive": {"workspace_root": str(ws), "action": "warnings", "context": "smoke"},
+            "memento_cognitive": {
+                "workspace_root": str(ws),
+                "action": "warnings",
+                "context": "smoke",
+            },
             "memento_health": {"workspace_root": str(ws), "action": "status"},
             "memento_coercion": {"workspace_root": str(ws), "action": "list_rules"},
             "memento_kg": {"workspace_root": str(ws), "action": "health"},
+            "memento_code": {"workspace_root": str(ws), "action": "stats"},
             "memento_notifications": {"workspace_root": str(ws), "action": "list"},
         }
 
-        await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
+        await call_tool(
+            "memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"}
+        )
 
         failures: list[tuple[str, str]] = []
         for name in tool_names:
@@ -180,19 +236,34 @@ async def test_all_tools_smoke(tmp_path, monkeypatch):
                     _mcp_contract.validate_tool_response_contract(name, out)
                 except Exception as e:
                     failures.append((name, str(e)))
-                await call_tool("memento_toggle_access", {"workspace_root": str(ws), "state": "read-write"})
+                await call_tool(
+                    "memento_toggle_access",
+                    {"workspace_root": str(ws), "state": "read-write"},
+                )
                 continue
 
             if name == "memento_resume_session":
                 try:
-                    out_handoff = await call_tool("memento_handoff", {"workspace_root": str(ws)})
-                    _mcp_contract.validate_tool_response_contract("memento_handoff", out_handoff)
+                    out_handoff = await call_tool(
+                        "memento_handoff", {"workspace_root": str(ws)}
+                    )
+                    _mcp_contract.validate_tool_response_contract(
+                        "memento_handoff", out_handoff
+                    )
                     handoff_text = out_handoff[0].text if out_handoff else ""
                     session_line = next(
-                        (line for line in (handoff_text or "").splitlines() if line.startswith("Session:")),
+                        (
+                            line
+                            for line in (handoff_text or "").splitlines()
+                            if line.startswith("Session:")
+                        ),
                         "",
                     )
-                    session_id = session_line.split("Session:", 1)[1].strip() if "Session:" in session_line else ""
+                    session_id = (
+                        session_line.split("Session:", 1)[1].strip()
+                        if "Session:" in session_line
+                        else ""
+                    )
                     out = await call_tool(
                         name,
                         {"workspace_root": str(ws), "session_id": session_id},

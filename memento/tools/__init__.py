@@ -1,6 +1,7 @@
 from . import (
     autonomy as autonomous_tools,
     cognitive,
+    code as code_tools,
     coercion,
     compaction_tool,
     consolidation,
@@ -25,6 +26,7 @@ from . import (
 __all__ = [
     "autonomous_tools",
     "cognitive",
+    "code_tools",
     "coercion",
     "compaction_tool",
     "consolidation",
@@ -42,5 +44,6 @@ __all__ = [
     "relevance",
     "sessions",
     "unified",
+    "unified_extra",
     "vnext_retrieval",
 ]
