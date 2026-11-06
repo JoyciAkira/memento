@@ -1,17 +1,25 @@
 import time
 from typing import List, Dict, Any, Iterable
 
+
 class L1WorkingMemory:
     """
     Fast, in-memory volatile cache (L1).
     Eviction policy: LRU + importance score. Entries with higher importance survive longer.
     eviction_score = last_accessed + 0.3 * importance (normalized [0,1])
     """
+
     def __init__(self, max_size: int = 100):
         self.max_size = max_size
         self._cache: Dict[str, Dict[str, Any]] = {}
 
-    def add(self, entry_id: str, content: str, metadata: Dict[str, Any] = None, importance: float = 0.5) -> None:
+    def add(
+        self,
+        entry_id: str,
+        content: str,
+        metadata: Dict[str, Any] = None,
+        importance: float = 0.5,
+    ) -> None:
         if entry_id in self._cache:
             # refresh on re-add
             self._cache[entry_id]["content"] = content
@@ -37,7 +45,8 @@ class L1WorkingMemory:
         # lowest (last_accessed + 0.3 * importance) is evicted
         victim = min(
             self._cache,
-            key=lambda k: self._cache[k]["last_accessed"] + 0.3 * self._cache[k]["importance"]
+            key=lambda k: self._cache[k]["last_accessed"]
+            + 0.3 * self._cache[k]["importance"],
         )
         del self._cache[victim]
 
@@ -62,7 +71,9 @@ class L1WorkingMemory:
             {
                 "id": item.get("id"),
                 "content": item.get("content"),
-                "metadata": item.get("metadata") if isinstance(item.get("metadata"), dict) else {},
+                "metadata": item.get("metadata")
+                if isinstance(item.get("metadata"), dict)
+                else {},
                 "timestamp": float(item.get("timestamp") or 0.0),
                 "importance": float(item.get("importance") or 0.5),
             }
@@ -77,7 +88,9 @@ class L1WorkingMemory:
                 continue
             entry_id = raw.get("id")
             content = raw.get("content", "")
-            metadata = raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+            metadata = (
+                raw.get("metadata") if isinstance(raw.get("metadata"), dict) else {}
+            )
             ts = float(raw.get("timestamp") or time.time())
             importance = float(raw.get("importance") or 0.5)
             if not isinstance(entry_id, str) or not entry_id:
@@ -94,4 +107,3 @@ class L1WorkingMemory:
 
         while len(self._cache) > self.max_size:
             self._evict()
-

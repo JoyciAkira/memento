@@ -3,7 +3,7 @@
 import logging
 import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +55,7 @@ class PredictiveCache:
             self._cache[key] = entry
             # Evict oldest if over limit
             while len(self._cache) > self.MAX_CACHE_SIZE:
-                oldest_key = min(
-                    self._cache, key=lambda k: self._cache[k]["timestamp"]
-                )
+                oldest_key = min(self._cache, key=lambda k: self._cache[k]["timestamp"])
                 del self._cache[oldest_key]
             return entry
         except Exception as e:

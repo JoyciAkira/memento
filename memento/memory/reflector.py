@@ -1,9 +1,9 @@
-import asyncio
 import logging
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class RetrievalResult:
@@ -12,6 +12,7 @@ class RetrievalResult:
     score: float
     tier: str
     relations: List[Dict[str, Any]] = field(default_factory=list)
+
 
 @dataclass
 class ReflectionReport:
@@ -22,11 +23,13 @@ class ReflectionReport:
     self_healed: bool
     recommendation: str
 
+
 class MetacognitiveReflector:
     """
     Monitors retrieval confidence and triggers self-healing when uncertainty is high.
     Implements the Monitor -> Evaluate -> Regulate cycle (inspired by Metagent-P).
     """
+
     CONFIDENCE_THRESHOLD = 0.6
 
     def __init__(self, provider=None, hdc_encoder=None):
@@ -36,10 +39,7 @@ class MetacognitiveReflector:
         self._strategy = "standard"
 
     async def reflect(
-        self,
-        query: str,
-        results: List[RetrievalResult],
-        confidence: float
+        self, query: str, results: List[RetrievalResult], confidence: float
     ) -> ReflectionReport:
         report = ReflectionReport(
             query=query,
@@ -47,7 +47,7 @@ class MetacognitiveReflector:
             strategy=self._strategy,
             result_count=len(results),
             self_healed=False,
-            recommendation=""
+            recommendation="",
         )
 
         if confidence < self.CONFIDENCE_THRESHOLD:
@@ -58,7 +58,9 @@ class MetacognitiveReflector:
             if self.hdc and results:
                 expanded = await self._expand_with_hdc(query, results)
                 report.result_count = len(expanded)
-                report.recommendation = f"HDC expanded from {len(results)} to {len(expanded)} results"
+                report.recommendation = (
+                    f"HDC expanded from {len(results)} to {len(expanded)} results"
+                )
             else:
                 report.recommendation = "Low confidence but no HDC encoder available"
         else:
@@ -69,9 +71,7 @@ class MetacognitiveReflector:
         return report
 
     async def _expand_with_hdc(
-        self,
-        query: str,
-        results: List[RetrievalResult]
+        self, query: str, results: List[RetrievalResult]
     ) -> List[RetrievalResult]:
         if not self.hdc or not results:
             return results
@@ -96,7 +96,7 @@ class MetacognitiveReflector:
                                     id=f"hdc-{name}",
                                     memory=f"HDC related: {name}",
                                     score=sim_score * 0.8,
-                                    tier="hdc_expanded"
+                                    tier="hdc_expanded",
                                 )
                                 if new_result.id not in seen_ids:
                                     expanded.append(new_result)
@@ -110,9 +110,7 @@ class MetacognitiveReflector:
             return results
 
     async def evaluate_confidence(
-        self,
-        results: List[RetrievalResult],
-        query: str
+        self, results: List[RetrievalResult], query: str
     ) -> float:
         if not results:
             return 0.0
@@ -128,10 +126,14 @@ class MetacognitiveReflector:
     def get_stats(self) -> Dict[str, Any]:
         return {
             "total_reflections": len(self._retrieval_history),
-            "self_healed_count": sum(1 for r in self._retrieval_history if r.self_healed),
+            "self_healed_count": sum(
+                1 for r in self._retrieval_history if r.self_healed
+            ),
             "current_strategy": self._strategy,
             "avg_confidence": (
-                sum(r.confidence for r in self._retrieval_history) / len(self._retrieval_history)
-                if self._retrieval_history else 0.0
-            )
+                sum(r.confidence for r in self._retrieval_history)
+                / len(self._retrieval_history)
+                if self._retrieval_history
+                else 0.0
+            ),
         }

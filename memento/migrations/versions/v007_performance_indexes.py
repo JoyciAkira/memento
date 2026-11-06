@@ -1,5 +1,7 @@
 """Add missing performance indexes for search, consolidation, and extraction queries."""
 
+import sqlite3
+
 
 _INDEXES = [
     "CREATE INDEX IF NOT EXISTS idx_memory_embeddings_id ON memory_embeddings(id)",
@@ -16,8 +18,6 @@ def up(conn):
         except sqlite3.OperationalError:
             pass
     conn.commit()
-
-import sqlite3
 
 
 def down(conn):

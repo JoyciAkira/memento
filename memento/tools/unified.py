@@ -12,6 +12,7 @@ logger = logging.getLogger("memento-mcp")
 # memento_project — unified project state & goals
 # ---------------------------------------------------------------------------
 
+
 @registry.register(
     Tool(
         name="memento_project",
@@ -72,7 +73,9 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
     # -- set_state -----------------------------------------------------------
     if action == "set_state":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot set project state. Access: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot set project state. Access: {access_manager.state}"
+            )
         key = arguments.get("key")
         raw = arguments.get("value", "")
         try:
@@ -85,22 +88,37 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
     # -- get_state -----------------------------------------------------------
     if action == "get_state":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot read project state. Access: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot read project state. Access: {access_manager.state}"
+            )
         state = await ctx.project_state.list_all()
-        return [TextContent(type="text", text=json.dumps(state, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(state, indent=2, ensure_ascii=False)
+            )
+        ]
 
     # -- delete_state --------------------------------------------------------
     if action == "delete_state":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot delete project state. Access: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot delete project state. Access: {access_manager.state}"
+            )
         key = arguments.get("key")
         deleted = await ctx.project_state.delete(key)
-        return [TextContent(type="text", text=f"Project state '{key}' {'deleted' if deleted else 'not found'}.")]
+        return [
+            TextContent(
+                type="text",
+                text=f"Project state '{key}' {'deleted' if deleted else 'not found'}.",
+            )
+        ]
 
     # -- set_goals -----------------------------------------------------------
     if action == "set_goals":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot set goals. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot set goals. Current access state is: {access_manager.state}"
+            )
         goals = arguments.get("goals") or []
         context = arguments.get("context")
         mode = arguments.get("mode") or "replace"
@@ -112,7 +130,11 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
                 mode=mode,
                 delete_reason=delete_reason,
             )
-            return [TextContent(type="text", text=json.dumps(out, indent=2, ensure_ascii=False))]
+            return [
+                TextContent(
+                    type="text", text=json.dumps(out, indent=2, ensure_ascii=False)
+                )
+            ]
         except Exception as e:
             logger.error(f"Error setting goals: {e}")
             return [TextContent(type="text", text=f"Error setting goals: {str(e)}")]
@@ -120,25 +142,35 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
     # -- list_goals ----------------------------------------------------------
     if action == "list_goals":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot read goals. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot read goals. Current access state is: {access_manager.state}"
+            )
         active_only = bool(arguments.get("active_only", True))
         context = arguments.get("context")
         limit = int(arguments.get("limit") or 50)
         offset = int(arguments.get("offset") or 0)
         out = await ctx.provider.list_goals(
-            context=context, active_only=active_only, limit=limit, offset=offset,
+            context=context,
+            active_only=active_only,
+            limit=limit,
+            offset=offset,
         )
-        return [TextContent(type="text", text=json.dumps(out, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(type="text", text=json.dumps(out, indent=2, ensure_ascii=False))
+        ]
 
     # -- summary -------------------------------------------------------------
     if action == "summary":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot read project state. Access: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot read project state. Access: {access_manager.state}"
+            )
         summary = await ctx.project_state.get_summary()
         return [
             TextContent(
                 type="text",
-                text=summary or "No project state defined. Use set_state to set vision, milestones, etc.",
+                text=summary
+                or "No project state defined. Use set_state to set vision, milestones, etc.",
             )
         ]
 
@@ -149,12 +181,12 @@ async def memento_project(arguments: dict, ctx, access_manager) -> list[TextCont
 # memento_session — unified session management
 # ---------------------------------------------------------------------------
 
+
 @registry.register(
     Tool(
         name="memento_session",
         description=(
-            "Manage Memento sessions. Actions: "
-            "begin, resume, handoff, status, list."
+            "Manage Memento sessions. Actions: " "begin, resume, handoff, status, list."
         ),
         inputSchema={
             "type": "object",
@@ -197,18 +229,30 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
     # -- begin ---------------------------------------------------------------
     if action == "begin":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot begin session. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot begin session. Current access state is: {access_manager.state}"
+            )
         await ctx.session_manager.store.close_active_sessions()
         sid = await ctx.session_manager.store.ensure_active_session()
-        return [TextContent(type="text", text=json.dumps({"session_id": sid}, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps({"session_id": sid}, ensure_ascii=False)
+            )
+        ]
 
     # -- resume --------------------------------------------------------------
     if action == "resume":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot resume session. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot resume session. Current access state is: {access_manager.state}"
+            )
         session_id = arguments.get("session_id")
         if not session_id:
-            return [TextContent(type="text", text="Error: session_id is required for resume.")]
+            return [
+                TextContent(
+                    type="text", text="Error: session_id is required for resume."
+                )
+            ]
         lossless = arguments.get("lossless", True)
         out = await ctx.session_manager.resume_from(session_id=str(session_id))
         if not lossless:
@@ -216,16 +260,22 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
                 "resumed_from": out.get("resumed_from"),
                 "new_session_id": out.get("new_session_id"),
             }
-        return [TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))]
+        return [
+            TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))
+        ]
 
     # -- handoff -------------------------------------------------------------
     if action == "handoff":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot read handoff. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot read handoff. Current access state is: {access_manager.state}"
+            )
         sid = await ctx.session_manager.ensure_session()
         reason = arguments.get("reason") or "manual"
         lossless = arguments.get("lossless", True)
-        await ctx.session_manager.create_checkpoint(session_id=sid, reason=str(reason), lossless=bool(lossless))
+        await ctx.session_manager.create_checkpoint(
+            session_id=sid, reason=str(reason), lossless=bool(lossless)
+        )
         row = await ctx.session_manager.store.get_session(sid)
         prompt = row.handoff_prompt if row else None
         return [TextContent(type="text", text=prompt or "")]
@@ -233,7 +283,9 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
     # -- status --------------------------------------------------------------
     if action == "status":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot read session status. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot read session status. Current access state is: {access_manager.state}"
+            )
         sid = await ctx.session_manager.ensure_session()
         row = await ctx.session_manager.store.get_session(sid)
         out = {
@@ -243,16 +295,24 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
             "last_event_at": row.last_event_at if row else None,
             "last_checkpoint_at": row.last_checkpoint_at if row else None,
         }
-        return [TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))]
+        return [
+            TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))
+        ]
 
     # -- list ----------------------------------------------------------------
     if action == "list":
         if not access_manager.can_read():
-            raise PermissionError(f"Cannot list sessions. Current access state is: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot list sessions. Current access state is: {access_manager.state}"
+            )
         limit = int(arguments.get("limit") or 20)
         status_filter = arguments.get("status_filter")
-        out = await ctx.session_manager.store.list_sessions(limit=limit, status=status_filter)
-        return [TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))]
+        out = await ctx.session_manager.store.list_sessions(
+            limit=limit, status=status_filter
+        )
+        return [
+            TextContent(type="text", text=json.dumps(out, ensure_ascii=False, indent=2))
+        ]
 
     return [TextContent(type="text", text=f"Unknown action: {action}")]
 
@@ -260,6 +320,7 @@ async def memento_session(arguments: dict, ctx, access_manager) -> list[TextCont
 # ---------------------------------------------------------------------------
 # memento_graph — unified Project Memory Graph
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -342,9 +403,16 @@ async def memento_graph(arguments: dict, ctx, access_manager) -> list[TextConten
             except Exception:
                 props = {"raw": raw_props}
         ok = await ctx.project_memory_graph.add_entity(
-            name=name, entity_type=entity_type, properties=props,
+            name=name,
+            entity_type=entity_type,
+            properties=props,
         )
-        return [TextContent(type="text", text=f"Entity '{name}' ({entity_type}) {'added' if ok else 'failed to add'}.")]
+        return [
+            TextContent(
+                type="text",
+                text=f"Entity '{name}' ({entity_type}) {'added' if ok else 'failed to add'}.",
+            )
+        ]
 
     # -- add_relation --------------------------------------------------------
     if action == "add_relation":
@@ -354,7 +422,9 @@ async def memento_graph(arguments: dict, ctx, access_manager) -> list[TextConten
         predicate = arguments.get("predicate", "")
         object_ = arguments.get("object", "")
         ok = await ctx.project_memory_graph.add_relation(
-            subject=subject, predicate=predicate, object_=object_,
+            subject=subject,
+            predicate=predicate,
+            object_=object_,
         )
         return [
             TextContent(
@@ -370,7 +440,8 @@ async def memento_graph(arguments: dict, ctx, access_manager) -> list[TextConten
         entity = arguments.get("entity_name", "")
         depth = int(arguments.get("depth") or 1)
         context = await ctx.project_memory_graph.get_entity_context(
-            entity_name=entity, depth=depth,
+            entity_name=entity,
+            depth=depth,
         )
         return [TextContent(type="text", text=context)]
 
@@ -384,7 +455,9 @@ async def memento_graph(arguments: dict, ctx, access_manager) -> list[TextConten
         )
         if not dependents:
             return [TextContent(type="text", text=f"No entities depend on '{entity}'.")]
-        lines = [f"Entities that depend on '{entity}':"] + [f"  - {d}" for d in dependents]
+        lines = [f"Entities that depend on '{entity}':"] + [
+            f"  - {d}" for d in dependents
+        ]
         return [TextContent(type="text", text="\n".join(lines))]
 
     # -- summary -------------------------------------------------------------

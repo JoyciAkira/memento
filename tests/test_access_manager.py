@@ -25,7 +25,16 @@ def test_set_state_persists_to_file(tmp_path):
 def test_state_restored_on_init(tmp_path):
     state_file = str(tmp_path / "settings.json")
     with open(state_file, "w") as f:
-        json.dump({"access_manager": {"state": "lockdown", "warnings_enabled": False, "auto_tasks_enabled": True}}, f)
+        json.dump(
+            {
+                "access_manager": {
+                    "state": "lockdown",
+                    "warnings_enabled": False,
+                    "auto_tasks_enabled": True,
+                }
+            },
+            f,
+        )
     am = MementoAccessManager(state_path=state_file)
     assert am.state == "lockdown"
     assert am.warnings_enabled is False

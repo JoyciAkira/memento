@@ -1,15 +1,14 @@
 """Tests for memento/autonomous.py — autonomous agent loop, levels, decisions."""
+
 from __future__ import annotations
 
-import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock
 
 import pytest
 
 from memento.autonomous import (
     AutonomousAgent,
     AutonomyLevel,
-    AutonomousDecision,
     LEVEL_DESCRIPTIONS,
     DEFAULT_INTERVALS,
 )
@@ -177,9 +176,11 @@ class TestPassiveCycle:
     @pytest.mark.asyncio
     async def test_observe_patterns(self):
         agent = _make_agent()
-        agent.provider.search = AsyncMock(return_value={
-            "results": [{"memory": "a"}, {"memory": "b"}, {"memory": "c"}]
-        })
+        agent.provider.search = AsyncMock(
+            return_value={
+                "results": [{"memory": "a"}, {"memory": "b"}, {"memory": "c"}]
+            }
+        )
         await agent._observe_patterns()
         log = agent.get_decision_log()
         assert any(d["action"] == "observe_patterns" for d in log)
@@ -213,10 +214,16 @@ class TestActiveCycle:
     @pytest.mark.asyncio
     async def test_detect_anomalies(self):
         agent = _make_agent()
-        agent.provider.search = AsyncMock(return_value={
-            "results": [{"score": 0.05, "memory": "orphan"}, {"score": 0.9, "memory": "good"}]
-        })
+        agent.provider.search = AsyncMock(
+            return_value={
+                "results": [
+                    {"score": 0.05, "memory": "orphan"},
+                    {"score": 0.9, "memory": "good"},
+                ]
+            }
+        )
         from memento.memory.governor import MemoryGovernor
+
         agent.governor = MemoryGovernor()
         await agent._detect_anomalies()
         log = agent.get_decision_log()
@@ -245,12 +252,10 @@ class TestAutonomousCycle:
     async def test_auto_goal_drift_check(self):
         agent = _make_agent()
         agent._cycle_count = 3
-        agent.provider.list_goals = AsyncMock(return_value=[
-            {"goal": "Build fast API"}
-        ])
-        agent.provider.search = AsyncMock(return_value={
-            "results": [{"memory": "refactoring database layer"}]
-        })
+        agent.provider.list_goals = AsyncMock(return_value=[{"goal": "Build fast API"}])
+        agent.provider.search = AsyncMock(
+            return_value={"results": [{"memory": "refactoring database layer"}]}
+        )
         agent.cognitive_engine.check_goal_alignment = AsyncMock(
             return_value="MISALIGNED: the work doesn't align with goals"
         )
@@ -283,7 +288,9 @@ class TestFullCycle:
         agent.provider.get_all = AsyncMock(return_value=[])
         agent.provider.search = AsyncMock(return_value={"results": []})
         await agent._run_cycle()
-        assert agent.get_status()["cycle_count"] == 0  # cycle_count is incremented by _loop
+        assert (
+            agent.get_status()["cycle_count"] == 0
+        )  # cycle_count is incremented by _loop
 
     @pytest.mark.asyncio
     async def test_run_cycle_active(self):
@@ -315,12 +322,14 @@ class TestFullCycle:
 class TestConfigStoreIntegration:
     def test_autonomy_config_default(self, tmp_path):
         from memento.config_store import WorkspaceConfigStore
+
         store = WorkspaceConfigStore(str(tmp_path), str(tmp_path))
         store.load()
         assert store.autonomy["level"] == "off"
 
     def test_autonomy_config_save_load(self, tmp_path):
         from memento.config_store import WorkspaceConfigStore
+
         store = WorkspaceConfigStore(str(tmp_path), str(tmp_path))
         store.load()
         store.autonomy["level"] = "active"
@@ -333,6 +342,7 @@ class TestConfigStoreIntegration:
     def test_autonomy_config_rejects_invalid(self, tmp_path):
         from memento.config_store import WorkspaceConfigStore
         import json
+
         settings = tmp_path / "settings.json"
         settings.write_text(json.dumps({"autonomy": {"level": "invalid_value"}}))
         store = WorkspaceConfigStore(str(tmp_path), str(tmp_path))

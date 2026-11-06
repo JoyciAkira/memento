@@ -1,7 +1,5 @@
-import os
 from pathlib import Path
 
-import pytest
 
 from memento.git_context import (
     build_auto_context,

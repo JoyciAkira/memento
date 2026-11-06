@@ -65,11 +65,11 @@ async def scan_workspace_for_imports(workspace_root: str | Path) -> Dict[str, Se
         return {}
 
     results = await asyncio.gather(*tasks)
-    
+
     # map import_name -> set of file paths
     import_locations = {}
     stdlib_modules = set(sys.stdlib_module_names)
-    
+
     for filepath, imports in results:
         for imp in imports:
             if imp not in stdlib_modules:
@@ -78,6 +78,52 @@ async def scan_workspace_for_imports(workspace_root: str | Path) -> Dict[str, Se
                 import_locations[imp].add(str(filepath.relative_to(root_path)))
 
     return import_locations
+
+
+def _parse_pyproject_dependencies_fallback(content: str) -> list[str]:
+    """Parse the dependencies array without a TOML parser.
+
+    A non-greedy regex stops at the first ``]``, which breaks requirements
+    such as ``pydantic[email]``. Scan the array instead and ignore brackets
+    inside quoted strings.
+    """
+    match = re.search(r"(?m)^\s*dependencies\s*=\s*\[", content)
+    if not match:
+        return []
+
+    dependencies: list[str] = []
+    current: list[str] = []
+    quote: str | None = None
+    escaped = False
+    index = match.end()
+
+    while index < len(content):
+        char = content[index]
+        if quote is not None:
+            if escaped:
+                current.append(char)
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == quote:
+                dependencies.append("".join(current))
+                current = []
+                quote = None
+            else:
+                current.append(char)
+        elif char in "\"'":
+            quote = char
+            current = []
+        elif char == "#":
+            newline = content.find("\n", index)
+            if newline == -1:
+                break
+            index = newline
+        elif char == "]":
+            break
+        index += 1
+
+    return dependencies
 
 
 def parse_pyproject_dependencies(filepath: str | Path) -> Set[str]:
@@ -99,15 +145,7 @@ def parse_pyproject_dependencies(filepath: str | Path) -> Set[str]:
         except Exception:
             deps = []
     else:
-        # Fallback to regex for basic [project] dependencies array
-        deps = []
-        # Find dependencies = [ ... ]
-        match = re.search(r"dependencies\s*=\s*\[(.*?)\]", content, re.DOTALL)
-        if match:
-            dep_block = match.group(1)
-            # Extract strings like "mem0ai", "watchdog>=4.0.0"
-            strings = re.findall(r'["\']([^"\']+)["\']', dep_block)
-            deps = strings
+        deps = _parse_pyproject_dependencies_fallback(content)
 
     # Strip version constraints to get base package name
     parsed_deps = set()
@@ -247,7 +285,9 @@ async def analyze_dependencies(
             local_modules.add(item.stem)
 
     filtered_imports = {
-        imp: files for imp, files in used_imports_dict.items() if imp not in local_modules
+        imp: files
+        for imp, files in used_imports_dict.items()
+        if imp not in local_modules
     }
 
     # Map to package names, preserving file locations

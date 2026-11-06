@@ -1,4 +1,3 @@
-import pytest
 from memento.llm_client import _is_retryable
 
 

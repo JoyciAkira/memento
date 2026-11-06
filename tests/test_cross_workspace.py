@@ -19,7 +19,9 @@ def _init_db(db_path: str) -> None:
     conn.close()
 
 
-def _insert_memory(db_path: str, memory_id: str, text: str, metadata: str = "{}") -> None:
+def _insert_memory(
+    db_path: str, memory_id: str, text: str, metadata: str = "{}"
+) -> None:
     conn = sqlite3.connect(db_path)
     conn.execute(
         "INSERT INTO memories (id, user_id, text, created_at, metadata) "
@@ -108,7 +110,9 @@ async def test_list_shared_outgoing(tmp_path):
     await mgr.share_memory("mem-010", "/target/ws", "/source/ws")
     await mgr.share_memory("mem-011", "/target/ws", "/source/ws")
 
-    outgoing = await mgr.list_shared_memories(direction="outgoing", workspace_path="/source/ws")
+    outgoing = await mgr.list_shared_memories(
+        direction="outgoing", workspace_path="/source/ws"
+    )
     assert len(outgoing) == 2
     assert all(o["source_workspace"] == "/source/ws" for o in outgoing)
 
@@ -123,7 +127,9 @@ async def test_list_shared_incoming(tmp_path):
     mgr = CrossWorkspaceManager(db_path=db_path)
     await mgr.share_memory("mem-020", "/my/workspace", "/other/workspace")
 
-    incoming = await mgr.list_shared_memories(direction="incoming", workspace_path="/my/workspace")
+    incoming = await mgr.list_shared_memories(
+        direction="incoming", workspace_path="/my/workspace"
+    )
     assert len(incoming) == 1
     assert incoming[0]["target_workspace"] == "/my/workspace"
     assert incoming[0]["source_workspace"] == "/other/workspace"

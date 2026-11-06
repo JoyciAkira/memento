@@ -51,4 +51,3 @@ async def test_auto_checkpoint_triggers_every_n_events_only(tmp_path, monkeypatc
         if getattr(ctx.provider, "_sync_db", None) is not None:
             ctx.provider._sync_db.close()
         _contexts.clear()
-

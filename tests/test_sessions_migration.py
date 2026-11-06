@@ -22,4 +22,3 @@ def test_sessions_tables_exist_after_migrations(tmp_path):
 
     assert "sessions" in tables
     assert "session_events" in tables
-

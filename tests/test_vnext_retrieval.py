@@ -51,7 +51,9 @@ async def test_vnext_pipeline_returns_traces_and_results():
         await p.add("alpha memory about testing", user_id="default")
         await p.add("beta memory about coding", user_id="default")
 
-        bundle = await p.search_vnext_bundle("alpha", user_id="default", limit=5, trace=True)
+        bundle = await p.search_vnext_bundle(
+            "alpha", user_id="default", limit=5, trace=True
+        )
         assert bundle["query"] == "alpha"
         assert len(bundle["results"]) >= 1
         assert any(t["lane"] == "fts" for t in bundle["traces"])
@@ -71,7 +73,9 @@ async def test_vnext_pipeline_no_trace():
 
         await p.add("hello world", user_id="default")
 
-        bundle = await p.search_vnext_bundle("hello", user_id="default", limit=5, trace=False)
+        bundle = await p.search_vnext_bundle(
+            "hello", user_id="default", limit=5, trace=False
+        )
         assert bundle["query"] == "hello"
         assert len(bundle["results"]) >= 1
         assert bundle["traces"] == []
@@ -89,7 +93,13 @@ async def test_vnext_pipeline_with_filters():
         await p.add("frontend memory", metadata={"module": "frontend"})
 
         bundle = await p.search_vnext_bundle(
-            "memory", user_id="default", limit=10, filters={"module": "backend"}, trace=True
+            "memory",
+            user_id="default",
+            limit=10,
+            filters={"module": "backend"},
+            trace=True,
         )
         assert len(bundle["results"]) >= 1
-        assert all("backend" in r["memory"] or r["memory"] == "" for r in bundle["results"])
+        assert all(
+            "backend" in r["memory"] or r["memory"] == "" for r in bundle["results"]
+        )

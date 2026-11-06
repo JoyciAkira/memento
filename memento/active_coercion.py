@@ -59,7 +59,9 @@ def _as_list_of_str(value: Any) -> list[str] | None:
     return out
 
 
-def normalize_hard_rules(raw_rules: Any, *, default_override_token: str = "memento-override") -> list[HardRule]:
+def normalize_hard_rules(
+    raw_rules: Any, *, default_override_token: str = "memento-override"
+) -> list[HardRule]:
     if raw_rules is None:
         return []
     if not isinstance(raw_rules, list):
@@ -136,6 +138,7 @@ def file_matches_globs(file_relpath: str, globs: Iterable[str]) -> bool:
 
 _ts_cache: dict[str, tuple[Any, Any]] = {}
 
+
 def _get_tree_sitter(language_name: str) -> tuple[Any, Any]:
     cached = _ts_cache.get(language_name)
     if cached is not None:
@@ -145,12 +148,15 @@ def _get_tree_sitter(language_name: str) -> tuple[Any, Any]:
 
     if language_name == "python":
         import tree_sitter_python as tspython
+
         lang = Language(tspython.language())
     elif language_name in {"javascript", "js"}:
         import tree_sitter_javascript as tsjavascript
+
         lang = Language(tsjavascript.language())
     elif language_name in {"typescript", "ts"}:
         import tree_sitter_typescript as tstypescript
+
         lang = Language(tstypescript.language_typescript())
     else:
         raise ValueError(f"Unsupported tree-sitter language: {language_name}")
@@ -197,6 +203,7 @@ def check_text_against_rules(
         column = None
         try:
             from tree_sitter import Query, QueryCursor
+
             parser, language = _get_tree_sitter(rule.language or "")
             tree = parser.parse(content.encode("utf-8", errors="replace"))
             query = Query(language, rule.query or "")

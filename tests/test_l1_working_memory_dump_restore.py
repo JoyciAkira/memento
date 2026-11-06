@@ -16,4 +16,3 @@ def test_l1_dump_roundtrip_restores_order_and_content():
     assert [r["id"] for r in restored] == ["a", "b"]
     assert restored[0]["content"] == "A"
     assert restored[0]["metadata"] == {"x": 1}
-

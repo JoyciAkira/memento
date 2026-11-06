@@ -82,6 +82,4 @@ async def memento_get_predictive_cache_stats(
         return [TextContent(type="text", text=f"Cache stats:\n{formatted}")]
     except Exception as e:
         logger.error(f"Error getting cache stats: {e}")
-        return [
-            TextContent(type="text", text=f"Error getting cache stats: {str(e)}")
-        ]
+        return [TextContent(type="text", text=f"Error getting cache stats: {str(e)}")]

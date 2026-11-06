@@ -1,4 +1,5 @@
 """Tests for enterprise lossless handoff + resume prompt rendering."""
+
 from memento.handoff_prompt import (
     render_handoff_prompt,
     _derive_blockers,
@@ -7,18 +8,23 @@ from memento.handoff_prompt import (
 
 
 def _snapshot(n_l1=25, n_events=20, with_error=True):
-    l1 = [{"id": f"m{i}", "content": f"working memory item number {i}"} for i in range(n_l1)]
+    l1 = [
+        {"id": f"m{i}", "content": f"working memory item number {i}"}
+        for i in range(n_l1)
+    ]
     events = []
     for i in range(n_events):
         err = (i == 3) and with_error
-        events.append({
-            "tool_name": f"tool_{i}",
-            "active_context": f"file_{i}.py",
-            "arguments_summary": f'{{"q": "query {i}"}}',
-            "result_summary": "ok result" if not err else "Error: something failed",
-            "is_error": err,
-            "created_at": f"2026-07-16T1{i%10}:00:00",
-        })
+        events.append(
+            {
+                "tool_name": f"tool_{i}",
+                "active_context": f"file_{i}.py",
+                "arguments_summary": f'{{"q": "query {i}"}}',
+                "result_summary": "ok result" if not err else "Error: something failed",
+                "is_error": err,
+                "created_at": f"2026-07-16T1{i%10}:00:00",
+            }
+        )
     return {
         "reason": "manual",
         "workspace_root": "/tmp/ws",
@@ -78,7 +84,7 @@ def test_next_steps_derived():
 def test_resume_command_is_lossless_flagged():
     snap = _snapshot()
     out = render_handoff_prompt(session_id="s1", snapshot=snap, lossless=True)
-    assert 'lossless=true' in out
+    assert "lossless=true" in out
     assert "zero context loss" in out.lower()
 
 

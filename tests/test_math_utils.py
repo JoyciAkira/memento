@@ -35,6 +35,7 @@ class TestCosineSimilarity:
 
     def test_high_dimensional(self):
         import random
+
         random.seed(42)
         v = [random.gauss(0, 1) for _ in range(1536)]
         assert cosine_similarity(v, v) == pytest.approx(1.0, abs=1e-6)

@@ -43,7 +43,11 @@ async def test_search_memory_applies_module_filter_from_active_context(monkeypat
 
         res = await ms.call_tool(
             "memento_search_memory",
-            {"query": "find stuff", "active_context": "backend/service.py", "workspace_root": ws},
+            {
+                "query": "find stuff",
+                "active_context": "backend/service.py",
+                "workspace_root": ws,
+            },
         )
         assert "Backend memory hit" in res[0].text
 
@@ -56,9 +60,14 @@ async def test_universal_router_focus_area_routes_and_passes_module_filter(monke
         ctx = get_workspace_context(ws)
 
         monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
+
         async def fake_parse(q):
-            return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
-            
+            return {
+                "action": "SEARCH",
+                "payload": {"query": "bug"},
+                "focus_area": "frontend",
+            }
+
         monkeypatch.setattr(
             ctx.cognitive_engine,
             "parse_natural_language_intent",
@@ -77,14 +86,18 @@ async def test_universal_router_focus_area_routes_and_passes_module_filter(monke
 
         monkeypatch.setattr(ctx.provider, "search", fake_search)
 
-        res = await ms.call_tool("memento", {"query": "cerca bug nel frontend", "workspace_root": ws})
+        res = await ms.call_tool(
+            "memento", {"query": "cerca bug nel frontend", "workspace_root": ws}
+        )
         text = res[0].text
         assert "Focus Context: frontend" in text
         assert "Found frontend bug" in text
 
 
 @pytest.mark.asyncio
-async def test_universal_router_level1_injection_uses_focus_area_as_context(monkeypatch):
+async def test_universal_router_level1_injection_uses_focus_area_as_context(
+    monkeypatch,
+):
     import memento.mcp_server as ms
 
     with tempfile.TemporaryDirectory() as ws:
@@ -94,7 +107,11 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(monk
         monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
 
         async def fake_parse_x(q):
-            return {"action": "SEARCH", "payload": {"query": "x"}, "focus_area": "frontend"}
+            return {
+                "action": "SEARCH",
+                "payload": {"query": "x"},
+                "focus_area": "frontend",
+            }
 
         monkeypatch.setattr(
             ctx.cognitive_engine,
@@ -113,11 +130,12 @@ async def test_universal_router_level1_injection_uses_focus_area_as_context(monk
             return "[ACTIVE GOALS]\n- G1\n\n"
 
         import memento.tools.core as mc
+
         monkeypatch.setattr(mc, "get_active_goals", fake_get_active_goals)
-        
+
         async def fake_search2(query, user_id=None, filters=None):
             return [{"memory": "hit"}]
-            
+
         monkeypatch.setattr(
             ctx.provider,
             "search",

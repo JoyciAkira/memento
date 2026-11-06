@@ -1,15 +1,15 @@
 def up(conn):
     """Initial schema: memories, embeddings, metadata, and goals tables."""
-    conn.execute('''
+    conn.execute("""
         CREATE VIRTUAL TABLE IF NOT EXISTS memories
         USING fts5(id UNINDEXED, user_id UNINDEXED, text, created_at UNINDEXED, metadata UNINDEXED);
-    ''')
-    conn.execute('''
+    """)
+    conn.execute("""
         CREATE TABLE IF NOT EXISTS memory_embeddings (
             id TEXT PRIMARY KEY,
             embedding TEXT
         );
-    ''')
+    """)
     conn.execute("""
         CREATE TABLE IF NOT EXISTS memory_meta (
             id TEXT PRIMARY KEY,

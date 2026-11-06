@@ -2,7 +2,6 @@
 
 import json
 import logging
-import os
 
 from mcp.types import Tool, TextContent
 from memento.registry import registry
@@ -17,16 +16,26 @@ logger = logging.getLogger("memento-mcp")
         inputSchema={"type": "object", "properties": {}},
     )
 )
-async def memento_system_health(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_system_health(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     from memento.quality_metrics import QualityMetrics
 
     kg_db_path = None
-    if hasattr(ctx, "provider") and hasattr(ctx.provider, "kg") and hasattr(ctx.provider.kg, "kg"):
+    if (
+        hasattr(ctx, "provider")
+        and hasattr(ctx.provider, "kg")
+        and hasattr(ctx.provider.kg, "kg")
+    ):
         kg_db_path = ctx.provider.kg.kg.db_path
 
     metrics = QualityMetrics(db_path=ctx.db_path, kg_db_path=kg_db_path)
     report = await metrics.system_health()
-    return [TextContent(type="text", text=f"System Health Report:\n{json.dumps(report, indent=2)}")]
+    return [
+        TextContent(
+            type="text", text=f"System Health Report:\n{json.dumps(report, indent=2)}"
+        )
+    ]
 
 
 @registry.register(
@@ -36,11 +45,16 @@ async def memento_system_health(arguments: dict, ctx, access_manager) -> list[Te
         inputSchema={"type": "object", "properties": {}},
     )
 )
-async def memento_memory_stats(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_memory_stats(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     from memento.quality_metrics import QualityMetrics
+
     metrics = QualityMetrics(db_path=ctx.db_path)
     stats = await metrics.memory_stats()
-    return [TextContent(type="text", text=f"Memory stats:\n{json.dumps(stats, indent=2)}")]
+    return [
+        TextContent(type="text", text=f"Memory stats:\n{json.dumps(stats, indent=2)}")
+    ]
 
 
 @registry.register(
@@ -54,12 +68,18 @@ async def memento_kg_health(arguments: dict, ctx, access_manager) -> list[TextCo
     from memento.quality_metrics import QualityMetrics
 
     kg_db_path = None
-    if hasattr(ctx, "provider") and hasattr(ctx.provider, "kg") and hasattr(ctx.provider.kg, "kg"):
+    if (
+        hasattr(ctx, "provider")
+        and hasattr(ctx.provider, "kg")
+        and hasattr(ctx.provider.kg, "kg")
+    ):
         kg_db_path = ctx.provider.kg.kg.db_path
 
     metrics = QualityMetrics(db_path=ctx.db_path, kg_db_path=kg_db_path)
     health = await metrics.kg_health()
-    return [TextContent(type="text", text=f"KG health:\n{json.dumps(health, indent=2)}")]
+    return [
+        TextContent(type="text", text=f"KG health:\n{json.dumps(health, indent=2)}")
+    ]
 
 
 @registry.register(

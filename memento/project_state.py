@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from typing import Any
 
@@ -43,7 +42,11 @@ class ProjectStateStore:
     async def set(self, key: str, value: Any, metadata: dict | None = None) -> None:
         await self._ensure_table()
         now = datetime.now().isoformat()
-        value_str = json.dumps(value, ensure_ascii=False) if not isinstance(value, str) else value
+        value_str = (
+            json.dumps(value, ensure_ascii=False)
+            if not isinstance(value, str)
+            else value
+        )
         meta_str = json.dumps(metadata or {}, ensure_ascii=False)
         async with aiosqlite.connect(self.db_path) as db:
             await db.execute(
@@ -57,9 +60,7 @@ class ProjectStateStore:
     async def delete(self, key: str) -> bool:
         await self._ensure_table()
         async with aiosqlite.connect(self.db_path) as db:
-            cursor = await db.execute(
-                "DELETE FROM project_state WHERE key = ?", (key,)
-            )
+            cursor = await db.execute("DELETE FROM project_state WHERE key = ?", (key,))
             await db.commit()
             return cursor.rowcount > 0
 

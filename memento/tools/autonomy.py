@@ -16,25 +16,29 @@ _LEVEL_HELP = (
 )
 
 
-@registry.register(Tool(
-    name="memento_set_autonomy",
-    description=(
-        f"[DEPRECATED] Set the autonomous agent level. Levels: {_LEVEL_HELP}. "
-        "The autonomous agent runs a background cognitive loop that observes, reasons, and acts proactively."
-    ),
-    inputSchema={
-        "type": "object",
-        "properties": {
-            "level": {
-                "type": "string",
-                "enum": ["off", "passive", "active", "autonomous"],
-                "description": "Autonomy level to set.",
-            }
+@registry.register(
+    Tool(
+        name="memento_set_autonomy",
+        description=(
+            f"[DEPRECATED] Set the autonomous agent level. Levels: {_LEVEL_HELP}. "
+            "The autonomous agent runs a background cognitive loop that observes, reasons, and acts proactively."
+        ),
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "level": {
+                    "type": "string",
+                    "enum": ["off", "passive", "active", "autonomous"],
+                    "description": "Autonomy level to set.",
+                }
+            },
+            "required": ["level"],
         },
-        "required": ["level"],
-    },
-))
-async def memento_set_autonomy(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    )
+)
+async def memento_set_autonomy(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     level = arguments.get("level")
     if not level:
         raise ValueError("The 'level' parameter is required.")
@@ -44,7 +48,9 @@ async def memento_set_autonomy(arguments: dict, ctx, access_manager) -> list[Tex
     try:
         autonomy_level = AutonomyLevel(level)
     except ValueError:
-        raise ValueError(f"Invalid level '{level}'. Must be one of: off, passive, active, autonomous")
+        raise ValueError(
+            f"Invalid level '{level}'. Must be one of: off, passive, active, autonomous"
+        )
 
     was_running = ctx.autonomous_agent.is_running
     if was_running:
@@ -76,15 +82,19 @@ async def memento_set_autonomy(arguments: dict, ctx, access_manager) -> list[Tex
     return [TextContent(type="text", text="\n".join(status_parts))]
 
 
-@registry.register(Tool(
-    name="memento_autonomy_status",
-    description=(
-        "[DEPRECATED] Get detailed status of the autonomous agent: current level, cycle count, "
-        "recent decisions, actions taken, and error count."
-    ),
-    inputSchema={"type": "object", "properties": {}},
-))
-async def memento_autonomy_status(arguments: dict, ctx, access_manager) -> list[TextContent]:
+@registry.register(
+    Tool(
+        name="memento_autonomy_status",
+        description=(
+            "[DEPRECATED] Get detailed status of the autonomous agent: current level, cycle count, "
+            "recent decisions, actions taken, and error count."
+        ),
+        inputSchema={"type": "object", "properties": {}},
+    )
+)
+async def memento_autonomy_status(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     status = ctx.autonomous_agent.get_status()
     lines = [
         "Autonomous Agent Status",
@@ -111,22 +121,30 @@ async def memento_autonomy_status(arguments: dict, ctx, access_manager) -> list[
     return [TextContent(type="text", text="\n".join(lines))]
 
 
-@registry.register(Tool(
-    name="memento_autonomy_decisions",
-    description="[DEPRECATED] Get the full decision log of the autonomous agent for auditing.",
-    inputSchema={
-        "type": "object",
-        "properties": {
-            "limit": {
-                "type": "integer",
-                "description": "Max number of decisions to return (default 50).",
-            }
+@registry.register(
+    Tool(
+        name="memento_autonomy_decisions",
+        description="[DEPRECATED] Get the full decision log of the autonomous agent for auditing.",
+        inputSchema={
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer",
+                    "description": "Max number of decisions to return (default 50).",
+                }
+            },
         },
-    },
-))
-async def memento_autonomy_decisions(arguments: dict, ctx, access_manager) -> list[TextContent]:
+    )
+)
+async def memento_autonomy_decisions(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     limit = arguments.get("limit", 50)
     decisions = ctx.autonomous_agent.get_decision_log(limit=limit)
     if not decisions:
         return [TextContent(type="text", text="No autonomous decisions recorded yet.")]
-    return [TextContent(type="text", text=json.dumps(decisions, indent=2, ensure_ascii=False))]
+    return [
+        TextContent(
+            type="text", text=json.dumps(decisions, indent=2, ensure_ascii=False)
+        )
+    ]

@@ -30,7 +30,9 @@ logger = logging.getLogger("memento-mcp")
         },
     )
 )
-async def memento_share_memory_to_workspace(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_share_memory_to_workspace(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_write():
         raise PermissionError(
             f"Cannot share memory. Current access state is: {access_manager.state}"
@@ -66,7 +68,9 @@ async def memento_share_memory_to_workspace(arguments: dict, ctx, access_manager
         },
     )
 )
-async def memento_get_cross_workspace_stats(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_get_cross_workspace_stats(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
         raise PermissionError(
             f"Cannot read stats. Current access state is: {access_manager.state}"

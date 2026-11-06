@@ -7,7 +7,11 @@ from memento.registry import ToolRegistry
 class TestRegistry:
     def test_register_adds_tool(self):
         reg = ToolRegistry()
-        tool = Tool(name="test_tool", description="A test tool", inputSchema={"type": "object", "properties": {}})
+        tool = Tool(
+            name="test_tool",
+            description="A test tool",
+            inputSchema={"type": "object", "properties": {}},
+        )
 
         @reg.register(tool)
         async def handler(args, ctx, access_manager):
@@ -24,11 +28,25 @@ class TestRegistry:
     def test_get_tools_returns_all(self):
         reg = ToolRegistry()
 
-        @reg.register(Tool(name="tool_a", description="A", inputSchema={"type": "object", "properties": {}}))
-        async def a(args, ctx, access_manager): pass
+        @reg.register(
+            Tool(
+                name="tool_a",
+                description="A",
+                inputSchema={"type": "object", "properties": {}},
+            )
+        )
+        async def a(args, ctx, access_manager):
+            pass
 
-        @reg.register(Tool(name="tool_b", description="B", inputSchema={"type": "object", "properties": {}}))
-        async def b(args, ctx, access_manager): pass
+        @reg.register(
+            Tool(
+                name="tool_b",
+                description="B",
+                inputSchema={"type": "object", "properties": {}},
+            )
+        )
+        async def b(args, ctx, access_manager):
+            pass
 
         names = [t.name for t in reg.get_tools()]
         assert "tool_a" in names

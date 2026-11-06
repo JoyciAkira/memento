@@ -7,12 +7,14 @@ from memento.memory.hdc import HDCEncoder
 
 logger = logging.getLogger(__name__)
 
+
 class VSAIndex:
     """
     Maintains a VSA index over stored memories for O(1) relational queries.
     Indexes memories by extracting entities and binding them into hypervectors.
     Persists hypervectors to SQLite so they survive process restarts.
     """
+
     def __init__(self, db_path: str, hdc: Optional[HDCEncoder] = None):
         self.db_path = db_path
         self.hdc = hdc or HDCEncoder()
@@ -39,7 +41,9 @@ class VSAIndex:
                 break
         return entities
 
-    def index_memory(self, memory_id: str, text: str, metadata: Optional[Dict[str, Any]] = None) -> None:
+    def index_memory(
+        self, memory_id: str, text: str, metadata: Optional[Dict[str, Any]] = None
+    ) -> None:
         entities = self.extract_entities(text)
         self._entity_cache[memory_id] = entities
 
@@ -81,7 +85,9 @@ class VSAIndex:
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_vsa_entities_text ON _vsa_entities(memory_id)")
+        conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_vsa_entities_text ON _vsa_entities(memory_id)"
+        )
 
     def _persist_memory(
         self,
@@ -96,11 +102,15 @@ class VSAIndex:
             self._ensure_tables(conn)
             conn.execute(
                 "INSERT OR REPLACE INTO _vsa_entities (memory_id, text, entities) VALUES (?, ?, ?)",
-                (memory_id, text, json.dumps(entities))
+                (memory_id, text, json.dumps(entities)),
             )
             conn.execute(
                 "INSERT OR REPLACE INTO _vsa_vectors (memory_id, hypervector, metadata, updated_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)",
-                (memory_id, sqlite3.Binary(self.hdc.to_bytes(hv)), json.dumps(metadata)),
+                (
+                    memory_id,
+                    sqlite3.Binary(self.hdc.to_bytes(hv)),
+                    json.dumps(metadata),
+                ),
             )
             conn.commit()
             conn.close()
@@ -126,7 +136,9 @@ class VSAIndex:
                 if hv_blob:
                     self._vector_cache[memory_id] = self.hdc.from_bytes(hv_blob)
                 else:
-                    self._vector_cache[memory_id] = self.hdc.encode_text(text or "", entities)
+                    self._vector_cache[memory_id] = self.hdc.encode_text(
+                        text or "", entities
+                    )
 
             logger.info(f"Loaded {len(self._entity_cache)} VSA entries from DB")
         except Exception as e:
@@ -148,17 +160,28 @@ class VSAIndex:
             ids = list(self._vector_cache.keys())
             token = len(ids)
             # Rebuild the packed byte matrix only when cache membership changed.
-            if self._matrix is None or self._matrix_token != token or self._matrix_ids != ids:
+            if (
+                self._matrix is None
+                or self._matrix_token != token
+                or self._matrix_ids != ids
+            ):
                 if not ids:
                     return []
-                self._matrix = np.stack([
-                    np.frombuffer(int(self._vector_cache[i]).to_bytes(nbytes, "little"), dtype=np.uint8)
-                    for i in ids
-                ])
+                self._matrix = np.stack(
+                    [
+                        np.frombuffer(
+                            int(self._vector_cache[i]).to_bytes(nbytes, "little"),
+                            dtype=np.uint8,
+                        )
+                        for i in ids
+                    ]
+                )
                 self._matrix_ids = ids
                 self._matrix_token = token
                 if self._popcount is None:
-                    self._popcount = np.array([bin(b).count("1") for b in range(256)], dtype=np.uint16)
+                    self._popcount = np.array(
+                        [bin(b).count("1") for b in range(256)], dtype=np.uint16
+                    )
             qbytes = np.frombuffer(int(qv).to_bytes(nbytes, "little"), dtype=np.uint8)
             # Exact Hamming over all rows: popcount of XOR, then similarity.
             # (An approximate bit-sampling LSH prefilter was evaluated and
@@ -176,7 +199,10 @@ class VSAIndex:
             # A real bug in the matrix/LSH path. Surface it loudly (so tests and
             # operators see it) but still fall back to the scalar scan so a
             # production query never hard-fails.
-            logger.warning("Vectorized VSA similarity failed; falling back to scalar", exc_info=True)
+            logger.warning(
+                "Vectorized VSA similarity failed; falling back to scalar",
+                exc_info=True,
+            )
             return None
 
     def query(self, query: str, top_k: int = 10) -> List[tuple[str, float]]:
@@ -203,7 +229,12 @@ class VSAIndex:
                     scored.append((mem_id, 0.7 * hv_score + 0.3 * overlap))
             else:
                 scored = [
-                    (mem_id, self._score(qv, hv, entities, self._entity_cache.get(mem_id, [])))
+                    (
+                        mem_id,
+                        self._score(
+                            qv, hv, entities, self._entity_cache.get(mem_id, [])
+                        ),
+                    )
                     for mem_id, hv in self._vector_cache.items()
                 ]
             scored.sort(key=lambda x: x[1], reverse=True)
@@ -212,13 +243,19 @@ class VSAIndex:
             logger.warning(f"VSA query failed: {e}")
             return []
 
-    def query_relation(self, subject: str, obj: str, predicate: str = "relates_to") -> List[str]:
+    def query_relation(
+        self, subject: str, obj: str, predicate: str = "relates_to"
+    ) -> List[str]:
         try:
             _rel_hv = self.hdc.encode_relation(subject, predicate, obj)
             candidates = set()
             for mem_id, entities in self._entity_cache.items():
                 for e in entities:
-                    if e in (subject.lower(), obj.lower()) or subject.lower() in e or obj.lower() in e:
+                    if (
+                        e in (subject.lower(), obj.lower())
+                        or subject.lower() in e
+                        or obj.lower() in e
+                    ):
                         candidates.add(mem_id)
             return list(candidates)
         except Exception as e:
@@ -255,7 +292,9 @@ class VSAIndex:
             if value:
                 vectors.append(self.hdc.encode_relation(str(key), "equals", str(value)))
         for i in range(max(0, len(entities) - 1)):
-            vectors.append(self.hdc.encode_relation(entities[i], "near", entities[i + 1]))
+            vectors.append(
+                self.hdc.encode_relation(entities[i], "near", entities[i + 1])
+            )
         return vectors[:32]
 
     def get_index_stats(self) -> Dict[str, Any]:

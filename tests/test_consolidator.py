@@ -1,14 +1,14 @@
 import pytest
 import asyncio
-from memento.memory.consolidator import LLMPredictor, CognitiveConsolidator, ConsolidationResult
-from memento.memory.orchestrator import MemoryOrchestrator
+from memento.memory.consolidator import LLMPredictor, CognitiveConsolidator
 from memento.memory.active_inference import Prediction
 from memento.migrations.runner import MigrationRunner
 from memento.migrations.versions import get_all_migrations
 
+
 @pytest.fixture
 def initialized_orch(tmp_path):
-    import sqlite3, os
+    import sqlite3
     from memento.memory.orchestrator import MemoryOrchestrator
 
     db_path = str(tmp_path / "consolidate.db")
@@ -42,7 +42,9 @@ def test_llm_predictor_fallback_on_no_client():
 async def test_consolidator_with_streaming_queue(initialized_orch):
     consolidator = CognitiveConsolidator(initialized_orch)
 
-    await consolidator.enqueue_event("python is great", actual_outcome="python is great")
+    await consolidator.enqueue_event(
+        "python is great", actual_outcome="python is great"
+    )
     await consolidator.enqueue_event("build succeeds", actual_outcome="build fails")
 
     stats_before = consolidator.get_consolidation_stats()

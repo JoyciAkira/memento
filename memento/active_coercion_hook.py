@@ -1,9 +1,12 @@
 import json
+import logging
 import os
 import subprocess
 import sys
 
 from memento.active_coercion import check_text_against_rules, normalize_hard_rules
+
+logger = logging.getLogger(__name__)
 
 
 def run_pre_commit(repo_root: str) -> int:
@@ -23,7 +26,9 @@ def run_pre_commit(repo_root: str) -> int:
     if not enabled:
         return 0
 
-    rules = normalize_hard_rules(active.get("rules", []) if isinstance(active, dict) else [])
+    rules = normalize_hard_rules(
+        active.get("rules", []) if isinstance(active, dict) else []
+    )
     if not rules:
         return 0
 
@@ -98,20 +103,26 @@ def run_pre_commit(repo_root: str) -> int:
         sys.stderr.write("\nMemento Active Coercion warnings:\n")
         for v in warn_violations:
             loc = f":{v.line}:{v.column}" if v.line and v.column else ""
-            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n")
+            sys.stderr.write(
+                f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n"
+            )
 
     if block_violations:
         sys.stderr.write("\nMemento Active Coercion BLOCKED commit:\n")
         for v in block_violations:
             loc = f":{v.line}:{v.column}" if v.line and v.column else ""
-            sys.stderr.write(f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n")
+            sys.stderr.write(
+                f"- {v.rule_id}: {os.path.relpath(v.file, repo_root)}{loc}: {v.message}\n"
+            )
         return 1
 
     return 0
 
 
 def main() -> None:
-    repo_root = subprocess.check_output(["git", "rev-parse", "--show-toplevel"], text=True).strip()
+    repo_root = subprocess.check_output(
+        ["git", "rev-parse", "--show-toplevel"], text=True
+    ).strip()
     raise SystemExit(run_pre_commit(repo_root))
 
 

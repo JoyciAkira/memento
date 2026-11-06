@@ -72,6 +72,23 @@ dependencies = [
     assert "watchdog" in deps
 
 
+def test_parse_pyproject_dependencies_fallback_handles_extras(tmp_path, monkeypatch):
+    import memento.dependency_tracker as tracker
+
+    monkeypatch.setattr(tracker, "tomllib", None)
+    pyproject_content = """
+[project]
+name = "test-project"
+dependencies = ["pytest>=7.0", "pydantic[email]", "watchdog==4.0.0"]
+"""
+    pyproject_file = tmp_path / "pyproject.toml"
+    pyproject_file.write_text(pyproject_content)
+
+    deps = tracker.parse_pyproject_dependencies(pyproject_file)
+
+    assert {"pytest", "pydantic", "watchdog"} <= deps
+
+
 def test_map_import_to_package():
     # standard mapping
     assert map_import_to_package("pytest") == "pytest"
@@ -180,7 +197,15 @@ require github.com/google/uuid v1.3.0
 
 
 def test_parse_missing_files_returns_empty(tmp_path):
-    assert parse_pyproject_dependencies(tmp_path / "nonexistent" / "pyproject.toml") == set()
-    assert parse_package_json_dependencies(tmp_path / "nonexistent" / "package.json") == set()
-    assert parse_cargo_toml_dependencies(tmp_path / "nonexistent" / "Cargo.toml") == set()
+    assert (
+        parse_pyproject_dependencies(tmp_path / "nonexistent" / "pyproject.toml")
+        == set()
+    )
+    assert (
+        parse_package_json_dependencies(tmp_path / "nonexistent" / "package.json")
+        == set()
+    )
+    assert (
+        parse_cargo_toml_dependencies(tmp_path / "nonexistent" / "Cargo.toml") == set()
+    )
     assert parse_go_mod_dependencies(tmp_path / "nonexistent" / "go.mod") == set()

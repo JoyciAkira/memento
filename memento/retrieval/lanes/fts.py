@@ -8,7 +8,9 @@ import aiosqlite
 
 def build_fts_query(query: str) -> str:
     terms = re.findall(r"[A-Za-z0-9_]{3,}", query or "")
-    fts_query = " OR ".join([f"{t}*" for t in terms]) if terms else (query or "").strip()
+    fts_query = (
+        " OR ".join([f"{t}*" for t in terms]) if terms else (query or "").strip()
+    )
     return fts_query or "*"
 
 

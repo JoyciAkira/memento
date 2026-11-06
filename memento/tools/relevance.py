@@ -17,15 +17,23 @@ logger = logging.getLogger("memento-mcp")
         inputSchema={"type": "object", "properties": {}},
     )
 )
-async def memento_get_relevance_stats(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_get_relevance_stats(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
-        raise PermissionError(f"Cannot read stats. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot read stats. Current access state is: {access_manager.state}"
+        )
 
     from memento.relevance import RelevanceTracker
 
     tracker = RelevanceTracker(db_path=ctx.db_path)
     stats = await tracker.get_stats()
-    return [TextContent(type="text", text=f"Relevance stats:\n{json.dumps(stats, indent=2)}")]
+    return [
+        TextContent(
+            type="text", text=f"Relevance stats:\n{json.dumps(stats, indent=2)}"
+        )
+    ]
 
 
 @registry.register(
@@ -45,13 +53,19 @@ async def memento_get_relevance_stats(arguments: dict, ctx, access_manager) -> l
         },
     )
 )
-async def memento_record_memory_hit(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_record_memory_hit(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_write():
-        raise PermissionError(f"Cannot record hits. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot record hits. Current access state is: {access_manager.state}"
+        )
 
     from memento.relevance import RelevanceTracker
 
     memory_ids = arguments.get("memory_ids", [])
     tracker = RelevanceTracker(db_path=ctx.db_path)
     await tracker.record_hits(memory_ids)
-    return [TextContent(type="text", text=f"Recorded hits for {len(memory_ids)} memories.")]
+    return [
+        TextContent(type="text", text=f"Recorded hits for {len(memory_ids)} memories.")
+    ]

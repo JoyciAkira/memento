@@ -15,7 +15,9 @@ SearchFn = Callable[[str], Awaitable[list[dict[str, Any]]]]
 class EvalResult:
     __slots__ = ("case", "retrieved_ids", "metrics")
 
-    def __init__(self, case: EvalCase, retrieved_ids: list[str], metrics: dict[str, float]):
+    def __init__(
+        self, case: EvalCase, retrieved_ids: list[str], metrics: dict[str, float]
+    ):
         self.case = case
         self.retrieved_ids = retrieved_ids
         self.metrics = metrics
@@ -42,7 +44,9 @@ class EvalRun:
                 "mrr": mrr(retrieved_ids, case.expected_ids),
                 f"ndcg@{k}": ndcg_at_k(retrieved_ids, case.expected_ids, k),
             }
-            self.results.append(EvalResult(case=case, retrieved_ids=retrieved_ids, metrics=metrics))
+            self.results.append(
+                EvalResult(case=case, retrieved_ids=retrieved_ids, metrics=metrics)
+            )
         self.ended_at = datetime.now().isoformat()
         self._compute_summary()
 

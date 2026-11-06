@@ -1,8 +1,8 @@
 """Tests for enterprise DB corruption detection + self-heal (memento.db_guard)."""
+
 import os
 import sqlite3
 
-import pytest
 
 from memento.db_guard import is_corrupted, backup_corrupted, ensure_healthy_db
 
@@ -28,7 +28,9 @@ def test_valid_db_not_corrupted(tmp_path):
 def test_garbage_file_is_corrupted(tmp_path):
     p = str(tmp_path / "bad.db")
     with open(p, "wb") as f:
-        f.write(b"\xef\xbf\xbd" * 500)  # U+FFFD repeated — classic text-decode corruption
+        f.write(
+            b"\xef\xbf\xbd" * 500
+        )  # U+FFFD repeated — classic text-decode corruption
     assert is_corrupted(p) is True
 
 

@@ -2,6 +2,7 @@ import pytest
 import os
 import tempfile
 
+
 @pytest.mark.asyncio
 async def test_reflected_search_integration():
     from memento.provider import NeuroGraphProvider

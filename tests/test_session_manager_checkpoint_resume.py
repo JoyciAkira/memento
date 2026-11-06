@@ -22,7 +22,9 @@ async def test_checkpoint_includes_goals_and_l1(tmp_path, monkeypatch):
 
     p = NeuroGraphProvider(db_path=db_path)
     try:
-        await p.set_goals(goals=["ship v1"], context=None, mode="replace", delete_reason="init")
+        await p.set_goals(
+            goals=["ship v1"], context=None, mode="replace", delete_reason="init"
+        )
         await p.initialize()
         p.orchestrator.l1.add("l1a", "hot context", {"k": "v"})
 

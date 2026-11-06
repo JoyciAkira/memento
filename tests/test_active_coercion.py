@@ -42,12 +42,14 @@ def test_rule_engine_match_and_override(tmp_path):
     )
     assert v2 == []
 
+
 def test_tree_sitter_rule_matches(tmp_path):
     try:
         import tree_sitter as _tree_sitter
         import tree_sitter_python as _tree_sitter_python
     except Exception:
         import pytest
+
         pytest.skip("tree-sitter dependencies not available")
     assert _tree_sitter and _tree_sitter_python
 
@@ -83,7 +85,9 @@ def test_pre_commit_hook_logic_blocks_commit_and_allows_override(tmp_path):
     repo_root.mkdir()
 
     subprocess.check_call(["git", "init"], cwd=repo_root)
-    subprocess.check_call(["git", "config", "user.email", "test@example.com"], cwd=repo_root)
+    subprocess.check_call(
+        ["git", "config", "user.email", "test@example.com"], cwd=repo_root
+    )
     subprocess.check_call(["git", "config", "user.name", "Test"], cwd=repo_root)
 
     memento_dir = repo_root / "memento"

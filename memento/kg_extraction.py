@@ -17,7 +17,9 @@ class KGExtractionEngine:
     MAX_CHARS_PER_MEMORY = 500
     DEFAULT_CONFIDENCE = 0.7
 
-    def __init__(self, db_path: str, kg, llm_client=None, model: str = "openai/gpt-4o-mini"):
+    def __init__(
+        self, db_path: str, kg, llm_client=None, model: str = "openai/gpt-4o-mini"
+    ):
         self.db_path = db_path
         self.kg = kg
         self.llm_client = llm_client
@@ -56,7 +58,7 @@ class KGExtractionEngine:
         text = raw.strip()
         if text.startswith("```"):
             lines = text.split("\n")
-            lines = [l for l in lines if not l.strip().startswith("```")]
+            lines = [line for line in lines if not line.strip().startswith("```")]
             text = "\n".join(lines)
         try:
             data = json.loads(text)
@@ -151,13 +153,22 @@ class KGExtractionEngine:
 
     async def run_extraction_cycle(self, max_memories: int = 50) -> Dict[str, Any]:
         if not self.llm_client:
-            return {"processed": 0, "entities": 0, "triples": 0, "batches": 0, "error": "LLM not configured"}
+            return {
+                "processed": 0,
+                "entities": 0,
+                "triples": 0,
+                "batches": 0,
+                "error": "LLM not configured",
+            }
 
         memories = await self.get_unprocessed_memories(limit=max_memories)
         if not memories:
             return {"processed": 0, "entities": 0, "triples": 0, "batches": 0}
 
-        chunks = [memories[i : i + self.BATCH_SIZE] for i in range(0, len(memories), self.BATCH_SIZE)]
+        chunks = [
+            memories[i : i + self.BATCH_SIZE]
+            for i in range(0, len(memories), self.BATCH_SIZE)
+        ]
 
         total_entities = 0
         total_triples = 0

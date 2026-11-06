@@ -34,7 +34,9 @@ logger = logging.getLogger("memento-mcp")
         },
     )
 )
-async def memento_configure_notifications(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_configure_notifications(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     from memento.notifications import NotificationManager
 
     manager = NotificationManager(db_path=ctx.db_path)
@@ -48,7 +50,12 @@ async def memento_configure_notifications(arguments: dict, ctx, access_manager) 
         topics=topics,
         min_confidence=min_confidence,
     )
-    return [TextContent(type="text", text=f"Notification config updated:\n{json.dumps(config, indent=2)}")]
+    return [
+        TextContent(
+            type="text",
+            text=f"Notification config updated:\n{json.dumps(config, indent=2)}",
+        )
+    ]
 
 
 @registry.register(
@@ -101,12 +108,21 @@ async def handler(arguments: dict, ctx, access_manager) -> list[TextContent]:
         },
     )
 )
-async def memento_dismiss_notification(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_dismiss_notification(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     from memento.notifications import NotificationManager
 
     manager = NotificationManager(db_path=ctx.db_path)
     notification_id = arguments["notification_id"]
     dismissed = manager.dismiss(notification_id)
     if dismissed:
-        return [TextContent(type="text", text=f"Notification {notification_id} dismissed.")]
-    return [TextContent(type="text", text=f"Notification {notification_id} not found or already dismissed.")]
+        return [
+            TextContent(type="text", text=f"Notification {notification_id} dismissed.")
+        ]
+    return [
+        TextContent(
+            type="text",
+            text=f"Notification {notification_id} not found or already dismissed.",
+        )
+    ]

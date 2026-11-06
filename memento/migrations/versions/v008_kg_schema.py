@@ -34,5 +34,9 @@ def up(conn):
     """)
     conn.execute("CREATE INDEX IF NOT EXISTS idx_triples_subject ON triples(subject)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_triples_object ON triples(object)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate)")
-    conn.execute("CREATE INDEX IF NOT EXISTS idx_triples_valid ON triples(valid_from, valid_to)")
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_triples_predicate ON triples(predicate)"
+    )
+    conn.execute(
+        "CREATE INDEX IF NOT EXISTS idx_triples_valid ON triples(valid_from, valid_to)"
+    )

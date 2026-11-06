@@ -7,15 +7,18 @@ from urllib.parse import urlparse, parse_qs
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Any
 
+from memento.settings import settings
+
 # We will inject these from mcp_server.py
 shared_state: dict[str, Any] = {
     "enforcement_config": {},
     "active_coercion": {},
     "get_active_goals": None,
-    "provider": None
+    "provider": None,
 }
 
 _loop: asyncio.AbstractEventLoop | None = None
+
 
 def _run_async(coro):
     global _loop
@@ -23,6 +26,7 @@ def _run_async(coro):
         _loop = asyncio.new_event_loop()
         asyncio.set_event_loop(_loop)
     return _loop.run_until_complete(coro)
+
 
 def _safe_int(value: str | None, default: int) -> int:
     if not value:
@@ -32,6 +36,7 @@ def _safe_int(value: str | None, default: int) -> int:
     except Exception:
         return default
 
+
 def render_dashboard_html(
     *,
     enforcement_config: dict,
@@ -40,11 +45,21 @@ def render_dashboard_html(
     memories: list[dict],
     query: str,
 ) -> str:
-    config_json = html.escape(json.dumps(enforcement_config, indent=2, ensure_ascii=False))
+    config_json = html.escape(
+        json.dumps(enforcement_config, indent=2, ensure_ascii=False)
+    )
     goals_text = html.escape(goals) if goals else ""
-    coercion_enabled = bool(active_coercion.get("enabled")) if isinstance(active_coercion, dict) else False
-    coercion_rules = active_coercion.get("rules", []) if isinstance(active_coercion, dict) else []
-    coercion_rules_count = len(coercion_rules) if isinstance(coercion_rules, list) else 0
+    coercion_enabled = (
+        bool(active_coercion.get("enabled"))
+        if isinstance(active_coercion, dict)
+        else False
+    )
+    coercion_rules = (
+        active_coercion.get("rules", []) if isinstance(active_coercion, dict) else []
+    )
+    coercion_rules_count = (
+        len(coercion_rules) if isinstance(coercion_rules, list) else 0
+    )
     query_value = html.escape(query or "")
     memories_html = "".join(
         [
@@ -146,16 +161,18 @@ def render_dashboard_html(
             </html>
             """
 
+
 class MementoUIHandler(BaseHTTPRequestHandler):
     def _check_auth(self):
-        if not _UI_AUTH_TOKEN:
+        token = settings.ui_auth_token
+        if not token:
             return True
         auth = self.headers.get("Authorization", "")
-        if auth == f"Bearer {_UI_AUTH_TOKEN}":
+        if auth == f"Bearer {token}":
             return True
-        token = urlparse(self.path).query
-        qs = parse_qs(token)
-        if qs.get("token", [None])[0] == _UI_AUTH_TOKEN:
+        query_string = urlparse(self.path).query
+        qs = parse_qs(query_string)
+        if qs.get("token", [None])[0] == token:
             return True
         self.send_response(401)
         self.send_header("Content-type", "application/json")
@@ -209,26 +226,32 @@ class MementoUIHandler(BaseHTTPRequestHandler):
             if provider:
                 try:
                     if q:
-                        items = _run_async(provider.search(q, user_id="default", limit=limit))
+                        items = _run_async(
+                            provider.search(q, user_id="default", limit=limit)
+                        )
                     else:
-                        items = _run_async(provider.get_all(user_id="default", limit=limit))
+                        items = _run_async(
+                            provider.get_all(user_id="default", limit=limit)
+                        )
                 except Exception:
                     items = []
 
             self.send_response(200)
             self.send_header("Content-type", "application/json")
             self.end_headers()
-            self.wfile.write(json.dumps({"results": items}, ensure_ascii=False).encode("utf-8"))
+            self.wfile.write(
+                json.dumps({"results": items}, ensure_ascii=False).encode("utf-8")
+            )
             return
 
         if path == "/":
             self.send_response(200)
             self.send_header("Content-type", "text/html")
             self.end_headers()
-            
+
             config = shared_state.get("enforcement_config") or {}
             active = shared_state.get("active_coercion") or {}
-            
+
             goals = ""
             fn = shared_state.get("get_active_goals")
             if fn:
@@ -236,15 +259,19 @@ class MementoUIHandler(BaseHTTPRequestHandler):
                     goals = _run_async(fn(5))
                 except Exception:
                     goals = ""
-                
+
             memories: list[dict] = []
             provider = shared_state.get("provider")
             if provider:
                 try:
                     if q:
-                        memories = _run_async(provider.search(q, user_id="default", limit=50))
+                        memories = _run_async(
+                            provider.search(q, user_id="default", limit=50)
+                        )
                     else:
-                        memories = _run_async(provider.get_all(user_id="default", limit=20))
+                        memories = _run_async(
+                            provider.get_all(user_id="default", limit=20)
+                        )
                 except Exception:
                     pass
 
@@ -260,6 +287,7 @@ class MementoUIHandler(BaseHTTPRequestHandler):
             self.send_response(404)
             self.end_headers()
 
+
 def run_ui_server(port=8089):
     global _loop
     _loop = asyncio.new_event_loop()
@@ -268,18 +296,22 @@ def run_ui_server(port=8089):
         server = HTTPServer(("localhost", port), MementoUIHandler)
         server.serve_forever()
     except Exception as e:
-        logging.getLogger("memento-ui").error(f"Failed to start UI server on port {port}: {e}")
+        logging.getLogger("memento-ui").error(
+            f"Failed to start UI server on port {port}: {e}"
+        )
     finally:
         if _loop and not _loop.is_closed():
             _loop.close()
 
 
-def start_ui_server_thread(enforcement_config, get_active_goals_fn, provider, port=8089, active_coercion=None):
+def start_ui_server_thread(
+    enforcement_config, get_active_goals_fn, provider, port=8089, active_coercion=None
+):
     shared_state["enforcement_config"] = enforcement_config
     shared_state["active_coercion"] = active_coercion or {}
     shared_state["get_active_goals"] = get_active_goals_fn
     shared_state["provider"] = provider
-    
+
     thread = threading.Thread(target=run_ui_server, args=(port,), daemon=True)
     thread.start()
     return thread

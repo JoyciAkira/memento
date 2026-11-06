@@ -2,13 +2,13 @@ import asyncio
 import logging
 from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-from memento.memory.active_inference import ActiveInferenceEngine, Prediction, PredictionResult
+from memento.memory.active_inference import ActiveInferenceEngine, Prediction
 from memento.memory.orchestrator import MemoryOrchestrator
-from memento.llm_client import get_llm_client
 
 logger = logging.getLogger(__name__)
+
 
 @dataclass
 class ConsolidationResult:
@@ -19,11 +19,13 @@ class ConsolidationResult:
     prediction_error: float
     timestamp: str
 
+
 class LLMPredictor:
     """
     Uses an LLM to generate semantically meaningful predictions.
     Wraps the event in context and asks for likely outcomes.
     """
+
     PREDICTOR_PROMPT = (
         "You are a predictor. Given an event, predict the most likely outcome. "
         "Reply ONLY with a brief prediction (1 sentence). Be specific and concise.\n\n"
@@ -39,12 +41,19 @@ class LLMPredictor:
 
     async def predict(self, event: str) -> Prediction:
         if not self._llm:
-            return Prediction(content=event, expected_outcome=event.lower(), confidence=0.5)
+            return Prediction(
+                content=event, expected_outcome=event.lower(), confidence=0.5
+            )
 
         try:
             response = await self._llm.chat.completions.create(
                 model=self._model,
-                messages=[{"role": "user", "content": self.PREDICTOR_PROMPT.format(event=event)}],
+                messages=[
+                    {
+                        "role": "user",
+                        "content": self.PREDICTOR_PROMPT.format(event=event),
+                    }
+                ],
                 max_tokens=64,
                 temperature=0.3,
             )
@@ -52,7 +61,9 @@ class LLMPredictor:
             return Prediction(content=event, expected_outcome=expected, confidence=0.8)
         except Exception as e:
             logger.warning(f"LLM predictor failed: {e}, falling back to dummy")
-            return Prediction(content=event, expected_outcome=event.lower(), confidence=0.3)
+            return Prediction(
+                content=event, expected_outcome=event.lower(), confidence=0.3
+            )
 
 
 class CognitiveConsolidator:
@@ -64,6 +75,7 @@ class CognitiveConsolidator:
     evaluates prediction errors, and routes surprising events
     to the appropriate memory tier for long-term storage.
     """
+
     DEFAULT_PREDICTOR_PROMPT = (
         "Given this event: '{event}'. "
         "Predict the most likely outcome in one short sentence. "
@@ -74,7 +86,7 @@ class CognitiveConsolidator:
         self,
         orchestrator: MemoryOrchestrator,
         predictor_fn: Optional[Callable[[str], Prediction]] = None,
-        surprise_threshold: float = 0.5
+        surprise_threshold: float = 0.5,
     ):
         self._orchestrator = orchestrator
         self._engine = ActiveInferenceEngine(predictor_fn=predictor_fn)
@@ -95,7 +107,7 @@ class CognitiveConsolidator:
         self,
         event: str,
         actual_outcome: Optional[str] = None,
-        force_consolidate: bool = False
+        force_consolidate: bool = False,
     ) -> ConsolidationResult:
         """
         Full lifecycle: predict -> evaluate -> consolidate.
@@ -113,7 +125,7 @@ class CognitiveConsolidator:
                 tier="",
                 was_surprising=False,
                 prediction_error=0.0,
-                timestamp=datetime.now().isoformat()
+                timestamp=datetime.now().isoformat(),
             )
 
         result = await self._engine.evaluate(event, actual_outcome)
@@ -132,7 +144,7 @@ class CognitiveConsolidator:
                     "surprise": result.is_surprise,
                     "event": event,
                 },
-                tier=tier
+                tier=tier,
             )
 
         consolidation = ConsolidationResult(
@@ -141,14 +153,13 @@ class CognitiveConsolidator:
             tier=tier,
             was_surprising=result.is_surprise,
             prediction_error=result.prediction_error,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
         self._consolidation_log.append(consolidation)
         return consolidation
 
     async def batch_process(
-        self,
-        events: List[Dict[str, str]]
+        self, events: List[Dict[str, str]]
     ) -> List[ConsolidationResult]:
         """
         Process a batch of events. Each event dict should have:
@@ -160,7 +171,7 @@ class CognitiveConsolidator:
             result = await self.process_event(
                 event=item["event"],
                 actual_outcome=item.get("actual"),
-                force_consolidate=item.get("force", False)
+                force_consolidate=item.get("force", False),
             )
             results.append(result)
         return results
@@ -174,9 +185,7 @@ class CognitiveConsolidator:
         self._running = False
 
     async def enqueue_event(
-        self,
-        event: str,
-        actual_outcome: Optional[str] = None
+        self, event: str, actual_outcome: Optional[str] = None
     ) -> None:
         """Add an event to the processing queue."""
         await self._event_queue.put((event, actual_outcome))
@@ -210,5 +219,5 @@ class CognitiveConsolidator:
             "recent_events": [
                 {"content": c.content, "tier": c.tier, "surprise": c.was_surprising}
                 for c in self._consolidation_log[-10:]
-            ]
+            ],
         }

@@ -3,7 +3,9 @@ from __future__ import annotations
 from typing import Sequence
 
 
-def recall_at_k(retrieved_ids: Sequence[str], expected_ids: Sequence[str], k: int) -> float:
+def recall_at_k(
+    retrieved_ids: Sequence[str], expected_ids: Sequence[str], k: int
+) -> float:
     if not expected_ids:
         return 0.0
     top_k = set(retrieved_ids[:k])
@@ -25,7 +27,9 @@ def mrr(retrieved_ids: Sequence[str], expected_ids: Sequence[str]) -> float:
     return 0.0
 
 
-def ndcg_at_k(retrieved_ids: Sequence[str], expected_ids: Sequence[str], k: int) -> float:
+def ndcg_at_k(
+    retrieved_ids: Sequence[str], expected_ids: Sequence[str], k: int
+) -> float:
     import math
 
     if not expected_ids:

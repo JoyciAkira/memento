@@ -1,4 +1,5 @@
 """Add descending index on memory_meta.created_at for O(1) MAX(created_at) resolution."""
+
 import sqlite3
 
 

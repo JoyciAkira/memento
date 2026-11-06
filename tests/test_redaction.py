@@ -1,4 +1,3 @@
-import pytest
 from memento.redaction import redact_secrets
 
 

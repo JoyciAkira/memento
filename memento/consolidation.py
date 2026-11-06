@@ -72,7 +72,7 @@ def _extract_sentences(text: str) -> List[str]:
     import re
 
     # Split on sentence-ending punctuation followed by whitespace or end
-    raw = re.split(r'(?<=[.!?])\s+', text)
+    raw = re.split(r"(?<=[.!?])\s+", text)
     return [s.strip() for s in raw if len(s.strip()) > 10]
 
 
@@ -125,8 +125,7 @@ def merge_metadatas(metadatas: List[Dict[str, Any]]) -> Dict[str, Any]:
                 merged[key] = {**merged[key], **value}
             elif isinstance(merged[key], list) and isinstance(value, list):
                 existing = set(
-                    json.dumps(v, sort_keys=True) if isinstance(v, (dict, list))
-                    else v
+                    json.dumps(v, sort_keys=True) if isinstance(v, (dict, list)) else v
                     for v in merged[key]
                 )
                 for item in value:
@@ -202,7 +201,7 @@ class ConsolidationEngine:
         # Compare all pairs
         ids = list(embeddings.keys())
         if len(ids) > self.batch_size:
-            ids = ids[:self.batch_size]
+            ids = ids[: self.batch_size]
         pairs: List[Tuple[str, str, float]] = []
         for i in range(len(ids)):
             for j in range(i + 1, len(ids)):
@@ -311,7 +310,8 @@ class ConsolidationEngine:
                 now = datetime.now().isoformat()
                 meta_str = json.dumps(merged_meta) if merged_meta else "{}"
                 emb_str = (
-                    best_embedding if isinstance(best_embedding, str)
+                    best_embedding
+                    if isinstance(best_embedding, str)
                     else json.dumps([])
                 )
 

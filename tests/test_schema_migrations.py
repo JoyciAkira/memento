@@ -1,6 +1,4 @@
 import sqlite3
-import pytest
-import asyncio
 from memento.migrations.runner import MigrationRunner
 from memento.migrations.versions import get_all_migrations
 from memento.migrations.versions.v001_initial_schema import up as up_001
@@ -13,7 +11,12 @@ def test_migration_runner_creates_tables(tmp_path):
     runner.run()
 
     conn = sqlite3.connect(db_path)
-    tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()}
+    tables = {
+        r[0]
+        for r in conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='table'"
+        ).fetchall()
+    }
     conn.close()
 
     assert "memories" in tables
@@ -60,7 +63,9 @@ def test_migration_tracks_applied_at(tmp_path):
     runner.run()
 
     conn = sqlite3.connect(db_path)
-    row = conn.execute("SELECT applied_at FROM _schema_migrations WHERE version=1").fetchone()
+    row = conn.execute(
+        "SELECT applied_at FROM _schema_migrations WHERE version=1"
+    ).fetchone()
     conn.close()
     assert row is not None
     assert len(row[0]) > 0
@@ -78,6 +83,7 @@ def test_v009_memory_tiers_migration(tmp_path):
     conn.close()
 
     from memento.migrations.versions.v009_memory_tiers import up as up_009
+
     runner2 = MigrationRunner(db_path)
     runner2.register(1, "initial_schema", up_001)
     runner2.register(9, "memory_tiers", up_009)

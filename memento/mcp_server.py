@@ -16,8 +16,7 @@ from memento.goal_middleware import per_call_goal_check, session_progress_report
 
 # Configure logger
 logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s"
 )
 logger = logging.getLogger("memento-mcp")
 
@@ -29,7 +28,10 @@ _tool_registration = _memento_tools
 
 def _auto_checkpoint_every_n() -> int:
     try:
-        return max(int(os.environ.get("MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS", "25")), 1)
+        return max(
+            int(os.environ.get("MEMENTO_HANDOFF_AUTO_CHECKPOINT_EVERY_N_EVENTS", "25")),
+            1,
+        )
     except Exception:
         return 25
 
@@ -38,21 +40,33 @@ def _auto_checkpoint_every_n() -> int:
 async def list_tools() -> list[Tool]:
     return registry.get_tools()
 
+
 @app.call_tool()
 async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     workspace_root = arguments.get("workspace_root")
     active_context = arguments.get("active_context")
-    if not workspace_root and isinstance(active_context, str) and active_context.strip():
+    if (
+        not workspace_root
+        and isinstance(active_context, str)
+        and active_context.strip()
+    ):
         candidate = os.path.abspath(active_context)
         if os.path.splitext(candidate)[1]:
             candidate = os.path.dirname(candidate)
         workspace_root = find_project_root(candidate)
 
-    workspace_root = workspace_root or os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
+    workspace_root = (
+        workspace_root
+        or os.environ.get("MEMENTO_DIR")
+        or find_project_root(os.getcwd())
+    )
     ctx = get_workspace_context(workspace_root)
 
     # Start autonomous agent if configured and not running
-    if ctx.autonomy.get("level", "off") != "off" and not ctx.autonomous_agent.is_running:
+    if (
+        ctx.autonomy.get("level", "off") != "off"
+        and not ctx.autonomous_agent.is_running
+    ):
         try:
             ctx.start_autonomous_agent()
         except Exception:
@@ -75,9 +89,13 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
 
     # Auto-resume: restore L1 from last checkpoint on first tool call of session
     try:
-        event_count = await ctx.session_manager.store.count_events(session_id=session_id)
+        event_count = await ctx.session_manager.store.count_events(
+            session_id=session_id
+        )
         if event_count <= 1:
-            sessions = await ctx.session_manager.store.list_sessions(limit=5, status="closed")
+            sessions = await ctx.session_manager.store.list_sessions(
+                limit=5, status="closed"
+            )
             for prev in sessions:
                 prev_id = prev.get("id")
                 if not prev_id or not prev.get("last_checkpoint_at"):
@@ -86,7 +104,12 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 if not prev_row or not prev_row.checkpoint_data:
                     continue
                 import json as _json
-                data = _json.loads(prev_row.checkpoint_data) if prev_row.checkpoint_data else {}
+
+                data = (
+                    _json.loads(prev_row.checkpoint_data)
+                    if prev_row.checkpoint_data
+                    else {}
+                )
                 l1_items = data.get("l1") if isinstance(data, dict) else []
                 if l1_items:
                     try:
@@ -100,7 +123,9 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
     is_error = False
     out: list[TextContent] = []
     try:
-        out = await registry.execute(name, arguments, ctx, access_manager=ctx.access_manager)
+        out = await registry.execute(
+            name, arguments, ctx, access_manager=ctx.access_manager
+        )
 
         # Goal-driven middleware: lightweight awareness check on relevant tool calls
         try:
@@ -121,11 +146,14 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
         raise
     finally:
         try:
-            active_context_val = arguments.get("active_context") if isinstance(arguments, dict) else None
+            active_context_val = (
+                arguments.get("active_context") if isinstance(arguments, dict) else None
+            )
             result_text = "\n".join(
                 c.text
                 for c in out
-                if getattr(c, "type", None) == "text" and isinstance(getattr(c, "text", None), str)
+                if getattr(c, "type", None) == "text"
+                and isinstance(getattr(c, "text", None), str)
             )
             await ctx.session_manager.store.append_tool_event(
                 session_id=session_id,
@@ -133,24 +161,31 @@ async def call_tool(name: str, arguments: dict) -> list[TextContent]:
                 arguments=arguments if isinstance(arguments, dict) else {},
                 result_text=result_text,
                 is_error=is_error,
-                active_context=active_context_val if isinstance(active_context_val, str) else None,
+                active_context=active_context_val
+                if isinstance(active_context_val, str)
+                else None,
             )
 
             n = _auto_checkpoint_every_n()
             cnt = await ctx.session_manager.store.count_events(session_id=session_id)
             if cnt > 0 and cnt % n == 0:
-                await ctx.session_manager.create_checkpoint(session_id=session_id, reason="auto")
+                await ctx.session_manager.create_checkpoint(
+                    session_id=session_id, reason="auto"
+                )
 
             # Session progress report every 3 auto-checkpoints
             if cnt > 0 and cnt % (n * 3) == 0:
                 try:
-                    progress = await session_progress_report(ctx=ctx, session_id=session_id)
+                    progress = await session_progress_report(
+                        ctx=ctx, session_id=session_id
+                    )
                     if progress:
                         logger.info(progress)
                 except Exception:
                     pass
         except Exception:
             pass
+
 
 async def _autostart_default_daemon() -> None:
     """Start the autonomous daemon for the default workspace at server startup,
@@ -162,9 +197,14 @@ async def _autostart_default_daemon() -> None:
     try:
         workspace_root = os.environ.get("MEMENTO_DIR") or find_project_root(os.getcwd())
         ctx = get_workspace_context(workspace_root)
-        if ctx.autonomy.get("level", "off") != "off" and not ctx.autonomous_agent.is_running:
+        if (
+            ctx.autonomy.get("level", "off") != "off"
+            and not ctx.autonomous_agent.is_running
+        ):
             ctx.start_autonomous_agent()
-            logger.info(f"Autonomous daemon auto-started for default workspace: {workspace_root}")
+            logger.info(
+                f"Autonomous daemon auto-started for default workspace: {workspace_root}"
+            )
     except Exception as e:
         logger.debug(f"Daemon auto-start skipped: {e}")
 
@@ -172,6 +212,7 @@ async def _autostart_default_daemon() -> None:
 async def run():
     logger.info("Starting Memento MCP server via stdio")
     from memento.settings import settings as _s
+
     if _s.embedding_backend == "none":
         logger.warning(
             "Embedding backend is 'none' — semantic search disabled. "
@@ -182,8 +223,10 @@ async def run():
     async with stdio_server() as (read_stream, write_stream):
         await app.run(read_stream, write_stream, app.create_initialization_options())
 
+
 def main():
     asyncio.run(run())
+
 
 if __name__ == "__main__":
     main()

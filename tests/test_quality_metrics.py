@@ -83,7 +83,7 @@ async def test_memory_stats_excludes_deleted(tmp_path, monkeypatch):
     provider = NeuroGraphProvider(db_path=db_path)
     await provider.initialize()
 
-    r1 = await provider.add("Active memory", user_id="default")
+    await provider.add("Active memory", user_id="default")
     r2 = await provider.add("To be deleted", user_id="default")
 
     await provider.soft_delete_memory(r2["id"], delete_reason="test cleanup")
@@ -209,8 +209,6 @@ async def test_extraction_coverage(tmp_path, monkeypatch):
 
     now = datetime.now().isoformat()
     conn = sqlite3.connect(db_path)
-
-    from memento.kg_extraction import KGExtractionEngine
 
     mem_ids = conn.execute("SELECT id FROM memories LIMIT 2").fetchall()
     for row in mem_ids:

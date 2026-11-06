@@ -81,7 +81,9 @@ class MemoryGovernor:
             staleness_penalty=staleness,
         )
 
-    def decide(self, signal: MemorySignal, *, novelty: float = 0.0, conflict: float = 0.0) -> TriggerDecision:
+    def decide(
+        self, signal: MemorySignal, *, novelty: float = 0.0, conflict: float = 0.0
+    ) -> TriggerDecision:
         should_inject = signal.strength >= self.inject_threshold
         should_prefetch = signal.strength >= self.prefetch_threshold
         should_consolidate = (

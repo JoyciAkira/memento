@@ -41,4 +41,3 @@ async def test_session_store_creates_session_and_logs_events(tmp_path):
 
     assert row[0] == "memento_search_memory"
     assert row[1] == 0
-

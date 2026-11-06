@@ -27,6 +27,7 @@ async def test_mcp_server_workspace_prefers_memento_dir(monkeypatch):
     with tempfile.TemporaryDirectory() as ws:
         monkeypatch.setenv("MEMENTO_DIR", ws)
         import memento.mcp_server as ms
+
         importlib.reload(ms)
         res = await ms.call_tool("memento_status", {})
         assert ws in res[0].text

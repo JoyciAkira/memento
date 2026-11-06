@@ -24,6 +24,7 @@ Output: a single JSON object on stdout:
      "components": {"recall_at_5": ..., "mrr_at_10": ..., "tier_retention": ...},
      "n_queries": <int>}
 """
+
 from __future__ import annotations
 
 import json
@@ -46,21 +47,81 @@ from memento.memory.orchestrator import MemoryOrchestrator  # noqa: E402
 # Each gold entry: (gold_key, content, tier).
 # ---------------------------------------------------------------------------
 GOLD = [
-    ("fastapi_async", "FastAPI is an asynchronous Python web framework built on Starlette and Pydantic", "semantic"),
-    ("sqlite_fts5", "SQLite provides FTS5, a full-text search extension with BM25 ranking", "semantic"),
-    ("python_gil", "CPython has a Global Interpreter Lock that serializes bytecode execution across threads", "semantic"),
-    ("rust_ownership", "Rust enforces memory safety at compile time through its ownership and borrowing system", "semantic"),
-    ("postgres_mvcc", "PostgreSQL uses MVCC so readers never block writers and writers never block readers", "semantic"),
-    ("react_hooks", "React hooks let function components manage state and side effects without classes", "semantic"),
-    ("docker_layers", "Docker images are composed of stacked read only layers cached by content hash", "semantic"),
-    ("tcp_handshake", "TCP establishes a connection with a three way SYN SYN-ACK ACK handshake", "semantic"),
-    ("git_rebase", "Git rebase rewrites commit history by replaying commits onto a new base", "episodic"),
-    ("kafka_partition", "Kafka topics are split into partitions to allow parallel consumption and ordering per key", "semantic"),
-    ("redis_single_thread", "Redis processes commands on a single thread which guarantees atomic command execution", "semantic"),
-    ("jwt_stateless", "JWT tokens carry signed claims so the server authenticates requests without server side sessions", "semantic"),
-    ("k8s_pod", "In Kubernetes a Pod is the smallest deployable unit and may contain one or more containers", "semantic"),
-    ("http2_multiplex", "HTTP2 multiplexes many streams over a single TCP connection to avoid head of line blocking", "semantic"),
-    ("grpc_protobuf", "gRPC uses Protocol Buffers as its interface definition language and wire format", "semantic"),
+    (
+        "fastapi_async",
+        "FastAPI is an asynchronous Python web framework built on Starlette and Pydantic",
+        "semantic",
+    ),
+    (
+        "sqlite_fts5",
+        "SQLite provides FTS5, a full-text search extension with BM25 ranking",
+        "semantic",
+    ),
+    (
+        "python_gil",
+        "CPython has a Global Interpreter Lock that serializes bytecode execution across threads",
+        "semantic",
+    ),
+    (
+        "rust_ownership",
+        "Rust enforces memory safety at compile time through its ownership and borrowing system",
+        "semantic",
+    ),
+    (
+        "postgres_mvcc",
+        "PostgreSQL uses MVCC so readers never block writers and writers never block readers",
+        "semantic",
+    ),
+    (
+        "react_hooks",
+        "React hooks let function components manage state and side effects without classes",
+        "semantic",
+    ),
+    (
+        "docker_layers",
+        "Docker images are composed of stacked read only layers cached by content hash",
+        "semantic",
+    ),
+    (
+        "tcp_handshake",
+        "TCP establishes a connection with a three way SYN SYN-ACK ACK handshake",
+        "semantic",
+    ),
+    (
+        "git_rebase",
+        "Git rebase rewrites commit history by replaying commits onto a new base",
+        "episodic",
+    ),
+    (
+        "kafka_partition",
+        "Kafka topics are split into partitions to allow parallel consumption and ordering per key",
+        "semantic",
+    ),
+    (
+        "redis_single_thread",
+        "Redis processes commands on a single thread which guarantees atomic command execution",
+        "semantic",
+    ),
+    (
+        "jwt_stateless",
+        "JWT tokens carry signed claims so the server authenticates requests without server side sessions",
+        "semantic",
+    ),
+    (
+        "k8s_pod",
+        "In Kubernetes a Pod is the smallest deployable unit and may contain one or more containers",
+        "semantic",
+    ),
+    (
+        "http2_multiplex",
+        "HTTP2 multiplexes many streams over a single TCP connection to avoid head of line blocking",
+        "semantic",
+    ),
+    (
+        "grpc_protobuf",
+        "gRPC uses Protocol Buffers as its interface definition language and wire format",
+        "semantic",
+    ),
 ]
 
 # Distractors share vocabulary with gold facts but are NOT the right answer.
@@ -83,7 +144,10 @@ DISTRACTORS = [
 ]
 
 # Generic noise to grow the corpus and dilute the signal.
-NOISE = [f"Routine log entry number {i} nothing notable happened during this session" for i in range(60)]
+NOISE = [
+    f"Routine log entry number {i} nothing notable happened during this session"
+    for i in range(60)
+]
 
 # Queries are graded by difficulty so the metric has a smooth gradient:
 #   EASY   — a contiguous phrase lifted from the gold doc. A naive whole-string
@@ -110,8 +174,14 @@ QUERIES = [
     ("container images built from cached stacked layers", "docker_layers"),
     ("connection setup using a three way handshake of packets", "tcp_handshake"),
     ("message topics divided into parallel ordered partitions", "kafka_partition"),
-    ("authenticate api requests without storing sessions on the server", "jwt_stateless"),
-    ("protocol that multiplexes many streams over one tcp connection", "http2_multiplex"),
+    (
+        "authenticate api requests without storing sessions on the server",
+        "jwt_stateless",
+    ),
+    (
+        "protocol that multiplexes many streams over one tcp connection",
+        "http2_multiplex",
+    ),
 ]
 
 K_RECALL = 5

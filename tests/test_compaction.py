@@ -1,5 +1,5 @@
 """Tests for the token-friendly compaction engine (memento.compaction)."""
-import pytest
+
 from memento.compaction import (
     compact,
     estimate_tokens,

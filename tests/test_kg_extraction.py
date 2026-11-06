@@ -11,8 +11,12 @@ from memento.provider import NeuroGraphProvider
 
 
 def test_text_hash_deterministic():
-    assert KGExtractionEngine._text_hash("hello") == KGExtractionEngine._text_hash("hello")
-    assert KGExtractionEngine._text_hash("hello") != KGExtractionEngine._text_hash("world")
+    assert KGExtractionEngine._text_hash("hello") == KGExtractionEngine._text_hash(
+        "hello"
+    )
+    assert KGExtractionEngine._text_hash("hello") != KGExtractionEngine._text_hash(
+        "world"
+    )
 
 
 @pytest.mark.asyncio
@@ -72,15 +76,24 @@ async def test_get_unprocessed_memories_excludes_deleted(tmp_path, monkeypatch):
 
 def test_parse_llm_response_valid_json():
     engine = KGExtractionEngine(db_path=":memory:", kg=None)
-    raw = json.dumps({
-        "extractions": [
-            {
-                "memory_id": "abc",
-                "entities": [{"name": "Alice", "type": "person"}],
-                "relations": [{"subject": "Alice", "predicate": "works_on", "object": "Project X", "confidence": 0.95}],
-            }
-        ]
-    })
+    raw = json.dumps(
+        {
+            "extractions": [
+                {
+                    "memory_id": "abc",
+                    "entities": [{"name": "Alice", "type": "person"}],
+                    "relations": [
+                        {
+                            "subject": "Alice",
+                            "predicate": "works_on",
+                            "object": "Project X",
+                            "confidence": 0.95,
+                        }
+                    ],
+                }
+            ]
+        }
+    )
     result = engine._parse_llm_response(raw)
     assert len(result["extractions"]) == 1
     assert result["extractions"][0]["memory_id"] == "abc"
@@ -112,7 +125,12 @@ def test_apply_extraction_creates_entities_and_triples():
                     {"name": "React", "type": "technology"},
                 ],
                 "relations": [
-                    {"subject": "Alice", "predicate": "uses", "object": "React", "confidence": 0.95},
+                    {
+                        "subject": "Alice",
+                        "predicate": "uses",
+                        "object": "React",
+                        "confidence": 0.95,
+                    },
                 ],
             }
         ]
@@ -152,7 +170,9 @@ async def test_mark_processed_records_stats(tmp_path, monkeypatch):
 
     conn = sqlite3.connect(db_path)
     conn.row_factory = sqlite3.Row
-    row = conn.execute("SELECT * FROM kg_extraction_log WHERE memory_id = ?", (r["id"],)).fetchone()
+    row = conn.execute(
+        "SELECT * FROM kg_extraction_log WHERE memory_id = ?", (r["id"],)
+    ).fetchone()
     assert row is not None
     assert row["entities_found"] == 3
     assert row["triples_found"] == 2

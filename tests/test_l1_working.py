@@ -1,5 +1,5 @@
-import pytest
 from memento.memory.l1_working import L1WorkingMemory
+
 
 def test_l1_working_memory_basic_ops():
     l1 = L1WorkingMemory(max_size=3)

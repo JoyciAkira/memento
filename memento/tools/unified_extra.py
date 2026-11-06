@@ -15,6 +15,7 @@ logger = logging.getLogger("memento-mcp")
 # memento_search — unified search
 # ---------------------------------------------------------------------------
 
+
 @registry.register(
     Tool(
         name="memento_search",
@@ -54,24 +55,53 @@ async def memento_search(arguments: dict, ctx, access_manager) -> list[TextConte
         if active_context:
             try:
                 from memento.ontology import extract_logical_namespace
+
                 ns = extract_logical_namespace(active_context, ctx.workspace_root)
                 if ns:
                     actual_filters["module"] = ns
             except Exception:
                 pass
-        res = await ctx.provider.search(query, user_id="default", filters=actual_filters or None)
+        res = await ctx.provider.search(
+            query, user_id="default", filters=actual_filters or None
+        )
         from memento.tools.utils import get_active_goals
-        injection = await get_active_goals(ctx) if ctx.enforcement_config.get("level1") else ""
-        return [TextContent(type="text", text=f"{injection}Results:\n{json.dumps(res, indent=2, ensure_ascii=False)}")]
+
+        injection = (
+            await get_active_goals(ctx) if ctx.enforcement_config.get("level1") else ""
+        )
+        return [
+            TextContent(
+                type="text",
+                text=f"{injection}Results:\n{json.dumps(res, indent=2, ensure_ascii=False)}",
+            )
+        ]
 
     if mode == "advanced":
-        res = await ctx.provider.search_vnext_bundle(query, user_id="default", limit=limit, filters=filters, trace=arguments.get("trace", False))
-        return [TextContent(type="text", text=json.dumps(res, indent=2, ensure_ascii=False, default=str))]
+        res = await ctx.provider.search_vnext_bundle(
+            query,
+            user_id="default",
+            limit=limit,
+            filters=filters,
+            trace=arguments.get("trace", False),
+        )
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(res, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if mode == "explain":
-        res = await ctx.provider.search_vnext_bundle(query, user_id="default", limit=limit, filters=filters, trace=True)
+        res = await ctx.provider.search_vnext_bundle(
+            query, user_id="default", limit=limit, filters=filters, trace=True
+        )
         explained = {k: res[k] for k in ("query", "routing", "traces") if k in res}
-        return [TextContent(type="text", text=json.dumps(explained, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(explained, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown mode: {mode}")]
 
@@ -79,6 +109,7 @@ async def memento_search(arguments: dict, ctx, access_manager) -> list[TextConte
 # ---------------------------------------------------------------------------
 # memento_remember — unified memory write operations
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -121,23 +152,33 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
         if active_context:
             try:
                 from memento.ontology import extract_logical_namespace
+
                 ns = extract_logical_namespace(active_context, ctx.workspace_root)
                 if ns:
                     metadata["module"] = ns
             except Exception:
                 pass
-        result = await ctx.provider.add(text, user_id="default", metadata=metadata or None)
+        result = await ctx.provider.add(
+            text, user_id="default", metadata=metadata or None
+        )
         return [TextContent(type="text", text=f"Memory saved: {result}")]
 
     if action == "consolidate":
         if not access_manager.can_write():
             raise PermissionError(f"Cannot consolidate. Access: {access_manager.state}")
         from memento.consolidation import ConsolidationEngine
+
         threshold = float(arguments.get("threshold") or 0.92)
         min_age = float(arguments.get("min_age_hours") or 1)
-        engine = ConsolidationEngine(ctx.db_path, threshold=threshold, min_age_hours=min_age)
+        engine = ConsolidationEngine(
+            ctx.db_path, threshold=threshold, min_age_hours=min_age
+        )
         result = await engine.consolidate()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     if action == "share":
         if not access_manager.can_write():
@@ -145,9 +186,14 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
         memory_id = arguments.get("memory_id", "")
         target = arguments.get("target_workspace", "")
         from memento.cross_workspace import CrossWorkspaceManager
+
         mgr = CrossWorkspaceManager(ctx.db_path)
         result = await mgr.share_memory(memory_id, target, ctx.workspace_root)
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     if action == "evaluate":
         if not access_manager.can_write():
@@ -158,31 +204,47 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
         if score is None or not (0 <= float(score) <= 1):
             return [TextContent(type="text", text="Error: score must be 0-1.")]
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(ctx.db_path)
         await metrics.record_evaluation(memory_id, float(score), reason)
-        return [TextContent(type="text", text=f"Quality evaluation recorded for {memory_id}.")]
+        return [
+            TextContent(
+                type="text", text=f"Quality evaluation recorded for {memory_id}."
+            )
+        ]
 
     if action == "hit":
         if not access_manager.can_write():
             raise PermissionError(f"Cannot record hit. Access: {access_manager.state}")
         memory_ids = arguments.get("memory_ids") or []
         from memento.relevance_tracker import RelevanceTracker
+
         tracker = RelevanceTracker(ctx.db_path)
         await tracker.record_hits(memory_ids)
-        return [TextContent(type="text", text=f"Recorded hits for {len(memory_ids)} memories.")]
+        return [
+            TextContent(
+                type="text", text=f"Recorded hits for {len(memory_ids)} memories."
+            )
+        ]
 
     if action == "ingest_commit":
         if not access_manager.can_write():
             raise PermissionError(f"Cannot ingest. Access: {access_manager.state}")
         from memento.git_ingestion import ingest_commit
+
         commit_hash = arguments.get("commit_hash", "HEAD")
         result = await ingest_commit(ctx.provider, ctx.workspace_root, commit_hash)
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     if action == "ingest_test_failure":
         if not access_manager.can_write():
             raise PermissionError(f"Cannot ingest. Access: {access_manager.state}")
         from memento.git_ingestion import ingest_test_failure
+
         result = await ingest_test_failure(
             provider=ctx.provider,
             test_name=arguments.get("test_name", "unknown"),
@@ -190,7 +252,11 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
             file_path=arguments.get("file_path", ""),
             workspace=ctx.workspace_root,
         )
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown action: {action}")]
 
@@ -198,6 +264,7 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
 # ---------------------------------------------------------------------------
 # memento_configure — unified configuration
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -212,9 +279,15 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
                 "action": {
                     "type": "string",
                     "enum": [
-                        "enforcement", "coercion", "daemon", "autonomy",
-                        "consolidation_scheduler", "kg_scheduler", "dependency_tracker",
-                        "superpowers", "access",
+                        "enforcement",
+                        "coercion",
+                        "daemon",
+                        "autonomy",
+                        "consolidation_scheduler",
+                        "kg_scheduler",
+                        "dependency_tracker",
+                        "superpowers",
+                        "access",
                     ],
                 },
                 "enabled": {"type": "boolean"},
@@ -239,26 +312,43 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
         if level:
             ctx.enforcement_config[level] = bool(enabled)
         ctx.save_enforcement_config()
-        return [TextContent(type="text", text=f"Enforcement config: {ctx.enforcement_config}")]
+        return [
+            TextContent(
+                type="text", text=f"Enforcement config: {ctx.enforcement_config}"
+            )
+        ]
 
     if action == "coercion":
         ctx.active_coercion["enabled"] = bool(enabled)
         ctx.save_active_coercion_config()
         if arguments.get("install_git_hooks"):
             from memento.git_hooks import install_pre_commit_hook
+
             install_pre_commit_hook(ctx.workspace_root)
-        return [TextContent(type="text", text=f"Active coercion {'enabled' if enabled else 'disabled'}.")]
+        return [
+            TextContent(
+                type="text",
+                text=f"Active coercion {'enabled' if enabled else 'disabled'}.",
+            )
+        ]
 
     if action == "daemon":
         from memento.tools.cognitive import memento_toggle_precognition as _daemon_impl
+
         return await _daemon_impl(arguments, ctx, access_manager)
 
     if action == "autonomy":
         from memento.autonomous import AutonomyLevel
+
         try:
             AutonomyLevel(level or "off")
         except ValueError:
-            return [TextContent(type="text", text="Invalid level. Use: off, passive, active, autonomous.")]
+            return [
+                TextContent(
+                    type="text",
+                    text="Invalid level. Use: off, passive, active, autonomous.",
+                )
+            ]
         if ctx.autonomous_agent.is_running:
             ctx.stop_autonomous_agent()
         ctx.autonomy["level"] = level or "off"
@@ -270,6 +360,7 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
     if action == "consolidation_scheduler":
         if enabled:
             from memento.consolidation import ConsolidationScheduler
+
             interval = float(arguments.get("interval_minutes") or 30)
             scheduler = ConsolidationScheduler(
                 db_path=ctx.db_path,
@@ -279,7 +370,12 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
             )
             scheduler.start()
             ctx.consolidation_scheduler = scheduler
-            return [TextContent(type="text", text=f"Consolidation scheduler started (every {interval}m).")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"Consolidation scheduler started (every {interval}m).",
+                )
+            ]
         if ctx.consolidation_scheduler:
             ctx.consolidation_scheduler.stop()
             return [TextContent(type="text", text="Consolidation scheduler stopped.")]
@@ -288,6 +384,7 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
     if action == "kg_scheduler":
         if enabled:
             from memento.kg_extraction_scheduler import KGExtractionScheduler
+
             interval = float(arguments.get("interval_minutes") or 60)
             scheduler = KGExtractionScheduler(
                 db_path=ctx.db_path,
@@ -297,7 +394,12 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
             )
             scheduler.start()
             ctx.kg_extraction_scheduler = scheduler
-            return [TextContent(type="text", text=f"KG extraction scheduler started (every {interval}m).")]
+            return [
+                TextContent(
+                    type="text",
+                    text=f"KG extraction scheduler started (every {interval}m).",
+                )
+            ]
         if ctx.kg_extraction_scheduler:
             ctx.kg_extraction_scheduler.stop()
             return [TextContent(type="text", text="KG extraction scheduler stopped.")]
@@ -306,20 +408,33 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
     if action == "dependency_tracker":
         ctx.dependency_tracker["enabled"] = bool(enabled)
         ctx.save_dependency_tracker_config()
-        return [TextContent(type="text", text=f"Dependency tracker {'enabled' if enabled else 'disabled'}.")]
+        return [
+            TextContent(
+                type="text",
+                text=f"Dependency tracker {'enabled' if enabled else 'disabled'}.",
+            )
+        ]
 
     if action == "superpowers":
         warnings = arguments.get("warnings", False)
         tasks = arguments.get("tasks", False)
         access_manager.toggle_superpowers(warnings, tasks)
-        return [TextContent(type="text", text=f"Superpowers: warnings={warnings}, tasks={tasks}")]
+        return [
+            TextContent(
+                type="text", text=f"Superpowers: warnings={warnings}, tasks={tasks}"
+            )
+        ]
 
     if action == "access":
         state = arguments.get("state") or arguments.get("level")
         if state:
             access_manager.set_state(state)
             return [TextContent(type="text", text=f"Access state: {state}")]
-        return [TextContent(type="text", text=f"Current access state: {access_manager.state}")]
+        return [
+            TextContent(
+                type="text", text=f"Current access state: {access_manager.state}"
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown config action: {action}")]
 
@@ -327,6 +442,7 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
 # ---------------------------------------------------------------------------
 # memento_cognitive — unified cognitive engine
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -342,8 +458,14 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
                     "type": "string",
                     "enum": ["dream", "align", "warnings", "tasks"],
                 },
-                "content": {"type": "string", "description": "Code/plan to evaluate (for align)."},
-                "context": {"type": "string", "description": "Topic/context (for dream, warnings)."},
+                "content": {
+                    "type": "string",
+                    "description": "Code/plan to evaluate (for align).",
+                },
+                "context": {
+                    "type": "string",
+                    "description": "Topic/context (for dream, warnings).",
+                },
                 "active_context": {"type": "string"},
                 "workspace_root": {"type": "string"},
             },
@@ -363,27 +485,45 @@ async def memento_cognitive(arguments: dict, ctx, access_manager) -> list[TextCo
         content = arguments.get("content", "")
         if ctx.enforcement_config.get("level2"):
             result = await ctx.cognitive_engine.check_goal_alignment(
-                content, context=arguments.get("active_context"),
+                content,
+                context=arguments.get("active_context"),
             )
             return [TextContent(type="text", text=result)]
-        return [TextContent(type="text", text="Goal Enforcer L2 is disabled. Enable via memento_configure action=enforcement level=level2 enabled=true.")]
+        return [
+            TextContent(
+                type="text",
+                text="Goal Enforcer L2 is disabled. Enable via memento_configure action=enforcement level=level2 enabled=true.",
+            )
+        ]
 
     if action == "warnings":
         if not access_manager.warnings_enabled:
-            return [TextContent(type="text", text="Proactive warnings disabled. Enable via memento_configure action=superpowers warnings=true.")]
+            return [
+                TextContent(
+                    type="text",
+                    text="Proactive warnings disabled. Enable via memento_configure action=superpowers warnings=true.",
+                )
+            ]
         context = arguments.get("context", "")
         warnings = await ctx.cognitive_engine.get_warnings(context)
         return [TextContent(type="text", text=warnings)]
 
     if action == "tasks":
         if not access_manager.auto_tasks_enabled:
-            return [TextContent(type="text", text="Auto-tasks disabled. Enable via memento_configure action=superpowers tasks=true.")]
+            return [
+                TextContent(
+                    type="text",
+                    text="Auto-tasks disabled. Enable via memento_configure action=superpowers tasks=true.",
+                )
+            ]
         result = await ctx.cognitive_engine.generate_tasks()
         return [TextContent(type="text", text=result)]
 
     if action == "forget":
         if not access_manager.can_write():
-            raise PermissionError(f"Cannot forget memories. Access: {access_manager.state}")
+            raise PermissionError(
+                f"Cannot forget memories. Access: {access_manager.state}"
+            )
         min_age_days = float(arguments.get("min_age_days", 30.0))
         decay_threshold = float(arguments.get("decay_threshold", 0.1))
         dry_run = bool(arguments.get("dry_run", False))
@@ -392,7 +532,11 @@ async def memento_cognitive(arguments: dict, ctx, access_manager) -> list[TextCo
             decay_threshold=decay_threshold,
             dry_run=dry_run,
         )
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown cognitive action: {action}")]
 
@@ -400,6 +544,7 @@ async def memento_cognitive(arguments: dict, ctx, access_manager) -> list[TextCo
 # ---------------------------------------------------------------------------
 # memento_health — unified diagnostics
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -414,10 +559,22 @@ async def memento_cognitive(arguments: dict, ctx, access_manager) -> list[TextCo
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["status", "health", "memory", "kg", "quality", "relevance", "cache", "explain"],
+                    "enum": [
+                        "status",
+                        "health",
+                        "memory",
+                        "kg",
+                        "quality",
+                        "relevance",
+                        "cache",
+                        "explain",
+                    ],
                     "default": "status",
                 },
-                "query": {"type": "string", "description": "Query to explain (for explain)."},
+                "query": {
+                    "type": "string",
+                    "description": "Query to explain (for explain).",
+                },
                 "workspace_root": {"type": "string"},
             },
         },
@@ -434,9 +591,13 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
         lines.append(f"Workspace: {ctx.workspace_root}")
         lines.append(f"DB: {db_path}")
         lines.append(f"Enforcement: {ctx.enforcement_config}")
-        lines.append(f"Daemon: {'running' if ctx.daemon and ctx.daemon.is_running else 'stopped'}")
+        lines.append(
+            f"Daemon: {'running' if ctx.daemon and ctx.daemon.is_running else 'stopped'}"
+        )
         auto = ctx.autonomous_agent.get_status()
-        lines.append(f"Autonomy: {auto['level']} ({'running' if auto['running'] else 'stopped'})")
+        lines.append(
+            f"Autonomy: {auto['level']} ({'running' if auto['running'] else 'stopped'})"
+        )
         goals = await ctx.provider.list_goals(active_only=True, limit=3)
         if goals:
             lines.append(f"Active goals ({len(goals)}):")
@@ -447,12 +608,19 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
     if action == "health":
         kg_path = getattr(ctx.provider, "kg_db_path", db_path)
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(db_path, kg_path)
         result = await metrics.system_health()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "memory":
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(db_path)
         result = await metrics.memory_stats()
         # Enrich with per-memory decay scores
@@ -460,6 +628,7 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
             from memento.settings import settings as _s
             from datetime import datetime
             import math
+
             memories = await ctx.provider.get_all(limit=50)
             now = datetime.now()
             scored = []
@@ -472,39 +641,81 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
                     decay = round(math.exp(-lam * age_days), 4)
                 except Exception:
                     decay = 1.0
-                scored.append({"id": m["id"][:8], "age_days": round((now - datetime.fromisoformat(m["created_at"])).days, 1), "decay_score": decay, "text": m["memory"][:60]})
+                scored.append(
+                    {
+                        "id": m["id"][:8],
+                        "age_days": round(
+                            (now - datetime.fromisoformat(m["created_at"])).days, 1
+                        ),
+                        "decay_score": decay,
+                        "text": m["memory"][:60],
+                    }
+                )
             scored.sort(key=lambda x: x["decay_score"])
             result["decaying_memories"] = scored[:20]
-            result["healthy_memories"] = len([s for s in scored if s["decay_score"] > 0.5])
-            result["degraded_memories"] = len([s for s in scored if s["decay_score"] <= 0.5])
+            result["healthy_memories"] = len(
+                [s for s in scored if s["decay_score"] > 0.5]
+            )
+            result["degraded_memories"] = len(
+                [s for s in scored if s["decay_score"] <= 0.5]
+            )
         except Exception:
             pass
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "kg":
         kg_path = getattr(ctx.provider, "kg_db_path", db_path)
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(db_path, kg_path)
         result = await metrics.kg_health()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "quality":
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(db_path)
         result = await metrics.get_quality_report()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "relevance":
         from memento.relevance_tracker import RelevanceTracker
+
         tracker = RelevanceTracker(db_path)
         result = await tracker.get_stats()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "cache":
         from memento.predictive_cache import PredictiveCache
+
         cache = PredictiveCache(db_path)
         result = await cache.cache_stats()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "explain":
         query = arguments.get("query", "")
@@ -512,8 +723,17 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
         if os.path.exists(trace_path):
             with open(trace_path, "r") as f:
                 data = json.load(f)
-            return [TextContent(type="text", text=json.dumps(data, indent=2, ensure_ascii=False))]
-        return [TextContent(type="text", text=json.dumps({"query": query, "error": "no trace available"}))]
+            return [
+                TextContent(
+                    type="text", text=json.dumps(data, indent=2, ensure_ascii=False)
+                )
+            ]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps({"query": query, "error": "no trace available"}),
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown health action: {action}")]
 
@@ -521,6 +741,7 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
 # ---------------------------------------------------------------------------
 # memento_coercion — unified coercion CRUD
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -534,7 +755,14 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
             "properties": {
                 "action": {
                     "type": "string",
-                    "enum": ["list_presets", "apply_preset", "list_rules", "add_rule", "remove_rule", "install_hooks"],
+                    "enum": [
+                        "list_presets",
+                        "apply_preset",
+                        "list_rules",
+                        "add_rule",
+                        "remove_rule",
+                        "install_hooks",
+                    ],
                 },
                 "preset": {"type": "string"},
                 "rule_id": {"type": "string"},
@@ -554,6 +782,7 @@ async def memento_coercion(arguments: dict, ctx, access_manager) -> list[TextCon
         memento_remove_active_coercion_rule as _remove_rule,
         memento_install_git_hooks as _install_hooks,
     )
+
     action = arguments["action"]
 
     if action == "list_presets":
@@ -576,6 +805,7 @@ async def memento_coercion(arguments: dict, ctx, access_manager) -> list[TextCon
 # ---------------------------------------------------------------------------
 # memento_kg — unified KG operations
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -603,20 +833,37 @@ async def memento_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
             raise PermissionError(f"Cannot extract KG. Access: {access_manager.state}")
         max_mem = int(arguments.get("max_memories") or 50)
         result = await ctx.provider.extract_kg(max_mem)
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "health":
         kg_path = getattr(ctx.provider, "kg_db_path", ctx.db_path)
         from memento.quality_metrics import QualityMetrics
+
         metrics = QualityMetrics(ctx.db_path, kg_path)
         result = await metrics.kg_health()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "cross_workspace_stats":
         from memento.cross_workspace import CrossWorkspaceManager
+
         mgr = CrossWorkspaceManager(ctx.db_path)
         result = await mgr.get_sync_stats()
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "add_causal":
         if not access_manager.can_write():
@@ -627,16 +874,36 @@ async def memento_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
         source_memory_id = arguments.get("source_memory_id")
         confidence = float(arguments.get("confidence", 1.0))
         triple_id = ctx.provider.kg.kg.add_causal_triple(
-            subject=subject, predicate=predicate, obj=obj,
-            source_memory_id=source_memory_id, confidence=confidence,
+            subject=subject,
+            predicate=predicate,
+            obj=obj,
+            source_memory_id=source_memory_id,
+            confidence=confidence,
         )
-        return [TextContent(type="text", text=json.dumps({"triple_id": triple_id, "subject": subject, "predicate": predicate, "object": obj}))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(
+                    {
+                        "triple_id": triple_id,
+                        "subject": subject,
+                        "predicate": predicate,
+                        "object": obj,
+                    }
+                ),
+            )
+        ]
 
     if action == "query_causal":
         entity = arguments.get("entity", "")
         direction = arguments.get("direction", "both")
         result = ctx.provider.kg.kg.query_causal(entity, direction=direction)
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     return [TextContent(type="text", text=f"Unknown KG action: {action}")]
 
@@ -644,6 +911,7 @@ async def memento_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
 # ---------------------------------------------------------------------------
 # memento_notifications — unified notifications
 # ---------------------------------------------------------------------------
+
 
 @registry.register(
     Tool(
@@ -667,9 +935,12 @@ async def memento_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
         },
     )
 )
-async def memento_notifications(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_notifications(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     action = arguments["action"]
     from memento.notifications import NotificationManager
+
     mgr = NotificationManager(ctx.db_path)
 
     if action == "configure":
@@ -681,16 +952,27 @@ async def memento_notifications(arguments: dict, ctx, access_manager) -> list[Te
         if "min_confidence" in arguments:
             config["min_confidence"] = arguments["min_confidence"]
         result = mgr.configure(**{k: v for k, v in config.items()})
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+            )
+        ]
 
     if action == "list":
         include = arguments.get("include_dismissed", False)
         result = mgr.get_pending_notifications(include_dismissed=include)
-        return [TextContent(type="text", text=json.dumps(result, indent=2, ensure_ascii=False, default=str))]
+        return [
+            TextContent(
+                type="text",
+                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+            )
+        ]
 
     if action == "dismiss":
         nid = arguments.get("notification_id", "")
         result = mgr.dismiss(nid)
-        return [TextContent(type="text", text=f"Notification {nid} dismissed: {result}")]
+        return [
+            TextContent(type="text", text=f"Notification {nid} dismissed: {result}")
+        ]
 
     return [TextContent(type="text", text=f"Unknown notification action: {action}")]

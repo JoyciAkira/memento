@@ -51,7 +51,9 @@ async def test_record_hit_increments_count(setup_db):
     await tracker.record_hit("mem-1")
 
     conn = sqlite3.connect(setup_db)
-    row = conn.execute("SELECT hit_count FROM memory_meta WHERE id = 'mem-1'").fetchone()
+    row = conn.execute(
+        "SELECT hit_count FROM memory_meta WHERE id = 'mem-1'"
+    ).fetchone()
     conn.close()
     assert row[0] == 1
 

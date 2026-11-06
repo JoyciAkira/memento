@@ -5,7 +5,7 @@ from memento.memory.l2_episodic import L2EpisodicMemory
 from memento.memory.l3_semantic import L3SemanticMemory
 from memento.migrations.runner import MigrationRunner
 from memento.migrations.versions import get_all_migrations
-from memento.migrations.versions.v001_initial_schema import up as up_001
+
 
 @pytest.fixture
 def initialized_db(tmp_path):

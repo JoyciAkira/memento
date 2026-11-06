@@ -1,7 +1,5 @@
 import asyncio
 import json
-import os
-import tempfile
 
 import pytest
 
@@ -129,7 +127,9 @@ async def populated_db(tmp_path):
 
     await provider.add("Memory alpha about React components.", user_id="default")
     await provider.add("Memory beta about React components.", user_id="default")
-    await provider.add("Memory gamma about something completely different.", user_id="default")
+    await provider.add(
+        "Memory gamma about something completely different.", user_id="default"
+    )
 
     monkeypatch.undo()
     return db_path, provider
@@ -157,17 +157,30 @@ async def test_consolidate_with_forced_embeddings(tmp_path):
     provider = NeuroGraphProvider(db_path=db_path)
     await provider.initialize()
 
-    r1 = await provider.add("The project uses React for the frontend.", user_id="default")
-    r2 = await provider.add("The project uses React for the UI layer.", user_id="default")
+    r1 = await provider.add(
+        "The project uses React for the frontend.", user_id="default"
+    )
+    r2 = await provider.add(
+        "The project uses React for the UI layer.", user_id="default"
+    )
     r3 = await provider.add("Python backend handles the API.", user_id="default")
 
     shared_emb = json.dumps([0.1, 0.2, 0.3, 0.4, 0.5])
     different_emb = json.dumps([0.9, 0.8, 0.7, 0.6, 0.5])
 
     conn = sqlite3.connect(db_path)
-    conn.execute("UPDATE memory_embeddings SET embedding = ? WHERE id = ?", (shared_emb, r1["id"]))
-    conn.execute("UPDATE memory_embeddings SET embedding = ? WHERE id = ?", (shared_emb, r2["id"]))
-    conn.execute("UPDATE memory_embeddings SET embedding = ? WHERE id = ?", (different_emb, r3["id"]))
+    conn.execute(
+        "UPDATE memory_embeddings SET embedding = ? WHERE id = ?",
+        (shared_emb, r1["id"]),
+    )
+    conn.execute(
+        "UPDATE memory_embeddings SET embedding = ? WHERE id = ?",
+        (shared_emb, r2["id"]),
+    )
+    conn.execute(
+        "UPDATE memory_embeddings SET embedding = ? WHERE id = ?",
+        (different_emb, r3["id"]),
+    )
     conn.commit()
     conn.close()
 

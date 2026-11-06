@@ -3,6 +3,7 @@
 Provides package detection (memento-mcp / memento fallback), pip upgrade
 via subprocess, and best-effort process restart.
 """
+
 from __future__ import annotations
 
 import importlib.metadata
@@ -107,7 +108,9 @@ def format_report(
 
     lines.append("")
     lines.append("Next steps:")
-    lines.append("  - Restart your IDE MCP server (Trae/Cursor/VSCode) to load the new code.")
+    lines.append(
+        "  - Restart your IDE MCP server (Trae/Cursor/VSCode) to load the new code."
+    )
     return "\n".join(lines)
 
 

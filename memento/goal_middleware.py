@@ -2,10 +2,7 @@
 
 from __future__ import annotations
 
-import json
 import logging
-import os
-from datetime import datetime
 from typing import Any
 
 logger = logging.getLogger("memento-goal-middleware")
@@ -66,7 +63,9 @@ async def per_call_goal_check(
         ratio = matches / min(len(relevant_keywords), 10)
 
         if ratio < 0.1 and relevant_keywords:
-            goal_names = [g.get("goal", "")[:60] for g in goals[:3] if isinstance(g, dict)]
+            goal_names = [
+                g.get("goal", "")[:60] for g in goals[:3] if isinstance(g, dict)
+            ]
             return (
                 f"[GOAL AWARENESS] Current work may not align with active goals. "
                 f"Active goals: {', '.join(goal_names)}. "
@@ -88,7 +87,9 @@ async def session_progress_report(*, ctx: Any, session_id: str) -> str | None:
         if not goals:
             return None
 
-        events = await ctx.session_manager.store.get_recent_events(session_id=session_id, limit=20)
+        events = await ctx.session_manager.store.get_recent_events(
+            session_id=session_id, limit=20
+        )
         if not events:
             return None
 
@@ -109,9 +110,13 @@ async def session_progress_report(*, ctx: Any, session_id: str) -> str | None:
         if total == 0:
             return None
 
-        lines = [f"[SESSION PROGRESS] {aligned}/{total} goals appear addressed in this session."]
+        lines = [
+            f"[SESSION PROGRESS] {aligned}/{total} goals appear addressed in this session."
+        ]
         if aligned == 0 and total > 0:
-            goal_names = [g.get("goal", "")[:50] for g in goals[:3] if isinstance(g, dict)]
+            goal_names = [
+                g.get("goal", "")[:50] for g in goals[:3] if isinstance(g, dict)
+            ]
             lines.append(f"  Unaddressed: {', '.join(goal_names)}")
 
         return "\n".join(lines)

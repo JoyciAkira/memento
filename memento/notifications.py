@@ -1,6 +1,5 @@
 """Real-time MCP notifications — proactive alerts about relevant context changes."""
 
-import asyncio
 import json
 import logging
 import os
@@ -8,7 +7,6 @@ import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-import aiosqlite
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +23,12 @@ class NotificationManager:
         self._dismissed: set = set()
         self._config: Dict[str, Any] = {
             "enabled": True,
-            "topics": ["memory_added", "consolidation", "kg_extraction", "relevance_alert"],
+            "topics": [
+                "memory_added",
+                "consolidation",
+                "kg_extraction",
+                "relevance_alert",
+            ],
             "min_confidence": 0.5,
         }
         self._load_config()
@@ -53,7 +56,12 @@ class NotificationManager:
         except Exception as e:
             logger.error(f"Failed to save notification config: {e}")
 
-    def configure(self, enabled: bool = None, topics: List[str] = None, min_confidence: float = None) -> Dict[str, Any]:
+    def configure(
+        self,
+        enabled: bool = None,
+        topics: List[str] = None,
+        min_confidence: float = None,
+    ) -> Dict[str, Any]:
         """Update notification configuration."""
         if enabled is not None:
             self._config["enabled"] = enabled
@@ -105,11 +113,14 @@ class NotificationManager:
         logger.info(f"Notification [{topic}]: {title}")
         return {"status": "queued", "id": notification["id"]}
 
-    def get_pending_notifications(self, include_dismissed: bool = False) -> List[Dict[str, Any]]:
+    def get_pending_notifications(
+        self, include_dismissed: bool = False
+    ) -> List[Dict[str, Any]]:
         """Get all pending notifications."""
         now = time.time()
         valid = [
-            n for n in self._pending
+            n
+            for n in self._pending
             if (now - n["timestamp"]) < self.NOTIFICATION_TTL_SECONDS
             and (include_dismissed or n["id"] not in self._dismissed)
         ]
@@ -143,7 +154,9 @@ class NotificationManager:
             "config": self._config,
         }
 
-    async def check_relevance_alert(self, text: str, top_results: List[Dict[str, Any]]) -> Optional[Dict[str, Any]]:
+    async def check_relevance_alert(
+        self, text: str, top_results: List[Dict[str, Any]]
+    ) -> Optional[Dict[str, Any]]:
         """Check if search results contain highly relevant memories and notify."""
         if not self.enabled or "relevance_alert" not in self._config.get("topics", []):
             return None
@@ -161,7 +174,9 @@ class NotificationManager:
             confidence=best.get("score", 0),
         )
 
-    async def notify_memory_event(self, event: str, details: Dict[str, Any] = None) -> Dict[str, Any]:
+    async def notify_memory_event(
+        self, event: str, details: Dict[str, Any] = None
+    ) -> Dict[str, Any]:
         """Generic notification for memory events (add, delete, consolidate, etc.)."""
         topic = f"memory_{event}"
         return await self.notify(

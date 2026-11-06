@@ -1,9 +1,11 @@
 import pytest
 from memento.mcp_server import call_tool
 
+
 @pytest.mark.asyncio
 async def test_memento_status_contains_core_sections():
     from memento.mcp_server import call_tool
+
     res = await call_tool("memento_status", {})
     text = res[0].text
     assert "[Workspace]" in text
@@ -13,15 +15,18 @@ async def test_memento_status_contains_core_sections():
     assert "[UI]" in text
     assert "[Database]" in text
 
+
 @pytest.mark.asyncio
 async def test_toggle_precognition():
     result = await call_tool("memento_toggle_precognition", {"enabled": True})
     text = result[0].text.lower()
     assert "started" in text or "stopped" in text
 
+
 @pytest.mark.asyncio
 async def test_synthesize_dreams_tool():
     from memento.mcp_server import call_tool
+
     try:
         result = await call_tool("memento_synthesize_dreams", {"context": "test"})
         assert len(result) > 0
@@ -30,11 +35,13 @@ async def test_synthesize_dreams_tool():
         if "Unknown tool" in str(e):
             pytest.fail("Tool not registered")
 
+
 @pytest.mark.asyncio
 async def test_goal_injection_level1(monkeypatch):
     import memento.mcp_server as ms
     from memento.workspace_context import get_workspace_context
     import os
+
     ctx = get_workspace_context(os.getcwd())
 
     async def fake_search(*args, **kwargs):
@@ -55,45 +62,66 @@ async def test_goal_injection_level1(monkeypatch):
     result2 = await ms.call_tool("memento_search_memory", {"query": "test"})
     assert "[ACTIVE GOALS]" not in result2[0].text
 
+
 @pytest.mark.asyncio
 async def test_configure_enforcement():
     from memento.mcp_server import call_tool
     from memento.workspace_context import get_workspace_context
     import os
+
     ctx = get_workspace_context(os.getcwd())
-    result = await call_tool("memento_configure_enforcement", {"level1": True, "level2": True, "level3": True})
+    result = await call_tool(
+        "memento_configure_enforcement",
+        {"level1": True, "level2": True, "level3": True},
+    )
     assert ctx.enforcement_config["level1"] is True
     assert ctx.enforcement_config["level3"] is True
     assert "configuration updated" in result[0].text.lower()
+
 
 @pytest.mark.asyncio
 async def test_universal_memento_tool(monkeypatch):
     import memento.mcp_server as ms
     from memento.workspace_context import get_workspace_context
     import os
+
     ctx = get_workspace_context(os.getcwd())
+
     async def fake_parse(*args, **kwargs):
         return {"action": "ADD", "payload": {"text": "Test routing"}}
-    monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
+
+    monkeypatch.setattr(
+        ctx.cognitive_engine, "parse_natural_language_intent", fake_parse
+    )
+
     async def fake_add(*args, **kwargs):
         return "Memory added successfully"
+
     monkeypatch.setattr(ctx.provider, "add", fake_add)
-    
+
     result = await ms.call_tool("memento", {"query": "Store this test"})
     assert len(result) > 0
     assert "Identified action: ADD" in result[0].text
+
 
 @pytest.mark.asyncio
 async def test_universal_memento_tool_with_focus_area(monkeypatch):
     import memento.mcp_server as ms
     from memento.workspace_context import get_workspace_context
     import os
+
     ctx = get_workspace_context(os.getcwd())
 
     async def fake_parse(query):
-        return {"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}
+        return {
+            "action": "SEARCH",
+            "payload": {"query": "bug"},
+            "focus_area": "frontend",
+        }
 
-    monkeypatch.setattr(ctx.cognitive_engine, "parse_natural_language_intent", fake_parse)
+    monkeypatch.setattr(
+        ctx.cognitive_engine, "parse_natural_language_intent", fake_parse
+    )
 
     def fake_extract(focus_area, workspace):
         return focus_area
@@ -106,27 +134,28 @@ async def test_universal_memento_tool_with_focus_area(monkeypatch):
 
     monkeypatch.setattr(ctx.provider, "search", fake_search)
     monkeypatch.setattr(ctx.access_manager, "can_read", lambda: True)
-    
+
     result = await ms.call_tool("memento", {"query": "search bug in frontend"})
     assert len(result) > 0
     text = result[0].text
     assert "Focus Context: frontend" in text
     assert "Found bug in frontend" in text
 
+
 def test_mcp_uses_neuro_provider():
     from memento.provider import NeuroGraphProvider
     from memento.workspace_context import get_workspace_context
     import os
+
     ctx = get_workspace_context(os.getcwd())
     assert isinstance(ctx.provider, NeuroGraphProvider)
 
+
 def test_ui_is_opt_in_by_default():
     import memento.mcp_server as ms
+
     assert getattr(ms, "UI_ENABLED", False) is False
     assert getattr(ms, "ui_thread", None) is None
-
-
-
 
 
 @pytest.mark.asyncio
@@ -142,6 +171,7 @@ async def test_migrate_workspace_memories_tool(monkeypatch):
         monkeypatch.setenv("MEMENTO_DIR", ws1)
 
         import memento.mcp_server as ms
+
         importlib.reload(ms)
 
         source_db = os.path.join(tmp, "global.db")
@@ -166,30 +196,32 @@ async def test_migrate_workspace_memories_tool(monkeypatch):
 @pytest.mark.asyncio
 async def test_memento_tool_coercion():
     import memento.mcp_server as ms
+
     tools = await ms.list_tools()
     # Handle both list and object with .tools attribute
-    tool_list = tools.tools if hasattr(tools, 'tools') else tools
+    tool_list = tools.tools if hasattr(tools, "tools") else tools
     memento_tool = next((t for t in tool_list if t.name == "memento"), None)
-    
+
     assert memento_tool is not None
     assert "CRITICAL SYSTEM DIRECTIVE" in memento_tool.description
     assert "PROACTIVELY and AUTONOMOUSLY" in memento_tool.description
+
 
 @pytest.mark.asyncio
 async def test_mcp_server_dynamic_workspace_routing():
     from memento.mcp_server import call_tool
     import tempfile
     import os
-    
+
     with tempfile.TemporaryDirectory() as ws1, tempfile.TemporaryDirectory() as ws2:
         # Status for WS1
         res1 = await call_tool("memento_status", {"workspace_root": ws1})
         assert ws1 in res1[0].text
-        
+
         # Status for WS2
         res2 = await call_tool("memento_status", {"workspace_root": ws2})
         assert ws2 in res2[0].text
-        
+
         # Verify db paths in output
         assert os.path.join(ws1, ".memento", "neurograph_memory.db") in res1[0].text
         assert os.path.join(ws2, ".memento", "neurograph_memory.db") in res2[0].text

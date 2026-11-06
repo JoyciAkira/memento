@@ -8,6 +8,7 @@ Uso dalla root del repo:
 
 Exit code = exit code di pytest (0 = tutti i gate superati).
 """
+
 from __future__ import annotations
 
 import subprocess

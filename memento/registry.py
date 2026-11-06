@@ -2,11 +2,14 @@ from typing import Callable, Dict, List, Any, Awaitable
 from mcp.types import Tool, TextContent
 
 # Tools that are explicitly about memory search — skip proactive injection to avoid recursion
-_SEARCH_TOOLS = frozenset({"memento", "memento_search", "memento_remember", "memento_health"})
+_SEARCH_TOOLS = frozenset(
+    {"memento", "memento_search", "memento_remember", "memento_health"}
+)
 
 # Delimiter that downstream agents can recognize as untrusted injected context
-_PROACTIVE_OPEN  = "<!-- memento:proactive-context -->"
+_PROACTIVE_OPEN = "<!-- memento:proactive-context -->"
 _PROACTIVE_CLOSE = "<!-- /memento:proactive-context -->"
+
 
 class ToolRegistry:
     def __init__(self):
@@ -20,29 +23,41 @@ class ToolRegistry:
                 tool.inputSchema["properties"] = {}
             tool.inputSchema["properties"]["workspace_root"] = {
                 "type": "string",
-                "description": "MANDATORY: The absolute path of the current project/workspace root."
+                "description": "MANDATORY: The absolute path of the current project/workspace root.",
             }
 
         def decorator(func: Callable[..., Awaitable[List[TextContent]]]):
             self._tools[tool.name] = tool
             self._handlers[tool.name] = func
             return func
+
         return decorator
 
     def get_tools(self, include_deprecated: bool = False) -> List[Tool]:
         """Return registered tools, excluding deprecated ones by default."""
         if include_deprecated:
             return list(self._tools.values())
-        return [t for t in self._tools.values() if not t.description.startswith("[DEPRECATED]")]
+        return [
+            t
+            for t in self._tools.values()
+            if not t.description.startswith("[DEPRECATED]")
+        ]
 
     @staticmethod
     def _sanitize_memory(text: str) -> str:
         """Strip control tokens that could be used for prompt injection."""
         import re
+
         # Remove instruction-like patterns that could hijack the agent
-        text = re.sub(r'(?i)(ignore\s+(previous|all|prior)\s+instructions?.*)', '[FILTERED]', text)
-        text = re.sub(r'(?i)(system\s*:|<\s*system\s*>|</\s*system\s*>)', '[FILTERED]', text)
-        text = re.sub(r'(?i)(you\s+are\s+now\s+a?\s*\w+\s+assistant)', '[FILTERED]', text)
+        text = re.sub(
+            r"(?i)(ignore\s+(previous|all|prior)\s+instructions?.*)", "[FILTERED]", text
+        )
+        text = re.sub(
+            r"(?i)(system\s*:|<\s*system\s*>|</\s*system\s*>)", "[FILTERED]", text
+        )
+        text = re.sub(
+            r"(?i)(you\s+are\s+now\s+a?\s*\w+\s+assistant)", "[FILTERED]", text
+        )
         return text
 
     @staticmethod
@@ -63,8 +78,14 @@ class ToolRegistry:
             ("memento_session", "resume"): "resuming previous session context memory",
             ("memento_configure", "enforcement"): "goal enforcement alignment rules",
             ("memento_configure", "autonomy"): "autonomous agent background tasks",
-            ("memento_cognitive", "dream"): "synthesizing patterns insights from memories",
-            ("memento_cognitive", "align"): "checking code alignment with project goals",
+            (
+                "memento_cognitive",
+                "dream",
+            ): "synthesizing patterns insights from memories",
+            (
+                "memento_cognitive",
+                "align",
+            ): "checking code alignment with project goals",
             ("memento_cognitive", "forget"): "forgetting old decayed memories cleanup",
             ("memento_kg", "add_causal"): "causal relationship dependency tracking",
             ("memento_remember", "ingest_commit"): "git commit code change ingestion",
@@ -75,7 +96,8 @@ class ToolRegistry:
 
         # Collect meaningful string values from arguments
         value_parts = [
-            str(v) for k, v in arguments.items()
+            str(v)
+            for k, v in arguments.items()
             if k not in skip_keys and isinstance(v, str) and len(v) > 3
         ]
 
@@ -92,6 +114,7 @@ class ToolRegistry:
     async def _proactive_context(self, name: str, arguments: dict, ctx: Any) -> str:
         """Build a proactive context block using intent-aware semantic search."""
         from memento.settings import settings as _settings
+
         if not _settings.proactive_inject:
             return ""
         if name in _SEARCH_TOOLS:
@@ -101,7 +124,10 @@ class ToolRegistry:
             return ""
         # Check access manager — respect lockdown/read-only
         access_manager = getattr(ctx, "access_manager", None)
-        if access_manager and getattr(access_manager, "_state", "read-write") == "lockdown":
+        if (
+            access_manager
+            and getattr(access_manager, "_state", "read-write") == "lockdown"
+        ):
             return ""
         # Enforce workspace filter
         workspace_root = arguments.get("workspace_root")
@@ -111,22 +137,32 @@ class ToolRegistry:
         if not query:
             return ""
         try:
-            results = await provider.search(query, limit=_settings.proactive_top_k, filters=filters)
+            results = await provider.search(
+                query, limit=_settings.proactive_top_k, filters=filters
+            )
         except Exception:
             return ""
         if not results:
             return ""
         from memento.compaction import compact_memory
-        lines = [f"{_PROACTIVE_OPEN}", f"[Proactive context — {len(results)} relevant memories]"]
+
+        lines = [
+            f"{_PROACTIVE_OPEN}",
+            f"[Proactive context — {len(results)} relevant memories]",
+        ]
         for r in results:
             sanitized = self._sanitize_memory(r.get("memory", ""))
-            compressed = compact_memory(sanitized, _settings.proactive_strategy, _settings.proactive_max_tokens)
+            compressed = compact_memory(
+                sanitized, _settings.proactive_strategy, _settings.proactive_max_tokens
+            )
             if compressed:
                 lines.append(f"• {compressed}")
         lines.append(_PROACTIVE_CLOSE)
         return "\n".join(lines) + "\n\n"
 
-    async def execute(self, name: str, arguments: dict, ctx: Any, **kwargs) -> List[TextContent]:
+    async def execute(
+        self, name: str, arguments: dict, ctx: Any, **kwargs
+    ) -> List[TextContent]:
         """Execute the handler for the given tool name."""
         if name not in self._handlers:
             raise ValueError(f"Unknown tool: {name}")
@@ -148,6 +184,7 @@ class ToolRegistry:
         except Exception:
             pass
         return result
+
 
 # Global registry instance
 registry = ToolRegistry()

@@ -1,13 +1,13 @@
 import pytest
-import asyncio
-import sqlite3
 from memento.provider import NeuroGraphProvider
+
 
 @pytest.mark.asyncio
 async def test_orchestrator_initialized_after_init():
     from memento.migrations.runner import MigrationRunner
     from memento.migrations.versions import get_all_migrations
-    import tempfile, os
+    import tempfile
+    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
@@ -29,7 +29,8 @@ async def test_orchestrator_initialized_after_init():
 async def test_orchestrator_add_to_different_tiers():
     from memento.migrations.runner import MigrationRunner
     from memento.migrations.versions import get_all_migrations
-    import tempfile, os
+    import tempfile
+    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
@@ -42,9 +43,9 @@ async def test_orchestrator_add_to_different_tiers():
         await provider.initialize()
         orch = provider.orchestrator
 
-        id1 = orch.add("L1 content", tier="working")
-        id2 = orch.add("L2 episodic content", tier="episodic")
-        id3 = orch.add("L3 semantic content", tier="semantic")
+        orch.add("L1 content", tier="working")
+        orch.add("L2 episodic content", tier="episodic")
+        orch.add("L3 semantic content", tier="semantic")
 
         l1_items = orch.l1.get_all()
         assert len(l1_items) == 1
@@ -63,7 +64,8 @@ async def test_orchestrator_add_to_different_tiers():
 async def test_orchestrator_search_all_tiers():
     from memento.migrations.runner import MigrationRunner
     from memento.migrations.versions import get_all_migrations
-    import tempfile, os
+    import tempfile
+    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_orch.db")
@@ -90,7 +92,8 @@ async def test_orchestrator_search_all_tiers():
 async def test_orchestrator_vsa_index_integration():
     from memento.migrations.runner import MigrationRunner
     from memento.migrations.versions import get_all_migrations
-    import tempfile, os
+    import tempfile
+    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_vsa_orch.db")
@@ -124,7 +127,8 @@ async def test_orchestrator_vsa_index_integration():
 async def test_orchestrator_vsa_search_relation():
     from memento.migrations.runner import MigrationRunner
     from memento.migrations.versions import get_all_migrations
-    import tempfile, os
+    import tempfile
+    import os
 
     with tempfile.TemporaryDirectory() as tmpdir:
         db_path = os.path.join(tmpdir, "test_vsa_rel.db")

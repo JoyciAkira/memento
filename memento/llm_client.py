@@ -21,7 +21,9 @@ async def _retry_async(coro):
         except Exception as e:
             if attempt < _MAX_RETRIES - 1 and _is_retryable(e):
                 wait = _RETRY_BACKOFF_BASE ** (attempt + 1)
-                logger.warning(f"Retrying LLM call (attempt {attempt + 1}/{_MAX_RETRIES}): {e}")
+                logger.warning(
+                    f"Retrying LLM call (attempt {attempt + 1}/{_MAX_RETRIES}): {e}"
+                )
                 await asyncio.sleep(wait)
             else:
                 raise
@@ -29,7 +31,9 @@ async def _retry_async(coro):
 
 def _is_retryable(exc: Exception) -> bool:
     msg = str(exc).lower()
-    return any(k in msg for k in ("rate_limit", "429", "timeout", "503", "502", "connection"))
+    return any(
+        k in msg for k in ("rate_limit", "429", "timeout", "503", "502", "connection")
+    )
 
 
 def _is_local_base_url(base_url: str) -> bool:
@@ -47,7 +51,9 @@ def get_llm_client() -> AsyncOpenAI | None:
 
     # Local LLM endpoints (LM Studio, Ollama) don't require authentication.
     if not api_key and not is_local:
-        logger.debug("No OPENAI_API_KEY set and base_url is not local. LLM features disabled.")
+        logger.debug(
+            "No OPENAI_API_KEY set and base_url is not local. LLM features disabled."
+        )
         return None
 
     effective_key = api_key if api_key else "local-no-key"

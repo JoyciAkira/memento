@@ -8,6 +8,7 @@ backs the corrupted file up to a timestamped ``.corrupted-<ts>`` copy, and lets
 the next connection recreate a fresh, empty store — while preserving the
 original for later recovery with ``sqlite3 "<file>" ".recover"``.
 """
+
 from __future__ import annotations
 
 import os
@@ -77,11 +78,15 @@ def ensure_healthy_db(db_path: str, *, label: str = "database") -> bool:
                 "MEMENTO DB CORRUPTION detected (%s) at %s — backed up to %s and "
                 "recreating a fresh store. To attempt data recovery run: "
                 "sqlite3 '%s' \".recover\" > recovered.sql",
-                label, db_path, backup, backup,
+                label,
+                db_path,
+                backup,
+                backup,
             )
         else:
             logger.warning(
                 "MEMENTO DB CORRUPTION detected (%s) at %s — removing unreadable file.",
-                label, db_path,
+                label,
+                db_path,
             )
     return True

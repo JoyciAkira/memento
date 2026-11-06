@@ -59,7 +59,9 @@ class ProjectMemoryGraph:
             )
             return True
         except Exception as e:
-            logger.warning(f"Failed to add relation {subject} {predicate} {object_}: {e}")
+            logger.warning(
+                f"Failed to add relation {subject} {predicate} {object_}: {e}"
+            )
             return False
 
     async def get_entity_context(self, entity_name: str, depth: int = 1) -> str:

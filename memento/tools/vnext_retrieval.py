@@ -24,9 +24,13 @@ logger = logging.getLogger("memento-mcp")
         },
     )
 )
-async def memento_search_vnext(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_search_vnext(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
-        raise PermissionError(f"Cannot search memory. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot search memory. Current access state is: {access_manager.state}"
+        )
 
     query = arguments.get("query")
     if not query:
@@ -44,10 +48,16 @@ async def memento_search_vnext(arguments: dict, ctx, access_manager) -> list[Tex
             filters=filters,
             trace=trace,
         )
-        return [TextContent(type="text", text=json.dumps(bundle, indent=2, ensure_ascii=False))]
+        return [
+            TextContent(
+                type="text", text=json.dumps(bundle, indent=2, ensure_ascii=False)
+            )
+        ]
     except Exception as e:
         logger.error(f"Error searching vNext memory: {e}")
-        return [TextContent(type="text", text=f"Error searching vNext memory: {str(e)}")]
+        return [
+            TextContent(type="text", text=f"Error searching vNext memory: {str(e)}")
+        ]
 
 
 @registry.register(
@@ -64,15 +74,27 @@ async def memento_search_vnext(arguments: dict, ctx, access_manager) -> list[Tex
         },
     )
 )
-async def memento_explain_retrieval(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_explain_retrieval(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
-        raise PermissionError(f"Cannot search memory. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot search memory. Current access state is: {access_manager.state}"
+        )
 
     query = arguments.get("query")
     if not query:
         raise ValueError("Query is required")
 
     filters = arguments.get("filters")
-    bundle = await ctx.provider.search_vnext_bundle(query=query, user_id="default", limit=10, filters=filters, trace=True)
-    payload = {"query": bundle.get("query"), "routing": bundle.get("routing"), "traces": bundle.get("traces")}
-    return [TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))]
+    bundle = await ctx.provider.search_vnext_bundle(
+        query=query, user_id="default", limit=10, filters=filters, trace=True
+    )
+    payload = {
+        "query": bundle.get("query"),
+        "routing": bundle.get("routing"),
+        "traces": bundle.get("traces"),
+    }
+    return [
+        TextContent(type="text", text=json.dumps(payload, indent=2, ensure_ascii=False))
+    ]

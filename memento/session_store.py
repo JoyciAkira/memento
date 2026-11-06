@@ -25,7 +25,9 @@ def _safe_json(obj: Any) -> str:
     try:
         raw = json.dumps(obj, ensure_ascii=False, separators=(",", ":"))
     except Exception:
-        raw = json.dumps({"unserializable": True}, ensure_ascii=False, separators=(",", ":"))
+        raw = json.dumps(
+            {"unserializable": True}, ensure_ascii=False, separators=(",", ":")
+        )
     return redact_secrets(raw)
 
 
@@ -195,7 +197,9 @@ class SessionStore:
                 metadata=row["metadata"],
             )
 
-    async def list_sessions(self, *, limit: int = 20, status: str | None = None) -> list[dict[str, Any]]:
+    async def list_sessions(
+        self, *, limit: int = 20, status: str | None = None
+    ) -> list[dict[str, Any]]:
         safe_limit = min(int(limit), 200)
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row
@@ -229,7 +233,9 @@ class SessionStore:
             for r in rows
         ]
 
-    async def get_recent_events(self, *, session_id: str, limit: int = 25) -> list[dict[str, Any]]:
+    async def get_recent_events(
+        self, *, session_id: str, limit: int = 25
+    ) -> list[dict[str, Any]]:
         safe_limit = min(int(limit), 200)
         async with aiosqlite.connect(self.db_path) as db:
             db.row_factory = aiosqlite.Row

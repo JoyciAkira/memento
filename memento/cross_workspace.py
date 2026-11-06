@@ -4,7 +4,7 @@ import json
 import logging
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import aiosqlite
 
@@ -131,9 +131,7 @@ class CrossWorkspaceManager:
             )
             pending_count = (await cursor.fetchone())[0]
 
-            cursor = await db.execute(
-                "SELECT COUNT(*) FROM cross_workspace_sync_log"
-            )
+            cursor = await db.execute("SELECT COUNT(*) FROM cross_workspace_sync_log")
             total = (await cursor.fetchone())[0]
 
             cursor = await db.execute(

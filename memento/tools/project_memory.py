@@ -17,19 +17,27 @@ logger = logging.getLogger("memento-mcp")
         inputSchema={
             "type": "object",
             "properties": {
-                "name": {"type": "string", "description": "Entity name (e.g. AuthModule, login_page.tsx)"},
+                "name": {
+                    "type": "string",
+                    "description": "Entity name (e.g. AuthModule, login_page.tsx)",
+                },
                 "entity_type": {
                     "type": "string",
                     "description": "Entity type: file, component, decision, bug_fix, feature, session, module, api",
                 },
-                "properties": {"type": "string", "description": "JSON string of additional properties"},
+                "properties": {
+                    "type": "string",
+                    "description": "JSON string of additional properties",
+                },
                 "workspace_root": {"type": "string"},
             },
             "required": ["name", "entity_type"],
         },
     )
 )
-async def memento_pmg_add_entity(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_pmg_add_entity(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_write():
         raise PermissionError(f"Access: {access_manager.state}")
     name = arguments.get("name", "")
@@ -38,12 +46,20 @@ async def memento_pmg_add_entity(arguments: dict, ctx, access_manager) -> list[T
     raw_props = arguments.get("properties")
     if raw_props:
         import json
+
         try:
             props = json.loads(raw_props)
         except Exception:
             props = {"raw": raw_props}
-    ok = await ctx.project_memory_graph.add_entity(name=name, entity_type=entity_type, properties=props)
-    return [TextContent(type="text", text=f"Entity '{name}' ({entity_type}) {'added' if ok else 'failed to add'}.")]
+    ok = await ctx.project_memory_graph.add_entity(
+        name=name, entity_type=entity_type, properties=props
+    )
+    return [
+        TextContent(
+            type="text",
+            text=f"Entity '{name}' ({entity_type}) {'added' if ok else 'failed to add'}.",
+        )
+    ]
 
 
 @registry.register(
@@ -68,14 +84,23 @@ async def memento_pmg_add_entity(arguments: dict, ctx, access_manager) -> list[T
         },
     )
 )
-async def memento_pmg_add_relation(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_pmg_add_relation(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_write():
         raise PermissionError(f"Access: {access_manager.state}")
     subject = arguments.get("subject", "")
     predicate = arguments.get("predicate", "")
     object_ = arguments.get("object", "")
-    ok = await ctx.project_memory_graph.add_relation(subject=subject, predicate=predicate, object_=object_)
-    return [TextContent(type="text", text=f"Relation '{subject} --{predicate}--> {object_}' {'added' if ok else 'failed'}.")]
+    ok = await ctx.project_memory_graph.add_relation(
+        subject=subject, predicate=predicate, object_=object_
+    )
+    return [
+        TextContent(
+            type="text",
+            text=f"Relation '{subject} --{predicate}--> {object_}' {'added' if ok else 'failed'}.",
+        )
+    ]
 
 
 @registry.register(
@@ -85,20 +110,31 @@ async def memento_pmg_add_relation(arguments: dict, ctx, access_manager) -> list
         inputSchema={
             "type": "object",
             "properties": {
-                "entity_name": {"type": "string", "description": "Entity name to look up"},
-                "depth": {"type": "integer", "description": "Traversal depth (1=direct, 2=one hop further)", "default": 1},
+                "entity_name": {
+                    "type": "string",
+                    "description": "Entity name to look up",
+                },
+                "depth": {
+                    "type": "integer",
+                    "description": "Traversal depth (1=direct, 2=one hop further)",
+                    "default": 1,
+                },
                 "workspace_root": {"type": "string"},
             },
             "required": ["entity_name"],
         },
     )
 )
-async def memento_pmg_entity_context(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_pmg_entity_context(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
         raise PermissionError(f"Access: {access_manager.state}")
     entity = arguments.get("entity_name", "")
     depth = int(arguments.get("depth") or 1)
-    context = await ctx.project_memory_graph.get_entity_context(entity_name=entity, depth=depth)
+    context = await ctx.project_memory_graph.get_entity_context(
+        entity_name=entity, depth=depth
+    )
     return [TextContent(type="text", text=context)]
 
 
@@ -116,7 +152,9 @@ async def memento_pmg_entity_context(arguments: dict, ctx, access_manager) -> li
         },
     )
 )
-async def memento_pmg_what_might_break(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_pmg_what_might_break(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
         raise PermissionError(f"Access: {access_manager.state}")
     entity = arguments.get("entity_name", "")
@@ -133,10 +171,15 @@ async def memento_pmg_what_might_break(arguments: dict, ctx, access_manager) -> 
     Tool(
         name="memento_pmg_summary",
         description="[DEPRECATED] Get a summary of the entire Project Memory Graph (all entities and recent relations).",
-        inputSchema={"type": "object", "properties": {"workspace_root": {"type": "string"}}},
+        inputSchema={
+            "type": "object",
+            "properties": {"workspace_root": {"type": "string"}},
+        },
     )
 )
-async def memento_pmg_summary(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_pmg_summary(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_read():
         raise PermissionError(f"Access: {access_manager.state}")
     summary = await ctx.project_memory_graph.get_project_summary()

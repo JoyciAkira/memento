@@ -1,4 +1,5 @@
 """Structured ingestion of git commits and test failures into Memento memory."""
+
 from __future__ import annotations
 
 import logging

@@ -17,10 +17,14 @@ class SessionManager:
     async def ensure_session(self) -> str:
         return await self.store.ensure_active_session()
 
-    async def create_checkpoint(self, *, session_id: str, reason: str, lossless: bool = True) -> dict[str, Any]:
+    async def create_checkpoint(
+        self, *, session_id: str, reason: str, lossless: bool = True
+    ) -> dict[str, Any]:
         await self.provider.initialize()
 
-        goals = await self.provider.list_goals(context=None, active_only=True, limit=50, offset=0)
+        goals = await self.provider.list_goals(
+            context=None, active_only=True, limit=50, offset=0
+        )
         try:
             l1 = self.provider.orchestrator.l1.dump()
         except Exception:
@@ -35,7 +39,9 @@ class SessionManager:
             l3 = []
 
         git_context = build_auto_context(self.workspace_root)
-        recent_events = await self.store.get_recent_events(session_id=session_id, limit=25)
+        recent_events = await self.store.get_recent_events(
+            session_id=session_id, limit=25
+        )
 
         active_contexts: list[str] = []
         for e in recent_events:
@@ -45,7 +51,11 @@ class SessionManager:
 
         summary = ""
         if recent_events:
-            last = [e.get("tool_name") for e in recent_events[:5] if isinstance(e, dict) and e.get("tool_name")]
+            last = [
+                e.get("tool_name")
+                for e in recent_events[:5]
+                if isinstance(e, dict) and e.get("tool_name")
+            ]
             summary = "Recent activity: " + ", ".join(reversed(last))
 
         snapshot = {
@@ -62,6 +72,7 @@ class SessionManager:
         # Include project state summary in snapshot
         try:
             from memento.project_state import ProjectStateStore
+
             ps = ProjectStateStore(self.db_path)
             project_summary = await ps.get_summary()
             if project_summary:
@@ -72,6 +83,7 @@ class SessionManager:
         # Include KG + decision log for a lossless enterprise handoff (best-effort).
         try:
             from memento.knowledge_graph import KnowledgeGraphStore
+
             kg = KnowledgeGraphStore(self.db_path)
             kg_summary = await kg.get_summary()
             if kg_summary:
@@ -81,7 +93,9 @@ class SessionManager:
         try:
             agent = getattr(self.provider, "autonomous_agent", None)
             if agent is not None:
-                decisions = agent.get_decisions() if hasattr(agent, "get_decisions") else None
+                decisions = (
+                    agent.get_decisions() if hasattr(agent, "get_decisions") else None
+                )
                 if decisions:
                     snapshot["decisions"] = decisions
         except Exception:
@@ -98,8 +112,13 @@ class SessionManager:
                 prev_row = await self.store.get_session(prev_id)
                 if not prev_row or not prev_row.checkpoint_data:
                     continue
-                prev_data = json.loads(prev_row.checkpoint_data) if prev_row.checkpoint_data else {}
+                prev_data = (
+                    json.loads(prev_row.checkpoint_data)
+                    if prev_row.checkpoint_data
+                    else {}
+                )
                 from memento.handoff_prompt import render_session_diff_prompt
+
                 session_diff = render_session_diff_prompt(
                     current_snapshot=snapshot,
                     previous_snapshot=prev_data,
@@ -119,10 +138,14 @@ class SessionManager:
             pass
 
         snapshot["session_diff"] = session_diff
-        prompt = render_handoff_prompt(session_id=session_id, snapshot=snapshot, lossless=lossless)
+        prompt = render_handoff_prompt(
+            session_id=session_id, snapshot=snapshot, lossless=lossless
+        )
         if session_diff:
             prompt += "\n" + session_diff
-        await self.store.update_checkpoint(session_id=session_id, checkpoint_data=snapshot, handoff_prompt=prompt)
+        await self.store.update_checkpoint(
+            session_id=session_id, checkpoint_data=snapshot, handoff_prompt=prompt
+        )
         return snapshot
 
     async def resume_from(self, *, session_id: str) -> dict[str, Any]:
@@ -154,4 +177,3 @@ class SessionManager:
             "handoff_prompt": handoff_prompt,
             "snapshot": data,
         }
-

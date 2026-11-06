@@ -17,7 +17,15 @@ def _cap(text: str, limit: int = 800) -> str:
 def _derive_blockers(events: List[dict]) -> List[str]:
     """Enterprise 'known blockers': error events + failure-looking results."""
     blockers: List[str] = []
-    fail_markers = ("error", "exception", "traceback", "failed", "cannot", "denied", "timeout")
+    fail_markers = (
+        "error",
+        "exception",
+        "traceback",
+        "failed",
+        "cannot",
+        "denied",
+        "timeout",
+    )
     for e in events:
         if not isinstance(e, dict):
             continue
@@ -36,7 +44,11 @@ def _derive_next_steps(events: List[dict], goals: List[dict]) -> List[str]:
         goal = g.get("goal") if isinstance(g, dict) else g
         if goal:
             steps.append(f"- Pursue goal: {goal}")
-    recent = [e.get("tool_name") for e in events[:3] if isinstance(e, dict) and e.get("tool_name")]
+    recent = [
+        e.get("tool_name")
+        for e in events[:3]
+        if isinstance(e, dict) and e.get("tool_name")
+    ]
     if recent:
         steps.append("- Continue from: " + ", ".join(reversed(recent)))
     if not steps:
@@ -79,15 +91,21 @@ def render_handoff_prompt(
     l1_cap = len(l1) if lossless else 20
     ev_cap = len(events) if lossless else 15
 
-    goals_block = "\n".join(
-        f"- {g.get('goal')}" for g in goals if isinstance(g, dict) and g.get("goal")
-    ) or "(none)"
+    goals_block = (
+        "\n".join(
+            f"- {g.get('goal')}" for g in goals if isinstance(g, dict) and g.get("goal")
+        )
+        or "(none)"
+    )
 
-    l1_lines = "\n".join(
-        f"- {i.get('id')}: {_cap(str(i.get('content', '')))}"
-        for i in l1[:l1_cap]
-        if isinstance(i, dict) and i.get("id") is not None
-    ) or "(empty)"
+    l1_lines = (
+        "\n".join(
+            f"- {i.get('id')}: {_cap(str(i.get('content', '')))}"
+            for i in l1[:l1_cap]
+            if isinstance(i, dict) and i.get("id") is not None
+        )
+        or "(empty)"
+    )
 
     def _tier_block(items: List[dict], label: str) -> str:
         if not items:
@@ -99,7 +117,9 @@ def render_handoff_prompt(
         )
         return f"\n{label}\n" + (lines or "(empty)")
 
-    files_block = "\n".join(f"- {p}" for p in files if isinstance(p, str) and p) or "(none)"
+    files_block = (
+        "\n".join(f"- {p}" for p in files if isinstance(p, str) and p) or "(none)"
+    )
 
     # Tool-call replay index (full, lossless) — enables exact resume.
     replay_lines: List[str] = []
@@ -118,9 +138,11 @@ def render_handoff_prompt(
     next_steps = _derive_next_steps(events, goals)
     next_block = "\n".join(next_steps)
 
-    decisions_block = "\n".join(
-        f"- {_cap(str(d), 300)}" for d in decisions if d
-    ) if decisions else "(none)"
+    decisions_block = (
+        "\n".join(f"- {_cap(str(d), 300)}" for d in decisions if d)
+        if decisions
+        else "(none)"
+    )
 
     parts = [
         "MEMENTO SESSION HANDOFF (lossless)",
@@ -175,7 +197,9 @@ def render_handoff_prompt(
 
     parts.append("")
     parts.append("TO RESUME (zero context loss)")
-    parts.append(f'Call: memento_session(action="resume", session_id="{session_id}", lossless=true)')
+    parts.append(
+        f'Call: memento_session(action="resume", session_id="{session_id}", lossless=true)'
+    )
 
     return "\n".join(parts).strip() + "\n"
 
@@ -191,8 +215,16 @@ def render_session_diff_prompt(
 
     parts = ["SESSION DELTA (since last session)", ""]
 
-    prev_goals = {g.get("goal") for g in _as_list(previous_snapshot.get("goals")) if isinstance(g, dict)}
-    curr_goals = {g.get("goal") for g in _as_list(current_snapshot.get("goals")) if isinstance(g, dict)}
+    prev_goals = {
+        g.get("goal")
+        for g in _as_list(previous_snapshot.get("goals"))
+        if isinstance(g, dict)
+    }
+    curr_goals = {
+        g.get("goal")
+        for g in _as_list(current_snapshot.get("goals"))
+        if isinstance(g, dict)
+    }
     new_goals = curr_goals - prev_goals
     removed_goals = prev_goals - curr_goals
     if new_goals:

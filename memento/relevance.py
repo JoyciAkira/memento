@@ -13,7 +13,9 @@ logger = logging.getLogger(__name__)
 class RelevanceTracker:
     """Tracks memory access patterns and computes relevance scores."""
 
-    DECAY_HALF_LIFE_DAYS = 30.0  # memories halve in relevance every 30 days without access
+    DECAY_HALF_LIFE_DAYS = (
+        30.0  # memories halve in relevance every 30 days without access
+    )
     BOOST_FACTOR = 1.5  # max boost multiplier for frequently accessed memories
     RECENT_ACCESS_BOOST = 0.3  # extra boost for memories accessed in last 24h
 
@@ -77,13 +79,17 @@ class RelevanceTracker:
                 )
             await db.commit()
 
-    def _compute_boost(self, hit_count: int, last_accessed: str | None, created_at: str | None) -> float:
+    def _compute_boost(
+        self, hit_count: int, last_accessed: str | None, created_at: str | None
+    ) -> float:
         """Compute relevance boost from hit count, recency, and decay."""
         if hit_count == 0:
             return 1.0  # no data, neutral
 
         # Frequency boost: logarithmic scale, capped at BOOST_FACTOR
-        freq_boost = min(math.log2(hit_count + 1) / 5.0, 1.0) * (self.BOOST_FACTOR - 1.0) + 1.0
+        freq_boost = (
+            min(math.log2(hit_count + 1) / 5.0, 1.0) * (self.BOOST_FACTOR - 1.0) + 1.0
+        )
 
         # Recency boost: accessed recently?
         recency_boost = 1.0
@@ -185,5 +191,7 @@ class RelevanceTracker:
                 "with_hits": with_hits_row[0] if with_hits_row else 0,
                 "hot_memories": hot_row[0] if hot_row else 0,
                 "cold_memories": cold_row[0] if cold_row else 0,
-                "avg_hit_count": round(avg_hits_row[0], 2) if avg_hits_row and avg_hits_row[0] else 0,
+                "avg_hit_count": round(avg_hits_row[0], 2)
+                if avg_hits_row and avg_hits_row[0]
+                else 0,
             }

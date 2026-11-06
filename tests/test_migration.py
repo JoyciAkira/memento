@@ -56,7 +56,12 @@ def test_migration_copy_only_is_idempotent_and_creates_report():
             "2026-01-02T00:00:00",
         )
         _insert(source_db, "id3", "Generic note without match", "2026-01-03T00:00:00")
-        _insert(source_db, "id4", "NEXUS-LM and ZERONODE together (ambiguous)", "2026-01-04T00:00:00")
+        _insert(
+            source_db,
+            "id4",
+            "NEXUS-LM and ZERONODE together (ambiguous)",
+            "2026-01-04T00:00:00",
+        )
 
         report_path = os.path.join(tmp, "report.json")
 

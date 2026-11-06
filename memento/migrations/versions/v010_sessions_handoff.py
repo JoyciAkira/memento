@@ -45,4 +45,3 @@ def up(conn):
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_session_events_workspace_created ON session_events(workspace_root, created_at DESC);"
     )
-

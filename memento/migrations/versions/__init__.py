@@ -10,6 +10,7 @@ from memento.migrations.versions.v010_sessions_handoff import up as up_010
 from memento.migrations.versions.v011_created_at_index import up as up_011
 from memento.migrations.versions.v012_backfill_memory_tiers import up as up_012
 
+
 def get_all_migrations():
     return [
         (1, "initial_schema", up_001),

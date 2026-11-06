@@ -1,5 +1,4 @@
 import uuid
-import json
 from datetime import datetime
 from typing import Any
 
@@ -21,7 +20,9 @@ class GoalStore:
         now = datetime.now().isoformat()
         batch_id = str(uuid.uuid4())
 
-        clean_goals = [g.strip() for g in (goals or []) if isinstance(g, str) and g.strip()]
+        clean_goals = [
+            g.strip() for g in (goals or []) if isinstance(g, str) and g.strip()
+        ]
         if not clean_goals:
             raise ValueError("goals must be a non-empty list of strings")
         if mode not in {"replace", "append"}:
@@ -49,10 +50,20 @@ class GoalStore:
                 )
             await db.commit()
 
-        return {"batch_id": batch_id, "inserted_ids": inserted_ids, "mode": mode, "context": context}
+        return {
+            "batch_id": batch_id,
+            "inserted_ids": inserted_ids,
+            "mode": mode,
+            "context": context,
+        }
 
     async def list_goals(
-        self, *, context: str | None = None, active_only: bool = True, limit: int = 50, offset: int = 0
+        self,
+        *,
+        context: str | None = None,
+        active_only: bool = True,
+        limit: int = 50,
+        offset: int = 0,
     ) -> list[dict[str, Any]]:
         safe_limit = min(int(limit), 200)
         safe_offset = max(int(offset), 0)
@@ -81,10 +92,15 @@ class GoalStore:
 
         return [
             {
-                "id": r["id"], "context": r["context"], "goal": r["goal"],
-                "created_at": r["created_at"], "updated_at": r["updated_at"],
-                "is_active": bool(r["is_active"]), "is_deleted": bool(r["is_deleted"]),
-                "deleted_at": r["deleted_at"], "delete_reason": r["delete_reason"],
+                "id": r["id"],
+                "context": r["context"],
+                "goal": r["goal"],
+                "created_at": r["created_at"],
+                "updated_at": r["updated_at"],
+                "is_active": bool(r["is_active"]),
+                "is_deleted": bool(r["is_deleted"]),
+                "deleted_at": r["deleted_at"],
+                "delete_reason": r["delete_reason"],
                 "replaced_by_id": r["replaced_by_id"],
             }
             for r in rows

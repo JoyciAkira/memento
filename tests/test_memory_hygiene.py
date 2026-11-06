@@ -135,9 +135,7 @@ async def test_forget_decayed_keeps_recently_accessed_memories(tmp_path, monkeyp
 async def test_tier_report_reports_distribution_and_candidates(tmp_path, monkeypatch):
     provider = _provider(tmp_path, monkeypatch)
     await provider.add("recent semantic fact")
-    old = await provider.add(
-        "old episodic event", metadata={"memory_tier": "episodic"}
-    )
+    old = await provider.add("old episodic event", metadata={"memory_tier": "episodic"})
     archived = await provider.add("archived fact")
     await provider.soft_delete_memory(archived["id"], "superseded")
 

@@ -18,6 +18,7 @@ def _int_from_bits(bits: "np.ndarray", d: int) -> int:
     packed = np.packbits(bits.astype(np.uint8), bitorder="little")
     return int.from_bytes(packed.tobytes(), "little") & ((1 << d) - 1)
 
+
 class BitVector:
     def __init__(self, value: int, d: int):
         self.value = value & ((1 << d) - 1)
@@ -42,7 +43,10 @@ class BitVector:
 
     def __eq__(self, other):
         other_value = int(other) if isinstance(other, BitVector) else int(other)
-        return [((self.value >> bit) & 1) == ((other_value >> bit) & 1) for bit in range(self.d)]
+        return [
+            ((self.value >> bit) & 1) == ((other_value >> bit) & 1)
+            for bit in range(self.d)
+        ]
 
 
 class HDCEncoder:
@@ -67,7 +71,11 @@ class HDCEncoder:
         needed = (self.d + 7) // 8
         seed = f"{self._seed}:{name}".encode("utf-8")
         while len(out) < needed:
-            out.extend(hashlib.blake2b(seed + counter.to_bytes(4, "little"), digest_size=64).digest())
+            out.extend(
+                hashlib.blake2b(
+                    seed + counter.to_bytes(4, "little"), digest_size=64
+                ).digest()
+            )
             counter += 1
         return BitVector(int.from_bytes(bytes(out[:needed]), "little"), self.d)
 
@@ -97,7 +105,9 @@ class HDCEncoder:
         value = int(v)
         if steps == 0:
             return BitVector(value & self._mask, self.d)
-        return BitVector(((value << steps) | (value >> (self.d - steps))) & self._mask, self.d)
+        return BitVector(
+            ((value << steps) | (value >> (self.d - steps))) & self._mask, self.d
+        )
 
     def similarity(self, a: int | BitVector, b: int | BitVector) -> float:
         differing = ((int(a) ^ int(b)) & self._mask).bit_count()
@@ -125,7 +135,9 @@ class HDCEncoder:
         o = self.concept(obj)
         return self.bundle([self.bind(s, p), self.bind(p, o)])
 
-    def decode_relation(self, hv: int | BitVector, top_k: int = 3) -> List[Tuple[str, float]]:
+    def decode_relation(
+        self, hv: int | BitVector, top_k: int = 3
+    ) -> List[Tuple[str, float]]:
         scores: Dict[str, float] = {}
         for name, vec in self._concept_vectors.items():
             scores[name] = self.similarity(hv, vec)

@@ -4,6 +4,7 @@ import tempfile
 
 _API_KEY_PLACEHOLDER = "sk-or-v2-placeholder-key-for-tests"
 
+
 @pytest.mark.asyncio
 async def test_consolidate_method_on_engine():
     from memento.provider import NeuroGraphProvider
@@ -25,10 +26,13 @@ async def test_consolidate_method_on_engine():
         assert consolidator._llm_predictor._llm is not None
 
         result = await engine.consolidate(
-            event="python tests pass",
-            actual_outcome="python tests pass"
+            event="python tests pass", actual_outcome="python tests pass"
         )
-        assert isinstance(result, type(consolidator._consolidation_log[-1])) if consolidator._consolidation_log else True
+        assert (
+            isinstance(result, type(consolidator._consolidation_log[-1]))
+            if consolidator._consolidation_log
+            else True
+        )
 
 
 @pytest.mark.asyncio
@@ -48,8 +52,7 @@ async def test_consolidate_predict_only():
         engine = CognitiveEngine(provider)
 
         result = await engine.consolidate(
-            event="git push origin main",
-            actual_outcome=None
+            event="git push origin main", actual_outcome=None
         )
         assert result.memory_id == ""
         assert result.was_surprising is False

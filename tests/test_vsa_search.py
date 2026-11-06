@@ -7,6 +7,7 @@ Hamming search but rejected: these bundle() hypervectors are near-orthogonal
 of recall/correctness guard that was previously missing and that the silent
 except in _batch_hv_similarity would have hidden.
 """
+
 import numpy as np
 
 from memento.memory.hdc import HDCEncoder

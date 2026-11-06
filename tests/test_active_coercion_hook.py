@@ -1,10 +1,6 @@
 import json
 import os
 import tempfile
-import pytest
-from unittest.mock import MagicMock
-
-from memento.active_coercion import normalize_hard_rules, check_text_against_rules, HardRule
 
 
 class TestActiveCoercionHook:
@@ -15,19 +11,47 @@ class TestActiveCoercionHook:
         os.makedirs(settings_dir, exist_ok=True)
         settings_path = os.path.join(settings_dir, "settings.json")
         with open(settings_path, "w") as f:
-            json.dump({"active_coercion": {"enabled": True, "rules": [
-                {"id": "test_no_print", "path_globs": ["*.py"], "kind": "regex",
-                 "regex": "\\bprint\\(", "message": "No print()", "severity": "block"}
-            ]}}, f)
+            json.dump(
+                {
+                    "active_coercion": {
+                        "enabled": True,
+                        "rules": [
+                            {
+                                "id": "test_no_print",
+                                "path_globs": ["*.py"],
+                                "kind": "regex",
+                                "regex": "\\bprint\\(",
+                                "message": "No print()",
+                                "severity": "block",
+                            }
+                        ],
+                    }
+                },
+                f,
+            )
 
         with tempfile.TemporaryDirectory() as repo:
             os.makedirs(os.path.join(repo, ".memento"))
             settings_repo_path = os.path.join(repo, ".memento", "settings.json")
             with open(settings_repo_path, "w") as f:
-                json.dump({"active_coercion": {"enabled": True, "rules": [
-                    {"id": "test_no_print", "path_globs": ["*.py"], "kind": "regex",
-                     "regex": "\\bprint\\(", "message": "No print()", "severity": "block"}
-                ]}}, f)
+                json.dump(
+                    {
+                        "active_coercion": {
+                            "enabled": True,
+                            "rules": [
+                                {
+                                    "id": "test_no_print",
+                                    "path_globs": ["*.py"],
+                                    "kind": "regex",
+                                    "regex": "\\bprint\\(",
+                                    "message": "No print()",
+                                    "severity": "block",
+                                }
+                            ],
+                        }
+                    },
+                    f,
+                )
 
             os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
 
@@ -47,10 +71,24 @@ class TestActiveCoercionHook:
             os.makedirs(os.path.join(repo, ".memento"))
             settings_repo_path = os.path.join(repo, ".memento", "settings.json")
             with open(settings_repo_path, "w") as f:
-                json.dump({"active_coercion": {"enabled": True, "rules": [
-                    {"id": "test_no_print", "path_globs": ["*.py"], "kind": "regex",
-                     "regex": "\\bprint\\(", "message": "No print()", "severity": "block"}
-                ]}}, f)
+                json.dump(
+                    {
+                        "active_coercion": {
+                            "enabled": True,
+                            "rules": [
+                                {
+                                    "id": "test_no_print",
+                                    "path_globs": ["*.py"],
+                                    "kind": "regex",
+                                    "regex": "\\bprint\\(",
+                                    "message": "No print()",
+                                    "severity": "block",
+                                }
+                            ],
+                        }
+                    },
+                    f,
+                )
 
             os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
 
@@ -70,10 +108,24 @@ class TestActiveCoercionHook:
             os.makedirs(os.path.join(repo, ".memento"))
             settings_repo_path = os.path.join(repo, ".memento", "settings.json")
             with open(settings_repo_path, "w") as f:
-                json.dump({"active_coercion": {"enabled": True, "rules": [
-                    {"id": "test_no_print", "path_globs": ["*.py"], "kind": "regex",
-                     "regex": "\\bprint\\(", "message": "No print()", "severity": "block"}
-                ]}}, f)
+                json.dump(
+                    {
+                        "active_coercion": {
+                            "enabled": True,
+                            "rules": [
+                                {
+                                    "id": "test_no_print",
+                                    "path_globs": ["*.py"],
+                                    "kind": "regex",
+                                    "regex": "\\bprint\\(",
+                                    "message": "No print()",
+                                    "severity": "block",
+                                }
+                            ],
+                        }
+                    },
+                    f,
+                )
 
             os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
 

@@ -1,8 +1,5 @@
 """Tests for notification system."""
 
-import json
-import os
-
 import pytest
 
 from memento.notifications import NotificationManager
@@ -72,7 +69,9 @@ async def test_notify_low_confidence(manager):
 @pytest.mark.asyncio
 async def test_get_pending_notifications(manager):
     await manager.notify(topic="memory_added", title="First", body="b1", confidence=1.0)
-    await manager.notify(topic="memory_added", title="Second", body="b2", confidence=1.0)
+    await manager.notify(
+        topic="memory_added", title="Second", body="b2", confidence=1.0
+    )
 
     pending = manager.get_pending_notifications()
     assert len(pending) == 2
@@ -82,7 +81,9 @@ async def test_get_pending_notifications(manager):
 
 @pytest.mark.asyncio
 async def test_dismiss_notification(manager):
-    await manager.notify(topic="memory_added", title="Dismiss me", body="b", confidence=1.0)
+    await manager.notify(
+        topic="memory_added", title="Dismiss me", body="b", confidence=1.0
+    )
 
     pending = manager.get_pending_notifications()
     notif_id = pending[0]["id"]

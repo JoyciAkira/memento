@@ -6,6 +6,7 @@ from watchdog.events import FileSystemEventHandler
 
 logger = logging.getLogger(__name__)
 
+
 class PreCognitiveDaemon:
     def __init__(
         self,
@@ -77,7 +78,7 @@ class PreCognitiveDaemon:
                     if loop and loop.is_running():
                         asyncio.run_coroutine_threadsafe(
                             self.daemon.handle_file_change(event.src_path, content),
-                            loop
+                            loop,
                         )
                 except Exception as e:
                     logger.error(f"Error reading modified file {event.src_path}: {e}")

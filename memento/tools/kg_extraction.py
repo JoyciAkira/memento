@@ -26,7 +26,9 @@ logger = logging.getLogger("memento-mcp")
 )
 async def memento_extract_kg(arguments: dict, ctx, access_manager) -> list[TextContent]:
     if not access_manager.can_write():
-        raise PermissionError(f"Cannot extract KG. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot extract KG. Current access state is: {access_manager.state}"
+        )
 
     if not ctx.provider._initialized:
         await ctx.provider.initialize()
@@ -62,16 +64,24 @@ async def memento_extract_kg(arguments: dict, ctx, access_manager) -> list[TextC
         },
     )
 )
-async def memento_toggle_kg_extraction_scheduler(arguments: dict, ctx, access_manager) -> list[TextContent]:
+async def memento_toggle_kg_extraction_scheduler(
+    arguments: dict, ctx, access_manager
+) -> list[TextContent]:
     if not access_manager.can_write():
-        raise PermissionError(f"Cannot modify scheduler. Current access state is: {access_manager.state}")
+        raise PermissionError(
+            f"Cannot modify scheduler. Current access state is: {access_manager.state}"
+        )
 
     enabled = arguments.get("enabled", False)
     interval_minutes = float(arguments.get("interval_minutes", 60.0))
 
     if enabled:
         if ctx.kg_extraction_scheduler and ctx.kg_extraction_scheduler.is_running:
-            return [TextContent(type="text", text="KG extraction scheduler already running.")]
+            return [
+                TextContent(
+                    type="text", text="KG extraction scheduler already running."
+                )
+            ]
 
         if not ctx.provider._initialized:
             await ctx.provider.initialize()
@@ -88,9 +98,16 @@ async def memento_toggle_kg_extraction_scheduler(arguments: dict, ctx, access_ma
         )
         scheduler.start()
         ctx.kg_extraction_scheduler = scheduler
-        return [TextContent(type="text", text=f"KG extraction scheduler started. Interval: {interval_minutes}m.")]
+        return [
+            TextContent(
+                type="text",
+                text=f"KG extraction scheduler started. Interval: {interval_minutes}m.",
+            )
+        ]
     else:
         if ctx.kg_extraction_scheduler and ctx.kg_extraction_scheduler.is_running:
             ctx.kg_extraction_scheduler.stop()
             return [TextContent(type="text", text="KG extraction scheduler stopped.")]
-        return [TextContent(type="text", text="KG extraction scheduler is not running.")]
+        return [
+            TextContent(type="text", text="KG extraction scheduler is not running.")
+        ]

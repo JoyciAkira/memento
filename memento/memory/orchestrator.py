@@ -14,16 +14,89 @@ logger = logging.getLogger(__name__)
 
 # Common English stopwords excluded from term-overlap scoring so that ranking is
 # driven by content words rather than function words.
-_STOPWORDS = frozenset({
-    "a", "an", "the", "and", "or", "but", "of", "to", "in", "on", "at", "by",
-    "for", "with", "from", "into", "onto", "over", "under", "is", "are", "was",
-    "were", "be", "been", "being", "as", "that", "this", "these", "those", "it",
-    "its", "they", "them", "their", "we", "us", "our", "you", "your", "i", "he",
-    "she", "his", "her", "do", "does", "did", "done", "not", "no", "than",
-    "then", "so", "if", "out", "up", "down", "off", "per", "via", "many", "one",
-    "more", "most", "some", "any", "all", "each", "such", "without", "within",
-    "across", "onto", "using", "use", "uses", "used",
-})
+_STOPWORDS = frozenset(
+    {
+        "a",
+        "an",
+        "the",
+        "and",
+        "or",
+        "but",
+        "of",
+        "to",
+        "in",
+        "on",
+        "at",
+        "by",
+        "for",
+        "with",
+        "from",
+        "into",
+        "onto",
+        "over",
+        "under",
+        "is",
+        "are",
+        "was",
+        "were",
+        "be",
+        "been",
+        "being",
+        "as",
+        "that",
+        "this",
+        "these",
+        "those",
+        "it",
+        "its",
+        "they",
+        "them",
+        "their",
+        "we",
+        "us",
+        "our",
+        "you",
+        "your",
+        "i",
+        "he",
+        "she",
+        "his",
+        "her",
+        "do",
+        "does",
+        "did",
+        "done",
+        "not",
+        "no",
+        "than",
+        "then",
+        "so",
+        "if",
+        "out",
+        "up",
+        "down",
+        "off",
+        "per",
+        "via",
+        "many",
+        "one",
+        "more",
+        "most",
+        "some",
+        "any",
+        "all",
+        "each",
+        "such",
+        "without",
+        "within",
+        "across",
+        "onto",
+        "using",
+        "use",
+        "uses",
+        "used",
+    }
+)
 
 _TOKEN_RE = re.compile(r"[a-z0-9]+")
 
@@ -33,8 +106,7 @@ def _tokenize(text: str) -> List[str]:
     if not text:
         return []
     return [
-        t for t in _TOKEN_RE.findall(text.lower())
-        if len(t) > 1 and t not in _STOPWORDS
+        t for t in _TOKEN_RE.findall(text.lower()) if len(t) > 1 and t not in _STOPWORDS
     ]
 
 
@@ -54,6 +126,7 @@ def _overlap_score(query_tokens: set[str], memory_text: str) -> float:
     inter = query_tokens & mem_tokens
     return len(inter) / len(query_tokens)
 
+
 class MemoryOrchestrator:
     """
     Coordinates L1, L2, and L3 memory layers with optional VSA-accelerated retrieval.
@@ -62,7 +135,10 @@ class MemoryOrchestrator:
     - L3: Semantic memory (facts, rules, crystallized knowledge)
     - VSA Index: O(1) relational query acceleration via Hyperdimensional Computing
     """
-    def __init__(self, db: sqlite3.Connection, hdc_encoder: Optional[HDCEncoder] = None):
+
+    def __init__(
+        self, db: sqlite3.Connection, hdc_encoder: Optional[HDCEncoder] = None
+    ):
         self.db = db
         self.l1 = L1WorkingMemory()
         self.l2 = L2EpisodicMemory(db)
@@ -104,10 +180,7 @@ class MemoryOrchestrator:
         return mem_id
 
     def search(
-        self,
-        query: str,
-        tier: str = "all",
-        limit: int = 100
+        self, query: str, tier: str = "all", limit: int = 100
     ) -> List[Dict[str, Any]]:
         vsa_results: List[Dict[str, Any]] = []
         if self._vsa_index and tier in ("episodic", "semantic", "all"):
@@ -122,7 +195,12 @@ class MemoryOrchestrator:
             l2_results = self.l2.search(query, limit)
             l1_items = self.l1.get_all()
             l1_formatted = [
-                {"id": item["id"], "memory": item["content"], "metadata": item.get("metadata", {}), "memory_tier": "working"}
+                {
+                    "id": item["id"],
+                    "memory": item["content"],
+                    "metadata": item.get("metadata", {}),
+                    "memory_tier": "working",
+                }
                 for item in l1_items
             ]
             # Whole-string LIKE in the tier searches misses paraphrase queries,
@@ -148,7 +226,10 @@ class MemoryOrchestrator:
 
             ranked = sorted(
                 enumerate(merged),
-                key=lambda pair: (-_overlap_score(query_tokens, pair[1].get("memory", "")), pair[0]),
+                key=lambda pair: (
+                    -_overlap_score(query_tokens, pair[1].get("memory", "")),
+                    pair[0],
+                ),
             )
             return [item for _, item in ranked]
         elif tier == "working":
@@ -160,11 +241,7 @@ class MemoryOrchestrator:
         else:
             raise ValueError(f"Unknown memory tier: {tier}")
 
-    def _gather_token_candidates(
-        self,
-        query: str,
-        limit: int
-    ) -> List[Dict[str, Any]]:
+    def _gather_token_candidates(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """Gather candidate memories whose text contains ANY content token of
         the query, using per-token LIKE against the store.
 
@@ -199,32 +276,28 @@ class MemoryOrchestrator:
             return results
 
         import json
+
         for r in rows:
             row_tier = r[3] if r[3] else "semantic"
-            results.append({
-                "id": r[0],
-                "memory": r[1],
-                "metadata": json.loads(r[2]) if r[2] else {},
-                "memory_tier": row_tier,
-            })
+            results.append(
+                {
+                    "id": r[0],
+                    "memory": r[1],
+                    "metadata": json.loads(r[2]) if r[2] else {},
+                    "memory_tier": row_tier,
+                }
+            )
         return results
 
     def search_relation(
-        self,
-        subject: str,
-        obj: str,
-        predicate: str = "relates_to"
+        self, subject: str, obj: str, predicate: str = "relates_to"
     ) -> List[Dict[str, Any]]:
         if not self._vsa_index:
             raise RuntimeError("VSA index not enabled. Call enable_vsa_index() first.")
         mem_ids = self._vsa_index.query_relation(subject, obj, predicate)
         return self._fetch_by_ids(mem_ids, tier="all")
 
-    def _fetch_by_ids(
-        self,
-        mem_ids: List[str],
-        tier: str
-    ) -> List[Dict[str, Any]]:
+    def _fetch_by_ids(self, mem_ids: List[str], tier: str) -> List[Dict[str, Any]]:
         results: List[Dict[str, Any]] = []
         placeholders = ",".join("?" * len(mem_ids)) if mem_ids else "''"
         query = f"SELECT id, text, metadata, memory_tier FROM memories WHERE id IN ({placeholders})"
@@ -234,12 +307,15 @@ class MemoryOrchestrator:
             if tier != "all" and row_tier != tier:
                 continue
             import json
-            results.append({
-                "id": r[0],
-                "memory": r[1],
-                "metadata": json.loads(r[2]) if r[2] else {},
-                "memory_tier": row_tier
-            })
+
+            results.append(
+                {
+                    "id": r[0],
+                    "memory": r[1],
+                    "metadata": json.loads(r[2]) if r[2] else {},
+                    "memory_tier": row_tier,
+                }
+            )
         return results
 
     def clear_l1(self) -> None:

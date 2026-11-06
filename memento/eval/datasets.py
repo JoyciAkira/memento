@@ -43,7 +43,11 @@ class EvalSet:
         with open(path) as f:
             data = json.load(f)
         cases = [
-            EvalCase(query=c["query"], expected_ids=c["expected_ids"], notes=c.get("notes", ""))
+            EvalCase(
+                query=c["query"],
+                expected_ids=c["expected_ids"],
+                notes=c.get("notes", ""),
+            )
             for c in data["cases"]
         ]
         return cls(name=data["name"], cases=cases)

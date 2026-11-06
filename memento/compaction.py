@@ -23,10 +23,12 @@ implemented here: it would add one LLM call per injection (latency + cost +
 API-key dependency) on a hot path that must stay offline. It can be added later
 as an opt-in strategy that reuses ``MEM0_MODEL``.
 """
+
 from __future__ import annotations
 
 import re
 from typing import List, Tuple
+
 
 # ---------------------------------------------------------------------------
 # Token estimation (cheap heuristic: ~4 chars / token for English code+prose)
@@ -41,6 +43,7 @@ def estimate_tokens(text: str) -> int:
 # Span protection: keep code / URLs / paths byte-exact
 # ---------------------------------------------------------------------------
 _PLACEHOLDER = "\x00{idx}\x00"
+
 
 def _protect_spans(text: str) -> Tuple[str, List[str]]:
     spans: List[str] = []
@@ -88,26 +91,66 @@ _CAVEMAN_PHRASES = {
 
 # Standalone filler / hedge / politeness words removed when they are their own token.
 _CAVEMAN_WORDS = {
-    "a", "an", "the",
-    "just", "really", "basically", "actually", "simply", "essentially", "generally",
-    "certainly", "sure", "perhaps", "maybe", "possibly",
-    "however", "furthermore", "additionally", "moreover", "in addition",
-    "therefore", "thus", "hence", "namely", "specifically", "overall",
-    "please", "thank", "thanks", "hi", "hello", "ok", "okay",
-    "note", "noted", "also", "too", "very", "quite", "rather",
+    "a",
+    "an",
+    "the",
+    "just",
+    "really",
+    "basically",
+    "actually",
+    "simply",
+    "essentially",
+    "generally",
+    "certainly",
+    "sure",
+    "perhaps",
+    "maybe",
+    "possibly",
+    "however",
+    "furthermore",
+    "additionally",
+    "moreover",
+    "in addition",
+    "therefore",
+    "thus",
+    "hence",
+    "namely",
+    "specifically",
+    "overall",
+    "please",
+    "thank",
+    "thanks",
+    "hi",
+    "hello",
+    "ok",
+    "okay",
+    "note",
+    "noted",
+    "also",
+    "too",
+    "very",
+    "quite",
+    "rather",
 }
 
 # Multi-word pleasantries collapsed to empty.
 _CAVEMAN_PHRASES_EMPTY = {
-    "happy to", "i'd recommend", "i would recommend", "of course",
-    "it might be worth", "you could consider", "it would be good to",
-    "i think", "i believe", "in my opinion", "as you know", "as a reminder",
+    "happy to",
+    "i'd recommend",
+    "i would recommend",
+    "of course",
+    "it might be worth",
+    "you could consider",
+    "it would be good to",
+    "i think",
+    "i believe",
+    "in my opinion",
+    "as you know",
+    "as a reminder",
 }
 
 
 def _caveman_text(body: str) -> str:
-    low = body.lower()
-
     # Remove empty-collapsing multi-word pleasantries first.
     for phrase in _CAVEMAN_PHRASES_EMPTY:
         body = re.sub(re.escape(phrase), "", body, flags=re.IGNORECASE)
@@ -139,9 +182,35 @@ def _caveman_text(body: str) -> str:
 # graphify: compact entity/relation sketch (native heuristic)
 # ---------------------------------------------------------------------------
 _STOP = {
-    "the", "and", "for", "with", "that", "this", "from", "into", "your", "you",
-    "are", "was", "were", "has", "have", "had", "but", "not", "can", "will",
-    "when", "where", "which", "while", "because", "then", "than", "out", "use",
+    "the",
+    "and",
+    "for",
+    "with",
+    "that",
+    "this",
+    "from",
+    "into",
+    "your",
+    "you",
+    "are",
+    "was",
+    "were",
+    "has",
+    "have",
+    "had",
+    "but",
+    "not",
+    "can",
+    "will",
+    "when",
+    "where",
+    "which",
+    "while",
+    "because",
+    "then",
+    "than",
+    "out",
+    "use",
 }
 
 

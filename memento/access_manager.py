@@ -65,7 +65,9 @@ class MementoAccessManager:
 
     def set_state(self, new_state: str) -> None:
         if new_state not in self.VALID_STATES:
-            raise ValueError(f"Invalid state: {new_state}. Valid states are: {self.VALID_STATES}")
+            raise ValueError(
+                f"Invalid state: {new_state}. Valid states are: {self.VALID_STATES}"
+            )
         with self._lock:
             self._state = new_state
             logger.info(f"Access state changed to: {self._state}")
@@ -81,5 +83,7 @@ class MementoAccessManager:
         with self._lock:
             self.warnings_enabled = warnings
             self.auto_tasks_enabled = auto_tasks
-            logger.info(f"Superpowers toggled - Warnings: {warnings}, Auto Tasks: {auto_tasks}")
+            logger.info(
+                f"Superpowers toggled - Warnings: {warnings}, Auto Tasks: {auto_tasks}"
+            )
             self._save_state()

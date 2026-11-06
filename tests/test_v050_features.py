@@ -1,5 +1,5 @@
 """Tests for v0.4/v0.5 features: decay, L1 LRU+importance, proactive injection, WAL watcher."""
-import asyncio
+
 import time
 import pytest
 from datetime import datetime, timedelta
@@ -21,7 +21,8 @@ async def test_decay_older_memory_ranks_lower(tmp_path, monkeypatch):
     new_text = "fresh memory about dragons"
 
     # Insert old memory with backdated created_at
-    import aiosqlite, uuid, json
+    import uuid
+
     old_id = str(uuid.uuid4())
     old_ts = (datetime.now() - timedelta(days=200)).isoformat()
     async with p._write_lock:
@@ -30,7 +31,8 @@ async def test_decay_older_memory_ranks_lower(tmp_path, monkeypatch):
             (old_id, "default", old_text, old_ts, "{}"),
         )
         await p._db.execute(
-            "INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)", (old_id, "[]")
+            "INSERT INTO memory_embeddings (id, embedding) VALUES (?, ?)",
+            (old_id, "[]"),
         )
         await p._db.commit()
 
@@ -42,7 +44,9 @@ async def test_decay_older_memory_ranks_lower(tmp_path, monkeypatch):
     assert old_text in texts
     new_idx = texts.index(new_text)
     old_idx = texts.index(old_text)
-    assert new_idx < old_idx, f"Fresh memory should rank higher (new={new_idx}, old={old_idx})"
+    assert (
+        new_idx < old_idx
+    ), f"Fresh memory should rank higher (new={new_idx}, old={old_idx})"
 
 
 # ---------------------------------------------------------------------------
@@ -50,6 +54,7 @@ async def test_decay_older_memory_ranks_lower(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 def test_l1_importance_survives_eviction():
     from memento.memory.l1_working import L1WorkingMemory
+
     l1 = L1WorkingMemory(max_size=5)
 
     # Fill with 5 low-importance entries
@@ -67,6 +72,7 @@ def test_l1_importance_survives_eviction():
 
 def test_l1_lru_access_updates_last_accessed():
     from memento.memory.l1_working import L1WorkingMemory
+
     l1 = L1WorkingMemory(max_size=3)
     l1.add("a", "content a", importance=0.5)
     time.sleep(0.01)
@@ -100,10 +106,11 @@ async def test_proactive_injection_prepends_context(tmp_path, monkeypatch):
 
     # Register a dummy tool
     from mcp.types import Tool
+
     dummy_tool = Tool(
         name="memento_test_dummy_v050",
         description="test",
-        inputSchema={"type": "object", "properties": {}}
+        inputSchema={"type": "object", "properties": {}},
     )
 
     @registry.register(dummy_tool)
@@ -130,7 +137,8 @@ async def test_wal_watcher_detects_external_write(tmp_path, monkeypatch):
     monkeypatch.setenv("MEMENTO_EMBEDDING_BACKEND", "none")
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     from memento.provider import NeuroGraphProvider
-    import aiosqlite, uuid
+    import aiosqlite
+    import uuid
 
     db_path = str(tmp_path / "wal_test.db")
     p = NeuroGraphProvider(db_path=db_path)
@@ -148,7 +156,9 @@ async def test_wal_watcher_detects_external_write(tmp_path, monkeypatch):
 
     # Manually trigger one watcher cycle (skip the 30s sleep)
     async with p._read_lock:
-        cursor = await p._db_read.execute("SELECT MAX(created_at) as latest FROM memory_meta")
+        cursor = await p._db_read.execute(
+            "SELECT MAX(created_at) as latest FROM memory_meta"
+        )
         row = await cursor.fetchone()
     latest = row["latest"] if row else None
 
@@ -161,6 +171,7 @@ async def test_wal_watcher_detects_external_write(tmp_path, monkeypatch):
 # ---------------------------------------------------------------------------
 def test_redaction_anthropic_key():
     from memento.redaction import redact_secrets
+
     text = "my key is sk-ant-api03-abc-xyz-ABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890"
     result = redact_secrets(text)
     assert "[REDACTED]" in result
@@ -169,6 +180,7 @@ def test_redaction_anthropic_key():
 
 def test_redaction_postgres_dsn():
     from memento.redaction import redact_secrets
+
     text = "connect to postgres://admin:s3cr3t@localhost:5432/mydb"
     result = redact_secrets(text)
     assert "[REDACTED]" in result
@@ -177,6 +189,7 @@ def test_redaction_postgres_dsn():
 
 def test_redaction_client_secret():
     from memento.redaction import redact_secrets
+
     text = 'client_secret = "super_secret_value_123"'
     result = redact_secrets(text)
     assert "[REDACTED]" in result

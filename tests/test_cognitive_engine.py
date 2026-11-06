@@ -1,93 +1,117 @@
 import pytest
 from memento.cognitive_engine import CognitiveEngine
 
+
 class MockProvider:
     async def search(self, query):
-        return {"results": [
-            {"memory": "BUG: Using SQLite for high-concurrency caused deadlocks.", "score": 0.9}
-        ]}
+        return {
+            "results": [
+                {
+                    "memory": "BUG: Using SQLite for high-concurrency caused deadlocks.",
+                    "score": 0.9,
+                }
+            ]
+        }
+
 
 def test_engine_independent_llm():
     from memento.provider import NeuroGraphProvider
     from memento.cognitive_engine import CognitiveEngine
     import os
+
     os.environ["OPENAI_API_KEY"] = "sk-dummy"
-    
+
     provider = NeuroGraphProvider(db_path=":memory:")
     engine = CognitiveEngine(provider)
-    
+
     assert engine.llm is not None
+
 
 @pytest.mark.asyncio
 async def test_evaluate_code_for_warnings():
     provider = MockProvider()
     engine = CognitiveEngine(provider)
-    
+
     code_snippet = "import sqlite3\ndef write_data(): db.execute('INSERT...')"
     warning = await engine.evaluate_raw_context(code_snippet)
-    
+
     assert "BUG: Using SQLite" in warning
     assert "SPIDER-SENSE" in warning
+
 
 class MockLLM:
     def generate_response(self, messages, **kwargs):
         return "Synthetic Insight: Consider using Redis based on memory X and Y."
 
+
 class MockProviderWithLLM(MockProvider):
     def __init__(self):
         class MockMem0:
             llm = MockLLM()
+
         self.memory = MockMem0()
 
     async def search(self, query, limit=10):
-        return {"results": [
-            {"id": "A", "memory": "Used SQLite for project X"},
-            {"id": "B", "memory": "Project X needs faster caching"}
-        ]}
+        return {
+            "results": [
+                {"id": "A", "memory": "Used SQLite for project X"},
+                {"id": "B", "memory": "Project X needs faster caching"},
+            ]
+        }
 
     async def list_goals(self, **kwargs):
         return [{"id": "g1", "goal": "Ship secure API", "context": None}]
+
 
 @pytest.mark.asyncio
 async def test_synthesize_dreams(monkeypatch):
     provider = MockProviderWithLLM()
     engine = CognitiveEngine(provider)
-    
+
     async def mock_gen(msgs):
         return "Synthetic Insight"
+
     monkeypatch.setattr(engine, "_generate_response", mock_gen)
-    
+
     result = await engine.synthesize_dreams("caching")
     assert "[DRAFT_INSIGHT]" in result
     assert "Synthetic Insight" in result
+
 
 @pytest.mark.asyncio
 async def test_check_goal_alignment(monkeypatch):
     provider = MockProviderWithLLM()
     engine = CognitiveEngine(provider)
-    
+
     async def mock_gen(msgs):
         return "GOAL ALIGNMENT CHECK"
+
     monkeypatch.setattr(engine, "_generate_response", mock_gen)
-    
+
     result = await engine.check_goal_alignment("def simple_function(): pass")
     assert "GOAL ALIGNMENT CHECK" in result
+
 
 @pytest.mark.asyncio
 async def test_parse_natural_language_intent(monkeypatch):
     provider = MockProviderWithLLM()
     from memento.cognitive_engine import CognitiveEngine
+
     engine = CognitiveEngine(provider)
-    
+
     async def mock_gen(msgs):
         return '{"action": "ADD", "payload": {"text": "Il server usa Nginx"}}'
+
     monkeypatch.setattr(engine, "_generate_response", mock_gen)
-    
-    result = await engine.parse_natural_language_intent("memento ricordati che il server usa Nginx")
-    
+
+    result = await engine.parse_natural_language_intent(
+        "memento ricordati che il server usa Nginx"
+    )
+
     assert isinstance(result, dict)
     assert result["action"] == "ADD"
     assert result["payload"]["text"] == "Il server usa Nginx"
+
 
 @pytest.mark.asyncio
 async def test_generate_tasks_writes_under_workspace_root(tmp_path, monkeypatch):
@@ -116,14 +140,18 @@ async def test_generate_tasks_writes_under_workspace_root(tmp_path, monkeypatch)
 async def test_parse_natural_language_intent_with_focus_area(monkeypatch):
     provider = MockProviderWithLLM()
     from memento.cognitive_engine import CognitiveEngine
+
     engine = CognitiveEngine(provider)
-    
+
     async def mock_gen(msgs):
         return '{"action": "SEARCH", "payload": {"query": "bug"}, "focus_area": "frontend"}'
+
     monkeypatch.setattr(engine, "_generate_response", mock_gen)
-    
-    result = await engine.parse_natural_language_intent("memento cerca bug nel frontend")
-    
+
+    result = await engine.parse_natural_language_intent(
+        "memento cerca bug nel frontend"
+    )
+
     assert isinstance(result, dict)
     assert result["action"] == "SEARCH"
     assert result["payload"]["query"] == "bug"
@@ -132,7 +160,13 @@ async def test_parse_natural_language_intent_with_focus_area(monkeypatch):
 
 def test_prompt_registry_loads_all_prompts():
     from memento.prompts.registry import load_prompt
-    for name in ["detect_latent_features", "synthesize_dreams", "check_goal_alignment", "parse_natural_language_intent"]:
+
+    for name in [
+        "detect_latent_features",
+        "synthesize_dreams",
+        "check_goal_alignment",
+        "parse_natural_language_intent",
+    ]:
         data = load_prompt(name)
         assert "system_prompt" in data
         assert "user_prompt_template" in data
@@ -140,6 +174,7 @@ def test_prompt_registry_loads_all_prompts():
 
 def test_prompt_registry_caches():
     from memento.prompts.registry import load_prompt, clear_cache
+
     clear_cache()
     a = load_prompt("synthesize_dreams")
     b = load_prompt("synthesize_dreams")
@@ -148,12 +183,14 @@ def test_prompt_registry_caches():
 
 def test_prompt_registry_raises_on_missing():
     from memento.prompts.registry import load_prompt
+
     with pytest.raises(FileNotFoundError):
         load_prompt("nonexistent_prompt")
 
 
 def test_deterministic_intent_add():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("remember that nginx is the proxy")
     assert result["action"] == "ADD"
@@ -162,6 +199,7 @@ def test_deterministic_intent_add():
 
 def test_deterministic_intent_add_italian():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("ricorda che abbiamo cambiato il database")
     assert result["action"] == "ADD"
@@ -169,6 +207,7 @@ def test_deterministic_intent_add_italian():
 
 def test_deterministic_intent_search():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("how do I fix the auth bug")
     assert result["action"] == "SEARCH"
@@ -176,6 +215,7 @@ def test_deterministic_intent_search():
 
 def test_deterministic_intent_search_italian():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("cerca come abbiamo risolto il bug")
     assert result["action"] == "SEARCH"
@@ -183,6 +223,7 @@ def test_deterministic_intent_search_italian():
 
 def test_deterministic_intent_list():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("list all memories")
     assert result["action"] == "LIST"
@@ -190,6 +231,7 @@ def test_deterministic_intent_list():
 
 def test_deterministic_intent_dream():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("dream about architecture patterns")
     assert result["action"] == "DREAM"
@@ -197,6 +239,7 @@ def test_deterministic_intent_dream():
 
 def test_deterministic_intent_alignment():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("check goal alignment for this code")
     assert result["action"] == "ALIGNMENT"
@@ -204,6 +247,7 @@ def test_deterministic_intent_alignment():
 
 def test_deterministic_intent_unknown():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     result = e._deterministic_intent_parse("random gibberish text xyz")
     assert result["action"] == "UNKNOWN"
@@ -212,6 +256,7 @@ def test_deterministic_intent_unknown():
 @pytest.mark.asyncio
 async def test_parse_intent_falls_back_to_deterministic():
     from memento.cognitive_engine import CognitiveEngine
+
     e = CognitiveEngine(None)
     e.llm = None
 

@@ -15,6 +15,7 @@ class LocalEmbeddingBackend:
         if self._model is not None:
             return
         from fastembed import TextEmbedding
+
         logger.info(f"Loading local embedding model: {self._MODEL_NAME}")
         self._model = TextEmbedding(self._MODEL_NAME)
         logger.info("Local embedding model loaded successfully")
@@ -34,6 +35,7 @@ class LocalEmbeddingBackend:
 def is_fastembed_available() -> bool:
     try:
         import fastembed  # noqa: F401
+
         return True
     except ImportError:
         return False

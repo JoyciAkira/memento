@@ -1,5 +1,5 @@
 import os
-from typing import List, Optional, Any
+from typing import Optional, Any
 
 from memento.math_utils import cosine_similarity
 

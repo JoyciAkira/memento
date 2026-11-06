@@ -61,9 +61,7 @@ async def memento_consolidate_memories(
         return [TextContent(type="text", text=f"Consolidation complete:\n{formatted}")]
     except Exception as e:
         logger.error(f"Error during consolidation: {e}")
-        return [
-            TextContent(type="text", text=f"Error during consolidation: {str(e)}")
-        ]
+        return [TextContent(type="text", text=f"Error during consolidation: {str(e)}")]
 
 
 @registry.register(
@@ -98,10 +96,7 @@ async def memento_toggle_consolidation_scheduler(
     interval_minutes = float(arguments.get("interval_minutes", 30.0))
 
     if enabled:
-        if (
-            ctx.consolidation_scheduler
-            and ctx.consolidation_scheduler.is_running
-        ):
+        if ctx.consolidation_scheduler and ctx.consolidation_scheduler.is_running:
             return [
                 TextContent(
                     type="text",

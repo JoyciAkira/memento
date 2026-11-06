@@ -5,11 +5,13 @@ from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
+
 @dataclass
 class Prediction:
     content: str
     expected_outcome: str
     confidence: float
+
 
 @dataclass
 class PredictionResult:
@@ -19,12 +21,14 @@ class PredictionResult:
     is_surprise: bool
     timestamp: str
 
+
 class ActiveInferenceEngine:
     """
     Implements surprise-guided memory retention via the Free Energy Principle.
     Only events with high prediction error (surprise) are consolidated into memory.
     This prevents memory bloat from predictable, redundant events.
     """
+
     SURPRISE_THRESHOLD = 0.5
 
     def __init__(self, predictor_fn: Optional[Callable[[str], Prediction]] = None):
@@ -40,9 +44,7 @@ class ActiveInferenceEngine:
             pred = await self._predictor_fn(event)
         else:
             pred = Prediction(
-                content=event,
-                expected_outcome=event.lower(),
-                confidence=0.5
+                content=event, expected_outcome=event.lower(), confidence=0.5
             )
         self._predictions[event] = pred
         return pred
@@ -60,7 +62,7 @@ class ActiveInferenceEngine:
             expected=pred.expected_outcome,
             prediction_error=error,
             is_surprise=is_surprise,
-            timestamp=datetime.now().isoformat()
+            timestamp=datetime.now().isoformat(),
         )
         self._history.append(result)
         return result
@@ -82,8 +84,7 @@ class ActiveInferenceEngine:
         total = len(self._history)
         surprises = sum(1 for r in self._history if r.is_surprise)
         avg_error = (
-            sum(r.prediction_error for r in self._history) / total
-            if total > 0 else 0.0
+            sum(r.prediction_error for r in self._history) / total if total > 0 else 0.0
         )
         return {
             "total_events": total,

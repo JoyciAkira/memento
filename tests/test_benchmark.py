@@ -7,26 +7,19 @@ Validates:
 3. Retrieval Accuracy: Does VSA + metacognitive search outperform naive RAG?
 4. Memory Bloat Prevention: Does surprise-guided retention keep DB lean?
 """
-import asyncio
-import tempfile
-import os
+
 import time
 import pytest
-import numpy as np
 from dataclasses import dataclass
 from typing import List, Dict, Any
 
-from memento.memory.l1_working import L1WorkingMemory
-from memento.memory.l2_episodic import L2EpisodicMemory
 from memento.memory.l3_semantic import L3SemanticMemory
-from memento.memory.hdc import HDCEncoder
 from memento.memory.reflector import MetacognitiveReflector
-from memento.memory.active_inference import ActiveInferenceEngine
-from memento.memory.vsa_index import VSAIndex
 from memento.memory.consolidator import CognitiveConsolidator
 from memento.memory.orchestrator import MemoryOrchestrator
 from memento.migrations.runner import MigrationRunner
 from memento.migrations.versions import get_all_migrations
+
 
 @dataclass
 class BenchmarkResult:
@@ -34,6 +27,7 @@ class BenchmarkResult:
     score: float
     unit: str
     details: Dict[str, Any]
+
 
 class ContinuousLearningBenchmark:
     def __init__(self, db_path: str):
@@ -64,14 +58,22 @@ class ContinuousLearningBenchmark:
             orch.add("Irrelevant episodic data point", tier="episodic")
 
         retrieved = orch.search("Python")
-        retention_score = 1.0 if any("Python" in r["memory"] for r in retrieved) else 0.0
+        retention_score = (
+            1.0 if any("Python" in r["memory"] for r in retrieved) else 0.0
+        )
 
-        self.results.append(BenchmarkResult(
-            name="Memory Retention (100 sessions)",
-            score=retention_score,
-            unit="accuracy",
-            details={"facts_preserved": len([r for r in retrieved if "Python" in r["memory"]])}
-        ))
+        self.results.append(
+            BenchmarkResult(
+                name="Memory Retention (100 sessions)",
+                score=retention_score,
+                unit="accuracy",
+                details={
+                    "facts_preserved": len(
+                        [r for r in retrieved if "Python" in r["memory"]]
+                    )
+                },
+            )
+        )
         conn.close()
 
     async def _run_no_catastrophic_forgetting(self):
@@ -91,12 +93,14 @@ class ContinuousLearningBenchmark:
         original = l3.search("JavaScript")
         forget_score = 1.0 if original else 0.0
 
-        self.results.append(BenchmarkResult(
-            name="No Catastrophic Forgetting",
-            score=forget_score,
-            unit="boolean",
-            details={"original_facts_found": len(original)}
-        ))
+        self.results.append(
+            BenchmarkResult(
+                name="No Catastrophic Forgetting",
+                score=forget_score,
+                unit="boolean",
+                details={"original_facts_found": len(original)},
+            )
+        )
         conn.close()
 
     async def _run_retrieval_accuracy(self):
@@ -111,13 +115,21 @@ class ContinuousLearningBenchmark:
             orch.add(content, tier="semantic")
 
         reflector = MetacognitiveReflector()
-        hdc = HDCEncoder(d=1000)
 
         correct = 0
         for query, expected_content in queries_and_answers:
             results = orch.search(query)
             retrieval_results = [
-                type('R', (), {"id": r["id"], "memory": r["memory"], "score": 0.9, "tier": r["memory_tier"]})()
+                type(
+                    "R",
+                    (),
+                    {
+                        "id": r["id"],
+                        "memory": r["memory"],
+                        "score": 0.9,
+                        "tier": r["memory_tier"],
+                    },
+                )()
                 for r in results
             ]
             confidence = await reflector.evaluate_confidence(retrieval_results, query)
@@ -125,12 +137,14 @@ class ContinuousLearningBenchmark:
                 correct += 1
 
         accuracy = correct / len(queries_and_answers)
-        self.results.append(BenchmarkResult(
-            name="Metacognitive Retrieval Accuracy",
-            score=accuracy,
-            unit="accuracy",
-            details={"correct": correct, "total": len(queries_and_answers)}
-        ))
+        self.results.append(
+            BenchmarkResult(
+                name="Metacognitive Retrieval Accuracy",
+                score=accuracy,
+                unit="accuracy",
+                details={"correct": correct, "total": len(queries_and_answers)},
+            )
+        )
         conn.close()
 
     async def _run_memory_bloat_prevention(self):
@@ -153,16 +167,19 @@ class ContinuousLearningBenchmark:
         stats = consolidator.get_consolidation_stats()
         surprise_rate = stats.get("surprise_rate", 0)
 
-        self.results.append(BenchmarkResult(
-            name="Memory Bloat Prevention (surprise-guided retention)",
-            score=surprise_rate,
-            unit="surprise_rate",
-            details={
-                "total_processed": stats["total_processed"],
-                "stored": stats.get("stored_to_semantic", 0),
-                "predictable_filtered": stats["total_processed"] - stats.get("stored_to_semantic", 0)
-            }
-        ))
+        self.results.append(
+            BenchmarkResult(
+                name="Memory Bloat Prevention (surprise-guided retention)",
+                score=surprise_rate,
+                unit="surprise_rate",
+                details={
+                    "total_processed": stats["total_processed"],
+                    "stored": stats.get("stored_to_semantic", 0),
+                    "predictable_filtered": stats["total_processed"]
+                    - stats.get("stored_to_semantic", 0),
+                },
+            )
+        )
         conn.close()
 
     async def _run_vsa_vs_naive_comparison(self):
@@ -189,21 +206,24 @@ class ContinuousLearningBenchmark:
         vsa_recall = len(vsa_results)
         naive_recall = len(naive_results)
 
-        self.results.append(BenchmarkResult(
-            name="VSA vs Naive RAG (O(1) relational query)",
-            score=vsa_recall / max(naive_recall, 1),
-            unit="recall_ratio",
-            details={
-                "vsa_time_ms": round(vsa_time * 1000, 3),
-                "naive_time_ms": round(naive_time * 1000, 3),
-                "vsa_results": vsa_recall,
-                "naive_results": naive_recall
-            }
-        ))
+        self.results.append(
+            BenchmarkResult(
+                name="VSA vs Naive RAG (O(1) relational query)",
+                score=vsa_recall / max(naive_recall, 1),
+                unit="recall_ratio",
+                details={
+                    "vsa_time_ms": round(vsa_time * 1000, 3),
+                    "naive_time_ms": round(naive_time * 1000, 3),
+                    "vsa_results": vsa_recall,
+                    "naive_results": naive_recall,
+                },
+            )
+        )
         conn.close()
 
     def _get_conn(self):
         import sqlite3
+
         conn = sqlite3.connect(self.db_path)
         conn.row_factory = sqlite3.Row
         return conn
@@ -213,11 +233,16 @@ class ContinuousLearningBenchmark:
         print("MEMENTO CONSCIENTIA — BENCHMARK REPORT")
         print("=" * 60)
         for r in self.results:
-            status = "✅" if (r.score >= 0.5 and isinstance(r.score, float) or r.score is True) else "❌"
+            status = (
+                "✅"
+                if (r.score >= 0.5 and isinstance(r.score, float) or r.score is True)
+                else "❌"
+            )
             print(f"{status} {r.name}: {r.score} {r.unit}")
             for k, v in r.details.items():
                 print(f"   {k}: {v}")
         print("=" * 60)
+
 
 @pytest.mark.asyncio
 async def test_continuous_learning_benchmark(tmp_path):

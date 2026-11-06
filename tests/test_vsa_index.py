@@ -1,14 +1,12 @@
-import pytest
-import os
-import tempfile
 from memento.memory.vsa_index import VSAIndex
-from memento.memory.hdc import HDCEncoder
+
 
 def test_extract_entities():
     idx = VSAIndex(":memory:")
     entities = idx.extract_entities("Python is a great programming language")
     assert "python" in entities
     assert len(entities) <= 10
+
 
 def test_index_and_query_by_entity():
     idx = VSAIndex(":memory:")
@@ -19,6 +17,7 @@ def test_index_and_query_by_entity():
     results = idx.query_by_entity("python")
     assert "mem1" in results or "mem3" in results
 
+
 def test_query_relation():
     idx = VSAIndex(":memory:")
     idx.index_memory("mem1", "User prefers FastAPI")
@@ -27,6 +26,7 @@ def test_query_relation():
     results = idx.query_relation("fastapi", "web framework")
     assert "mem2" in results
 
+
 def test_unindex_memory():
     idx = VSAIndex(":memory:")
     idx.index_memory("mem1", "Test memory")
@@ -34,6 +34,7 @@ def test_unindex_memory():
 
     idx.unindex_memory("mem1")
     assert "mem1" not in idx._entity_cache
+
 
 def test_index_stats():
     idx = VSAIndex(":memory:")

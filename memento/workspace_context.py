@@ -6,10 +6,11 @@ from memento.cognitive_engine import CognitiveEngine
 from memento.access_manager import MementoAccessManager
 from memento.config_store import WorkspaceConfigStore
 from memento.session_manager import SessionManager
-from memento.autonomous import AutonomousAgent, AutonomyLevel
+from memento.autonomous import AutonomousAgent
 from memento.project_state import ProjectStateStore
 
 logger = logging.getLogger("memento-workspace")
+
 
 class WorkspaceContext:
     def __init__(self, workspace_root: str):
@@ -19,7 +20,9 @@ class WorkspaceContext:
 
         self.db_path = os.path.join(self.memento_dir, "neurograph_memory.db")
         self.provider = NeuroGraphProvider(db_path=self.db_path)
-        self.cognitive_engine = CognitiveEngine(self.provider, workspace_root=self.workspace_root)
+        self.cognitive_engine = CognitiveEngine(
+            self.provider, workspace_root=self.workspace_root
+        )
         settings_path = os.path.join(self.memento_dir, "settings.json")
         self.access_manager = MementoAccessManager(state_path=settings_path)
 
@@ -45,6 +48,7 @@ class WorkspaceContext:
         self.project_state = ProjectStateStore(self.db_path)
 
         from memento.project_memory_graph import ProjectMemoryGraph
+
         self.project_memory_graph = ProjectMemoryGraph(kg_provider=self.provider.kg)
 
     @property
@@ -138,7 +142,9 @@ class WorkspaceContext:
     def stop_autonomous_agent(self) -> bool:
         return self.autonomous_agent.stop()
 
+
 _contexts: Dict[str, WorkspaceContext] = {}
+
 
 def get_workspace_context(workspace_root: str) -> WorkspaceContext:
     if not workspace_root:

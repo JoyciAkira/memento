@@ -112,8 +112,11 @@ class KnowledgeGraph:
         if self._connection is None:
             # Enterprise self-heal: back up a corrupted KG db and recreate fresh.
             from memento.db_guard import ensure_healthy_db
+
             ensure_healthy_db(self.db_path, label="kg")
-            self._connection = sqlite3.connect(self.db_path, timeout=10, check_same_thread=False)
+            self._connection = sqlite3.connect(
+                self.db_path, timeout=10, check_same_thread=False
+            )
             self._connection.execute("PRAGMA journal_mode=WAL")
             self._connection.row_factory = sqlite3.Row
         return self._connection
@@ -150,7 +153,9 @@ class KnowledgeGraph:
                 (name, centroid_str),
             )
 
-    def add_entity(self, name: str, entity_type: str = "unknown", properties: dict = None):
+    def add_entity(
+        self, name: str, entity_type: str = "unknown", properties: dict = None
+    ):
         """Add or update an entity node."""
         eid = self._entity_id(name)
         props = json.dumps(properties or {})
@@ -189,9 +194,12 @@ class KnowledgeGraph:
         conn = self._conn()
         with conn:
             conn.execute(
-                "INSERT OR IGNORE INTO entities (id, name) VALUES (?, ?)", (sub_id, subject)
+                "INSERT OR IGNORE INTO entities (id, name) VALUES (?, ?)",
+                (sub_id, subject),
             )
-            conn.execute("INSERT OR IGNORE INTO entities (id, name) VALUES (?, ?)", (obj_id, obj))
+            conn.execute(
+                "INSERT OR IGNORE INTO entities (id, name) VALUES (?, ?)", (obj_id, obj)
+            )
 
             # Check for existing identical triple
             existing = conn.execute(
@@ -222,7 +230,9 @@ class KnowledgeGraph:
         return triple_id
 
     # Causal predicates: caused_by, fixed_by, introduced_by, blocked_by, depends_on
-    CAUSAL_PREDICATES = frozenset({"caused_by", "fixed_by", "introduced_by", "blocked_by", "depends_on"})
+    CAUSAL_PREDICATES = frozenset(
+        {"caused_by", "fixed_by", "introduced_by", "blocked_by", "depends_on"}
+    )
 
     def add_causal_triple(
         self,
@@ -234,7 +244,9 @@ class KnowledgeGraph:
     ) -> str:
         """Add a causal relationship. predicate must be one of CAUSAL_PREDICATES."""
         if predicate not in self.CAUSAL_PREDICATES:
-            raise ValueError(f"predicate must be one of {self.CAUSAL_PREDICATES}, got '{predicate}'")
+            raise ValueError(
+                f"predicate must be one of {self.CAUSAL_PREDICATES}, got '{predicate}'"
+            )
         return self.add_triple(
             subject=subject,
             predicate=predicate,
@@ -255,10 +267,15 @@ class KnowledgeGraph:
         ended = ended or date.today().isoformat()
         self._execute_write(
             "UPDATE triples SET valid_to=? WHERE subject=? AND predicate=? AND object=? AND valid_to IS NULL",
-            ended, sub_id, pred, obj_id,
+            ended,
+            sub_id,
+            pred,
+            obj_id,
         )
 
-    def add_bridge(self, room_a: str, room_b: str, score: float, reason: str = "") -> str:
+    def add_bridge(
+        self, room_a: str, room_b: str, score: float, reason: str = ""
+    ) -> str:
         """Create a semantic wormhole between two rooms."""
         self.add_entity(room_a, "room")
         self.add_entity(room_b, "room")
@@ -267,13 +284,17 @@ class KnowledgeGraph:
             room_a, "semantically_bridges", room_b, confidence=score, source_file=reason
         )
 
-    def evolve_fact(self, old_triple_id: str, new_triple_id: str, reason: str = "") -> None:
+    def evolve_fact(
+        self, old_triple_id: str, new_triple_id: str, reason: str = ""
+    ) -> None:
         """Mark an old fact as evolved into a new fact."""
         conn = self._conn()
         with conn:
             # Invalidate old triple
             ended = datetime.now().isoformat()
-            conn.execute("UPDATE triples SET valid_to=? WHERE id=?", (ended, old_triple_id))
+            conn.execute(
+                "UPDATE triples SET valid_to=? WHERE id=?", (ended, old_triple_id)
+            )
 
             # Look up original subject/object for human-readable metadata
             old_row = conn.execute(
@@ -316,13 +337,17 @@ class KnowledgeGraph:
         """Get all rooms and their centroids."""
         conn = self._conn()
         rooms = []
-        for row in conn.execute("SELECT id, name, centroid, created_at FROM rooms ORDER BY name"):
-            rooms.append({
-                "id": row["id"],
-                "name": row["name"],
-                "centroid": json.loads(row["centroid"]),
-                "created_at": row["created_at"],
-            })
+        for row in conn.execute(
+            "SELECT id, name, centroid, created_at FROM rooms ORDER BY name"
+        ):
+            rooms.append(
+                {
+                    "id": row["id"],
+                    "name": row["name"],
+                    "centroid": json.loads(row["centroid"]),
+                    "created_at": row["created_at"],
+                }
+            )
         return rooms
 
     def query_entities_batch(self, names: list[str]) -> dict[str, list[dict]]:
@@ -340,15 +365,17 @@ class KnowledgeGraph:
         result: dict[str, list[dict]] = {}
         for row in rows:
             sub_name = row["subject"]
-            result.setdefault(sub_name, []).append({
-                "direction": "outgoing",
-                "predicate": row["predicate"],
-                "object": row["obj_name"],
-                "valid_from": row["valid_from"],
-                "confidence": row["confidence"],
-                "source_closet": row["source_closet"],
-                "current": True,
-            })
+            result.setdefault(sub_name, []).append(
+                {
+                    "direction": "outgoing",
+                    "predicate": row["predicate"],
+                    "object": row["obj_name"],
+                    "valid_from": row["valid_from"],
+                    "confidence": row["confidence"],
+                    "source_closet": row["source_closet"],
+                    "current": True,
+                }
+            )
         return result
 
     def query_entity(self, name: str, as_of: str = None, direction: str = "outgoing"):
@@ -481,7 +508,9 @@ class KnowledgeGraph:
 
     def stats(self):
         conn = self._conn()
-        entities = conn.execute("SELECT COUNT(*) as cnt FROM entities").fetchone()["cnt"]
+        entities = conn.execute("SELECT COUNT(*) as cnt FROM entities").fetchone()[
+            "cnt"
+        ]
         triples = conn.execute("SELECT COUNT(*) as cnt FROM triples").fetchone()["cnt"]
         current = conn.execute(
             "SELECT COUNT(*) as cnt FROM triples WHERE valid_to IS NULL"
@@ -524,7 +553,10 @@ class KnowledgeGraph:
             parent = facts.get("parent")
             if parent:
                 self.add_triple(
-                    name, "child_of", parent.capitalize(), valid_from=facts.get("birthday")
+                    name,
+                    "child_of",
+                    parent.capitalize(),
+                    valid_from=facts.get("birthday"),
                 )
 
             partner = facts.get("partner")
@@ -540,13 +572,21 @@ class KnowledgeGraph:
                     valid_from=facts.get("birthday"),
                 )
             elif relationship == "husband":
-                self.add_triple(name, "is_partner_of", facts.get("partner", name).capitalize())
+                self.add_triple(
+                    name, "is_partner_of", facts.get("partner", name).capitalize()
+                )
             elif relationship == "brother":
-                self.add_triple(name, "is_sibling_of", facts.get("sibling", name).capitalize())
+                self.add_triple(
+                    name, "is_sibling_of", facts.get("sibling", name).capitalize()
+                )
             elif relationship == "dog":
-                self.add_triple(name, "is_pet_of", facts.get("owner", name).capitalize())
+                self.add_triple(
+                    name, "is_pet_of", facts.get("owner", name).capitalize()
+                )
                 self.add_entity(name, "animal")
 
             # Interests
             for interest in facts.get("interests", []):
-                self.add_triple(name, "loves", interest.capitalize(), valid_from="2025-01-01")
+                self.add_triple(
+                    name, "loves", interest.capitalize(), valid_from="2025-01-01"
+                )

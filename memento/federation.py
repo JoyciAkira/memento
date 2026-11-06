@@ -10,6 +10,7 @@ Architecture:
 Both sides degrade gracefully — if the socket is unavailable, the WAL watcher fallback
 in provider.py handles eventual consistency.
 """
+
 from __future__ import annotations
 
 import asyncio

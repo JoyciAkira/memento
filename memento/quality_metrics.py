@@ -2,7 +2,7 @@
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import aiosqlite
 
@@ -120,15 +120,11 @@ class QualityMetrics:
                 "total_triples": triples[0] if triples else 0,
                 "current_triples": current[0] if current else 0,
                 "expired_triples": expired,
-                "temporal_coverage": (
-                    f"{dated}/{triples[0]}" if triples else "N/A"
-                ),
+                "temporal_coverage": (f"{dated}/{triples[0]}" if triples else "N/A"),
                 "top_predicates": [
                     {"predicate": r[0], "count": r[1]} for r in predicates
                 ],
-                "entity_types": [
-                    {"type": r[0], "count": r[1]} for r in types
-                ],
+                "entity_types": [{"type": r[0], "count": r[1]} for r in types],
             }
         except Exception as e:
             logger.error(f"KG health check error: {e}")
@@ -137,9 +133,7 @@ class QualityMetrics:
     async def consolidation_effectiveness(self) -> Dict[str, Any]:
         """Measure how effective consolidation has been."""
         async with aiosqlite.connect(self.db_path) as db:
-            cur = await db.execute(
-                "SELECT COUNT(*) FROM consolidation_log"
-            )
+            cur = await db.execute("SELECT COUNT(*) FROM consolidation_log")
             log_count = await cur.fetchone()
             cur = await db.execute(
                 "SELECT COALESCE(SUM(source_count), 0) FROM consolidation_log"
@@ -154,9 +148,7 @@ class QualityMetrics:
                 "consolidation_runs": log_count[0] if log_count else 0,
                 "total_memories_fused": total_fused[0] if total_fused else 0,
                 "avg_sources_per_run": (
-                    round(avg_sources[0], 2)
-                    if avg_sources and avg_sources[0]
-                    else 0
+                    round(avg_sources[0], 2) if avg_sources and avg_sources[0] else 0
                 ),
             }
 
@@ -165,9 +157,7 @@ class QualityMetrics:
         async with aiosqlite.connect(self.db_path) as db:
             cur = await db.execute("SELECT COUNT(*) FROM memories")
             total = await cur.fetchone()
-            cur = await db.execute(
-                "SELECT COUNT(*) FROM kg_extraction_log"
-            )
+            cur = await db.execute("SELECT COUNT(*) FROM kg_extraction_log")
             extracted = await cur.fetchone()
             cur = await db.execute(
                 "SELECT COUNT(*) FROM kg_extraction_log WHERE entities_found > 0"
@@ -182,9 +172,7 @@ class QualityMetrics:
             )
             with_errors = await cur.fetchone()
 
-            coverage = (
-                (extracted[0] / total[0] * 100) if total and total[0] > 0 else 0
-            )
+            coverage = (extracted[0] / total[0] * 100) if total and total[0] > 0 else 0
 
             return {
                 "total_memories": total[0] if total else 0,
@@ -242,7 +230,12 @@ class QualityMetrics:
             if total == 0:
                 return {
                     "health_score": 0,
-                    "factors": {"coverage": 0, "freshness": 0, "size_health": 0, "redundancy": 100},
+                    "factors": {
+                        "coverage": 0,
+                        "freshness": 0,
+                        "size_health": 0,
+                        "redundancy": 100,
+                    },
                     "total_memories": 0,
                 }
 
@@ -322,13 +315,61 @@ class QualityMetrics:
             rows = await rows_cursor.fetchall()
 
             stop_words = {
-                "the", "a", "an", "is", "are", "was", "were", "be", "been",
-                "have", "has", "had", "do", "does", "did", "will", "would",
-                "could", "should", "may", "might", "can", "to", "of", "in",
-                "for", "on", "with", "at", "by", "from", "as", "into",
-                "through", "during", "before", "after", "and", "but", "or",
-                "not", "so", "if", "when", "where", "how", "what", "which",
-                "who", "this", "that", "these", "those", "it", "its",
+                "the",
+                "a",
+                "an",
+                "is",
+                "are",
+                "was",
+                "were",
+                "be",
+                "been",
+                "have",
+                "has",
+                "had",
+                "do",
+                "does",
+                "did",
+                "will",
+                "would",
+                "could",
+                "should",
+                "may",
+                "might",
+                "can",
+                "to",
+                "of",
+                "in",
+                "for",
+                "on",
+                "with",
+                "at",
+                "by",
+                "from",
+                "as",
+                "into",
+                "through",
+                "during",
+                "before",
+                "after",
+                "and",
+                "but",
+                "or",
+                "not",
+                "so",
+                "if",
+                "when",
+                "where",
+                "how",
+                "what",
+                "which",
+                "who",
+                "this",
+                "that",
+                "these",
+                "those",
+                "it",
+                "its",
             }
 
             word_freq: Dict[str, int] = {}
@@ -383,12 +424,16 @@ class QualityMetrics:
                     except (ValueError, TypeError):
                         days_since = days
 
-                result.append({
-                    "id": mem_id,
-                    "text": (text[:100] + "...") if text and len(text) > 100 else text,
-                    "days_since_access": days_since,
-                    "created_at": created_at,
-                })
+                result.append(
+                    {
+                        "id": mem_id,
+                        "text": (text[:100] + "...")
+                        if text and len(text) > 100
+                        else text,
+                        "days_since_access": days_since,
+                        "created_at": created_at,
+                    }
+                )
 
             return result
 
@@ -408,7 +453,9 @@ class QualityMetrics:
             return [
                 {
                     "id": row[0],
-                    "text": (row[1][:100] + "...") if row[1] and len(row[1]) > 100 else row[1],
+                    "text": (row[1][:100] + "...")
+                    if row[1] and len(row[1]) > 100
+                    else row[1],
                     "created_at": row[2],
                 }
                 for row in rows

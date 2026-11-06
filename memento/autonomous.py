@@ -4,15 +4,15 @@ Runs a background cognitive loop that observes, reasons, and acts without
 external prompting. Governed by a configurable autonomy_level (off, passive,
 active, autonomous) stored in workspace settings.
 """
+
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 import os
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Optional
@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 # Autonomy levels
 # ---------------------------------------------------------------------------
+
 
 class AutonomyLevel(str, Enum):
     OFF = "off"
@@ -39,14 +40,15 @@ LEVEL_DESCRIPTIONS = {
 
 DEFAULT_INTERVALS = {
     AutonomyLevel.OFF: 0,
-    AutonomyLevel.PASSIVE: 300,    # 5 min
-    AutonomyLevel.ACTIVE: 120,     # 2 min
+    AutonomyLevel.PASSIVE: 300,  # 5 min
+    AutonomyLevel.ACTIVE: 120,  # 2 min
     AutonomyLevel.AUTONOMOUS: 60,  # 1 min
 }
 
 # ---------------------------------------------------------------------------
 # Decision record
 # ---------------------------------------------------------------------------
+
 
 @dataclass
 class AutonomousDecision:
@@ -58,17 +60,25 @@ class AutonomousDecision:
     confidence: float = 0.0
     duration_ms: float = 0.0
 
+
 # ---------------------------------------------------------------------------
 # The autonomous agent
 # ---------------------------------------------------------------------------
+
 
 class AutonomousAgent:
     """Background agent that observes, reasons, and acts proactively."""
 
     MAX_DECISION_LOG = 200
 
-    def __init__(self, provider, cognitive_engine, workspace_root: str,
-                 notification_manager=None, governor=None):
+    def __init__(
+        self,
+        provider,
+        cognitive_engine,
+        workspace_root: str,
+        notification_manager=None,
+        governor=None,
+    ):
         self.provider = provider
         self.cognitive_engine = cognitive_engine
         self.workspace_root = workspace_root
@@ -118,7 +128,9 @@ class AutonomousAgent:
                     logger.warning(
                         "Invalid MEMENTO_AUTONOMY_INTERVAL=%r, ignoring", override
                     )
-        logger.info(f"Autonomous agent level set to: {level.value} (interval={self._interval}s)")
+        logger.info(
+            f"Autonomous agent level set to: {level.value} (interval={self._interval}s)"
+        )
 
     # --- lifecycle ---
 
@@ -144,7 +156,9 @@ class AutonomousAgent:
             except Exception:
                 self._running = False
                 self._task = None
-                logger.warning("Could not start autonomous agent: no event loop available")
+                logger.warning(
+                    "Could not start autonomous agent: no event loop available"
+                )
                 return False
         logger.info(f"Autonomous agent started at level: {self._level.value}")
         return True
@@ -160,7 +174,9 @@ class AutonomousAgent:
     # --- main loop ---
 
     async def _loop(self) -> None:
-        logger.info(f"Autonomous loop entering: level={self._level.value}, interval={self._interval}s")
+        logger.info(
+            f"Autonomous loop entering: level={self._level.value}, interval={self._interval}s"
+        )
         while self._running:
             cycle_start = time.monotonic()
             try:
@@ -213,7 +229,9 @@ class AutonomousAgent:
     async def _observe_health(self) -> None:
         """Observe system health without modifying anything."""
         try:
-            all_memories = await self.provider.get_all(user_id="default", limit=5, offset=0)
+            all_memories = await self.provider.get_all(
+                user_id="default", limit=5, offset=0
+            )
             if isinstance(all_memories, list):
                 self._log_decision(
                     action="observe_health",
@@ -244,7 +262,7 @@ class AutonomousAgent:
     async def _auto_consolidate(self) -> None:
         """Automatically consolidate similar memories."""
         try:
-            if hasattr(self.provider, 'consolidate'):
+            if hasattr(self.provider, "consolidate"):
                 result = await self.provider.consolidate(
                     threshold=0.92, min_age_hours=1, batch_size=50
                 )
@@ -264,14 +282,14 @@ class AutonomousAgent:
     async def _auto_kg_extract(self) -> None:
         """Extract knowledge graph entities from unprocessed memories."""
         try:
-            if hasattr(self.provider, 'extract_kg'):
+            if hasattr(self.provider, "extract_kg"):
                 result = await self.provider.extract_kg()
                 if result and isinstance(result, dict):
                     extracted = result.get("triples_extracted", 0)
                     if extracted > 0:
                         self._log_decision(
                             action="kg_extract",
-                            reason=f"Found unprocessed memories",
+                            reason="Found unprocessed memories",
                             outcome=f"Extracted {extracted} triples",
                             confidence=0.8,
                         )
@@ -282,7 +300,7 @@ class AutonomousAgent:
     async def _auto_cache_warm(self) -> None:
         """Pre-warm predictive cache based on recent workspace context."""
         try:
-            if hasattr(self.provider, 'warm_predictive_cache'):
+            if hasattr(self.provider, "warm_predictive_cache"):
                 context = f"workspace:{self.workspace_root}"
                 await self.provider.warm_predictive_cache(context)
                 self._log_decision(
@@ -333,9 +351,13 @@ class AutonomousAgent:
             return
         try:
             insight = await self.cognitive_engine.synthesize_dreams(
-                context=f"workspace patterns and architecture"
+                context="workspace patterns and architecture"
             )
-            if insight and "DRAFT_INSIGHT" in insight and "Not enough memories" not in insight:
+            if (
+                insight
+                and "DRAFT_INSIGHT" in insight
+                and "Not enough memories" not in insight
+            ):
                 self._log_decision(
                     action="dream_synthesis",
                     reason="Periodic dream cycle for hidden pattern discovery",
@@ -362,12 +384,18 @@ class AutonomousAgent:
             if not goals or not isinstance(goals, list) or len(goals) == 0:
                 return
 
-            recent = await self.provider.search("recent work", user_id="default", limit=5)
+            recent = await self.provider.search(
+                "recent work", user_id="default", limit=5
+            )
             results = recent.get("results", []) if isinstance(recent, dict) else recent
             if not results or not isinstance(results, list):
                 return
 
-            goal_texts = [g.get("goal", "") for g in goals if isinstance(g, dict) and g.get("goal")]
+            goal_texts = [
+                g.get("goal", "")
+                for g in goals
+                if isinstance(g, dict) and g.get("goal")
+            ]
             memory_texts = " ".join(
                 r.get("memory", "") for r in results[:3] if isinstance(r, dict)
             )
@@ -377,7 +405,9 @@ class AutonomousAgent:
                     code_or_plan=memory_texts[:500],
                     context="autonomous drift check",
                 )
-                if alignment and ("MISALIGNED" in alignment.upper() or "DRIFT" in alignment.upper()):
+                if alignment and (
+                    "MISALIGNED" in alignment.upper() or "DRIFT" in alignment.upper()
+                ):
                     self._log_decision(
                         action="goal_drift",
                         reason="Potential goal drift detected",
@@ -425,17 +455,22 @@ class AutonomousAgent:
                 f"Errors: {self._stats['errors']}",
             ]
 
-            if hasattr(self.provider, 'get_memory_stats'):
+            if hasattr(self.provider, "get_memory_stats"):
                 stats = await self.provider.get_memory_stats(user_id="default")
                 if isinstance(stats, dict):
-                    report_lines.append(f"Total memories: {stats.get('total_count', 'N/A')}")
+                    report_lines.append(
+                        f"Total memories: {stats.get('total_count', 'N/A')}"
+                    )
 
             report_text = "\n".join(report_lines)
 
             await self.provider.add(
                 text=f"[AUTO-REPORT] {report_text}",
                 user_id="system",
-                metadata={"type": "autonomous_health_report", "level": self._level.value},
+                metadata={
+                    "type": "autonomous_health_report",
+                    "level": self._level.value,
+                },
             )
             self._log_decision(
                 action="health_report",
@@ -464,8 +499,9 @@ class AutonomousAgent:
 
     # --- decision logging ---
 
-    def _log_decision(self, action: str, reason: str, outcome: str,
-                      confidence: float = 0.0) -> None:
+    def _log_decision(
+        self, action: str, reason: str, outcome: str, confidence: float = 0.0
+    ) -> None:
         elapsed = 0.0
         if self._last_cycle_time:
             elapsed = (time.time() - self._last_cycle_time) * 1000

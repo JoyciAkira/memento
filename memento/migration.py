@@ -48,7 +48,9 @@ def _read_all_memories(db_path: str) -> list[dict[str, Any]]:
 
 def _exists_id(db_path: str, mem_id: str) -> bool:
     conn = sqlite3.connect(db_path)
-    row = conn.execute("SELECT 1 FROM memories WHERE id = ? LIMIT 1", (mem_id,)).fetchone()
+    row = conn.execute(
+        "SELECT 1 FROM memories WHERE id = ? LIMIT 1", (mem_id,)
+    ).fetchone()
     conn.close()
     return row is not None
 
@@ -79,7 +81,9 @@ def _targets_from_workspace_roots(workspace_roots: list[str]) -> list[WorkspaceT
     return targets
 
 
-def classify_memory_to_targets(memory_text: str, targets: list[WorkspaceTarget]) -> list[WorkspaceTarget]:
+def classify_memory_to_targets(
+    memory_text: str, targets: list[WorkspaceTarget]
+) -> list[WorkspaceTarget]:
     text = (memory_text or "").lower()
     matches: list[WorkspaceTarget] = []
     for t in targets:
@@ -110,7 +114,9 @@ def migrate_memories_copy_only(
 
     memories = _read_all_memories(source_db_path)
 
-    per_workspace: dict[str, dict[str, int]] = {t.root: {"copied": 0, "skipped_existing": 0} for t in targets}
+    per_workspace: dict[str, dict[str, int]] = {
+        t.root: {"copied": 0, "skipped_existing": 0} for t in targets
+    }
     unassigned: list[dict[str, Any]] = []
     ambiguous: list[dict[str, Any]] = []
 
@@ -121,7 +127,13 @@ def migrate_memories_copy_only(
 
         matches = classify_memory_to_targets(text, targets)
         if len(matches) == 0:
-            unassigned.append({"id": mem_id, "created_at": mem.get("created_at"), "snippet": text[:200]})
+            unassigned.append(
+                {
+                    "id": mem_id,
+                    "created_at": mem.get("created_at"),
+                    "snippet": text[:200],
+                }
+            )
             continue
         if len(matches) > 1:
             ambiguous.append(
@@ -146,7 +158,9 @@ def migrate_memories_copy_only(
     payload = {
         "source_db_path": os.path.abspath(source_db_path),
         "backup_path": os.path.abspath(backup_path),
-        "workspaces": [{"root": t.root, "name": t.name, "db_path": t.db_path} for t in targets],
+        "workspaces": [
+            {"root": t.root, "name": t.name, "db_path": t.db_path} for t in targets
+        ],
         "per_workspace": per_workspace,
         "unassigned": unassigned,
         "ambiguous": ambiguous,

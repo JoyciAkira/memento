@@ -27,6 +27,7 @@ Output: a single JSON object on stdout:
    "components": {"self_query_recall": ..., "max_n_median_ms": ..., "latency_ok": bool},
    "per_n": {"1000": {...}, "5000": {...}, "20000": {...}}}
 """
+
 from __future__ import annotations
 
 import json

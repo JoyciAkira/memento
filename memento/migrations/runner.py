@@ -32,9 +32,7 @@ class MigrationRunner:
         conn = sqlite3.connect(self.db_path)
         try:
             conn.execute(MIGRATIONS_DDL)
-            row = conn.execute(
-                "SELECT MAX(version) FROM _schema_migrations"
-            ).fetchone()
+            row = conn.execute("SELECT MAX(version) FROM _schema_migrations").fetchone()
             return row[0] or 0
         except Exception:
             return 0
@@ -48,9 +46,7 @@ class MigrationRunner:
         conn.execute(MIGRATIONS_DDL)
         current = 0
         try:
-            row = conn.execute(
-                "SELECT MAX(version) FROM _schema_migrations"
-            ).fetchone()
+            row = conn.execute("SELECT MAX(version) FROM _schema_migrations").fetchone()
             current = row[0] or 0
         except Exception:
             current = 0
