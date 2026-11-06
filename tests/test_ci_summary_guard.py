@@ -1,5 +1,8 @@
+import os
 import re
+import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -19,10 +22,27 @@ def _summary_guard() -> str:
     return matches[0]
 
 
+def _bash_executable() -> str:
+    if sys.platform == "win32":
+        git = shutil.which("git")
+        candidates = []
+        if git:
+            candidates.append(Path(git).resolve().parent.parent / "bin" / "bash.exe")
+        program_files = os.environ.get("ProgramFiles", r"C:\Program Files")
+        candidates.append(Path(program_files) / "Git" / "bin" / "bash.exe")
+        for candidate in candidates:
+            if candidate.is_file():
+                return str(candidate)
+
+    bash = shutil.which("bash")
+    assert bash, "bash is required to execute the CI summary guard"
+    return bash
+
+
 def _run_guard(tmp_path: Path, log_text: str) -> subprocess.CompletedProcess:
     (tmp_path / "pytest.log").write_text(log_text, encoding="utf-8")
     return subprocess.run(
-        ["bash", "-c", _summary_guard()],
+        [_bash_executable(), "-c", _summary_guard()],
         cwd=tmp_path,
         capture_output=True,
         text=True,

@@ -1,6 +1,19 @@
 import json
 import os
+import subprocess
 import tempfile
+
+
+def _git(repo: str, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=repo, check=True, capture_output=True, text=True)
+
+
+def _init_repo(repo: str) -> None:
+    _git(repo, "init")
+    _git(repo, "config", "user.email", "tests@example.com")
+    _git(repo, "config", "user.name", "Memento Tests")
+    _git(repo, "add", ".")
+    _git(repo, "commit", "-m", "init")
 
 
 class TestActiveCoercionHook:
@@ -53,13 +66,13 @@ class TestActiveCoercionHook:
                     f,
                 )
 
-            os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
+            _init_repo(repo)
 
             bad_file = os.path.join(repo, "bad.py")
             with open(bad_file, "w") as f:
                 f.write('print("hello")\n')
 
-            os.system(f"cd {repo} && git add bad.py")
+            _git(repo, "add", "bad.py")
 
             exit_code = run_pre_commit(repo)
             assert exit_code == 1
@@ -90,13 +103,13 @@ class TestActiveCoercionHook:
                     f,
                 )
 
-            os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
+            _init_repo(repo)
 
             clean_file = os.path.join(repo, "clean.py")
             with open(clean_file, "w") as f:
                 f.write('import logging\nlogger.info("hello")\n')
 
-            os.system(f"cd {repo} && git add clean.py")
+            _git(repo, "add", "clean.py")
 
             exit_code = run_pre_commit(repo)
             assert exit_code == 0
@@ -127,7 +140,7 @@ class TestActiveCoercionHook:
                     f,
                 )
 
-            os.system(f"cd {repo} && git init && git add . && git commit -m 'init'")
+            _init_repo(repo)
 
             exit_code = run_pre_commit(repo)
             assert exit_code == 0

@@ -1,3 +1,6 @@
+import os
+import tempfile
+
 import pytest
 import pytest_asyncio
 
@@ -11,6 +14,20 @@ def _disable_openai(monkeypatch):
     settings.reload()
     yield
     settings.reload()
+
+
+@pytest.fixture(autouse=True)
+def _windows_safe_tempdirs(monkeypatch):
+    """Windows cannot remove SQLite files still held by a provider."""
+    if os.name != "nt":
+        return
+
+    class SafeTemporaryDirectory(tempfile.TemporaryDirectory):
+        def __init__(self, *args, **kwargs):
+            kwargs.setdefault("ignore_cleanup_errors", True)
+            super().__init__(*args, **kwargs)
+
+    monkeypatch.setattr(tempfile, "TemporaryDirectory", SafeTemporaryDirectory)
 
 
 @pytest.fixture

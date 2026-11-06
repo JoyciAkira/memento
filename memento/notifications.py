@@ -20,6 +20,7 @@ class NotificationManager:
     def __init__(self, db_path: str):
         self.db_path = db_path
         self._pending: List[Dict[str, Any]] = []
+        self._sequence = 0
         self._dismissed: set = set()
         self._config: Dict[str, Any] = {
             "enabled": True,
@@ -94,8 +95,9 @@ class NotificationManager:
         if confidence < self._config.get("min_confidence", 0.0):
             return {"status": "low_confidence", "confidence": confidence}
 
+        self._sequence += 1
         notification = {
-            "id": f"notif_{int(time.time() * 1000)}",
+            "id": f"notif_{time.time_ns()}",
             "topic": topic,
             "title": title,
             "body": body,
@@ -103,6 +105,7 @@ class NotificationManager:
             "metadata": metadata or {},
             "created_at": datetime.now().isoformat(),
             "timestamp": time.time(),
+            "sequence": self._sequence,
         }
 
         # Add to pending (evict oldest if over limit)
@@ -124,8 +127,8 @@ class NotificationManager:
             if (now - n["timestamp"]) < self.NOTIFICATION_TTL_SECONDS
             and (include_dismissed or n["id"] not in self._dismissed)
         ]
-        # Sort newest first
-        valid.sort(key=lambda n: n["timestamp"], reverse=True)
+        # Sort newest first, with insertion order as a tie-break on coarse clocks.
+        valid.sort(key=lambda n: (n["timestamp"], n.get("sequence", 0)), reverse=True)
         return valid
 
     def dismiss(self, notification_id: str) -> bool:
