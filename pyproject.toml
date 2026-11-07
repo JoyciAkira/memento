@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "memento-mcp"
-version = "1.2.1"
+version = "1.2.2"
 authors = [
   { name = "Daniele Corrao" },
 ]
@@ -37,7 +37,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "mcp",
+    "mcp>=1.27,<2",
     "watchdog>=4.0.0",
     "aiosqlite",
     "openai",
@@ -84,8 +84,10 @@ exclude = [
 ]
 
 [tool.setuptools]
-packages = ["memento"]
 include-package-data = true
+
+[tool.setuptools.packages.find]
+include = ["memento*"]
 
 [tool.setuptools.package-data]
 memento = ["prompts/*.json"]

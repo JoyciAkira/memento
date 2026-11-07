@@ -2,6 +2,22 @@
 
 All notable changes to Memento are documented here.
 
+## [1.2.2] — 2026-11-07
+
+### Code Grounding & Workspace Sync
+- New incremental tree-sitter code index and memory grounding, exposed through the `memento_code` MCP tool and the `memento index`, `graph`, and `ground` CLI commands.
+- New append-only workspace ledger with a rebuildable SQLite cache, `memento sync`/`sync --watch`, git hooks, and snapshot compaction.
+- Added migration `v012` to backfill memory tiers and expanded schema-migration coverage.
+
+### Reliability
+- `provider.close()` now closes synchronous SQLite and KnowledgeGraph connections; workspace tests close providers before removing temporary directories.
+- Windows CI is stable: subprocess git hooks, SQLite cleanup, latency thresholds, notification ordering, and pytest summary guards are deterministic.
+- Fixed Python 3.10 compatibility, runtime logger initialization, UI auth-token handling, and Ruff 0.4 formatting.
+- Pinned the MCP SDK to the tested 1.x line (`mcp>=1.27,<2`): 2.x renamed `Tool.inputSchema` to `input_schema`, which prevented a fresh install from importing the tool registry.
+
+### Packaging
+- The wheel now includes all `memento.*` subpackages. The published `1.2.1` wheel contained only the top-level `memento` modules, so a fresh PyPI install could not import `memento.memory`, `memento.tools`, `memento.retrieval`, or the migration packages.
+
 ## [1.2.1] — 2026-07-16
 
 ### Enterprise DB Self-Healing & Corruption Resilience
