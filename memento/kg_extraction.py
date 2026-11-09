@@ -5,9 +5,11 @@ import hashlib
 import json
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 import aiosqlite
+
+from memento.llm_client import get_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -17,13 +19,11 @@ class KGExtractionEngine:
     MAX_CHARS_PER_MEMORY = 500
     DEFAULT_CONFIDENCE = 0.7
 
-    def __init__(
-        self, db_path: str, kg, llm_client=None, model: str = "openai/gpt-4o-mini"
-    ):
+    def __init__(self, db_path: str, kg, llm_client=None, model: Optional[str] = None):
         self.db_path = db_path
         self.kg = kg
         self.llm_client = llm_client
-        self.model = model
+        self.model = model or get_model_name()
 
     @staticmethod
     def _text_hash(text: str) -> str:

@@ -501,7 +501,7 @@ class CognitiveEngine:
         """Get or create a CognitiveConsolidator wired to this engine's LLM."""
         if self._consolidator is None:
             self._consolidator = CognitiveConsolidator(orchestrator)
-            self._consolidator.set_llm_client(self.llm)
+            self._consolidator.set_llm_client(self.llm, model=self.model)
             logger.info("CognitiveConsolidator initialized with LLM client")
         return self._consolidator
 

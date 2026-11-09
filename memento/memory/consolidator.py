@@ -4,6 +4,7 @@ from typing import Dict, List, Any, Optional, Callable
 from datetime import datetime
 from dataclasses import dataclass
 
+from memento.llm_client import get_model_name
 from memento.memory.active_inference import ActiveInferenceEngine, Prediction
 from memento.memory.orchestrator import MemoryOrchestrator
 
@@ -32,12 +33,14 @@ class LLMPredictor:
         "Event: {event}\nPrediction:"
     )
 
-    def __init__(self, llm_client=None, model: str = "openai/gpt-4o-mini"):
+    def __init__(self, llm_client=None, model: Optional[str] = None):
         self._llm = llm_client
-        self._model = model
+        self._model = model or get_model_name()
 
-    def set_client(self, llm_client) -> None:
+    def set_client(self, llm_client, model: Optional[str] = None) -> None:
         self._llm = llm_client
+        if model:
+            self._model = model
 
     async def predict(self, event: str) -> Prediction:
         if not self._llm:
@@ -97,8 +100,8 @@ class CognitiveConsolidator:
         self._event_queue: asyncio.Queue = asyncio.Queue()
         self._llm_predictor = LLMPredictor()
 
-    def set_llm_client(self, llm_client) -> None:
-        self._llm_predictor.set_client(llm_client)
+    def set_llm_client(self, llm_client, model: Optional[str] = None) -> None:
+        self._llm_predictor.set_client(llm_client, model=model)
 
     async def predict_outcome(self, event: str) -> Prediction:
         return await self._llm_predictor.predict(event)

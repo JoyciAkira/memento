@@ -67,8 +67,21 @@ def get_llm_client() -> AsyncOpenAI | None:
     return _client
 
 
+DEFAULT_MODEL = "openai/gpt-4o-mini"
+
+# MCP does not expose the host agent's model, so Memento inherits it from the
+# environment shared with the agent: explicit Memento override first, then the
+# model the agent uses on the same OpenAI-compatible endpoint, then the legacy
+# Mem0 variable kept for backwards compatibility.
+_MODEL_ENV_VARS = ("MEMENTO_MODEL", "OPENAI_MODEL", "MEM0_MODEL")
+
+
 def get_model_name() -> str:
-    return os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini")
+    for var in _MODEL_ENV_VARS:
+        value = os.environ.get(var, "").strip()
+        if value:
+            return value
+    return DEFAULT_MODEL
 
 
 def get_embedding_model() -> str:

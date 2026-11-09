@@ -1,5 +1,7 @@
 import os
 
+from memento.llm_client import get_model_name
+
 
 class Settings:
     def __init__(self):
@@ -10,7 +12,7 @@ class Settings:
         self.embedding_model = os.environ.get(
             "MEM0_EMBEDDING_MODEL", "text-embedding-3-small"
         ).strip()
-        self.llm_model = os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini").strip()
+        self.llm_model = get_model_name()
         self.embedding_backend = self._detect_embedding_backend()
         self.memento_dir = os.environ.get("MEMENTO_DIR", os.getcwd()).strip()
         self.ui_port = int(os.environ.get("MEMENTO_UI_PORT", "8089"))

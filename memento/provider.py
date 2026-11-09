@@ -1461,6 +1461,5 @@ class NeuroGraphProvider:
             db_path=self.db_path,
             kg=self.kg.kg,
             llm_client=self.llm_client,
-            model=os.environ.get("MEM0_MODEL", "openai/gpt-4o-mini"),
         )
         return await engine.run_extraction_cycle(max_memories=max_memories)
