@@ -53,20 +53,21 @@ async def test_provider_metadata_uses_workspace_not_memento_dir(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_mcp_server_workspace_prefers_memento_dir(monkeypatch):
+async def test_mcp_server_workspace_prefers_memento_dir(monkeypatch, tmp_path):
     import importlib
 
-    with tempfile.TemporaryDirectory() as ws:
-        monkeypatch.setenv("MEMENTO_DIR", ws)
-        import memento.mcp_server as ms
+    ws = str(tmp_path / "workspace")
+    os.makedirs(ws)
+    monkeypatch.setenv("MEMENTO_DIR", ws)
+    import memento.mcp_server as ms
 
-        importlib.reload(ms)
-        res = await ms.call_tool("memento_status", {})
-        assert ws in res[0].text
+    importlib.reload(ms)
+    res = await ms.call_tool("memento_status", {})
+    assert os.path.realpath(ws) in res[0].text
 
-        from memento.workspace_context import get_workspace_context
+    from memento.workspace_context import get_workspace_context
 
-        await get_workspace_context(ws).provider.close()
+    await get_workspace_context(ws).provider.close()
 
 
 def _search_memories(result) -> list[str]:
@@ -90,7 +91,7 @@ def _metadata_workspace_roots(workspace: str) -> set[str]:
 
 
 @pytest.mark.asyncio
-async def test_mcp_two_workspaces_isolated_via_memento_dir(monkeypatch):
+async def test_mcp_two_workspaces_isolated_via_memento_dir(monkeypatch, tmp_path):
     """MEMENTO_DIR must select the workspace: no memory or metadata leakage.
 
     No ``workspace_root`` argument is passed, so the server resolves each call
@@ -98,10 +99,11 @@ async def test_mcp_two_workspaces_isolated_via_memento_dir(monkeypatch):
     """
     from memento.mcp_server import call_tool
 
-    with (
-        tempfile.TemporaryDirectory() as workspace_a,
-        tempfile.TemporaryDirectory() as workspace_b,
-    ):
+    workspace_a = str(tmp_path / "workspace_a")
+    workspace_b = str(tmp_path / "workspace_b")
+    os.makedirs(workspace_a)
+    os.makedirs(workspace_b)
+    try:
         monkeypatch.setenv("MEMENTO_DIR", workspace_a)
         await call_tool(
             "memento_remember",
@@ -130,3 +132,11 @@ async def test_mcp_two_workspaces_isolated_via_memento_dir(monkeypatch):
 
         assert _metadata_workspace_roots(workspace_a) == {os.path.realpath(workspace_a)}
         assert _metadata_workspace_roots(workspace_b) == {os.path.realpath(workspace_b)}
+    finally:
+        # Close the KG/SQLite handles before pytest cleans tmp_path: Windows
+        # cannot delete a database file that is still open.
+        from memento.workspace_context import _contexts
+
+        for ctx in list(_contexts.values()):
+            await ctx.provider.close()
+        _contexts.clear()

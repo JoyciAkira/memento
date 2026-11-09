@@ -212,25 +212,32 @@ async def test_memento_tool_coercion():
 
 
 @pytest.mark.asyncio
-async def test_mcp_server_dynamic_workspace_routing():
+async def test_mcp_server_dynamic_workspace_routing(tmp_path):
     from memento.mcp_server import call_tool
-    import tempfile
     import os
 
-    with tempfile.TemporaryDirectory() as ws1, tempfile.TemporaryDirectory() as ws2:
-        # Status for WS1
-        res1 = await call_tool("memento_status", {"workspace_root": ws1})
-        assert ws1 in res1[0].text
+    ws1 = str(tmp_path / "ws1")
+    ws2 = str(tmp_path / "ws2")
+    os.makedirs(ws1)
+    os.makedirs(ws2)
+    # The server canonicalizes workspaces with realpath (on Windows this
+    # expands 8.3 short names in temp paths), so compare against that.
+    root1 = os.path.realpath(ws1)
+    root2 = os.path.realpath(ws2)
 
-        # Status for WS2
-        res2 = await call_tool("memento_status", {"workspace_root": ws2})
-        assert ws2 in res2[0].text
+    # Status for WS1
+    res1 = await call_tool("memento_status", {"workspace_root": ws1})
+    assert root1 in res1[0].text
 
-        # Verify db paths in output
-        assert os.path.join(ws1, ".memento", "neurograph_memory.db") in res1[0].text
-        assert os.path.join(ws2, ".memento", "neurograph_memory.db") in res2[0].text
+    # Status for WS2
+    res2 = await call_tool("memento_status", {"workspace_root": ws2})
+    assert root2 in res2[0].text
 
-        from memento.workspace_context import get_workspace_context
+    # Verify db paths in output
+    assert os.path.join(root1, ".memento", "neurograph_memory.db") in res1[0].text
+    assert os.path.join(root2, ".memento", "neurograph_memory.db") in res2[0].text
 
-        await get_workspace_context(ws1).provider.close()
-        await get_workspace_context(ws2).provider.close()
+    from memento.workspace_context import get_workspace_context
+
+    await get_workspace_context(ws1).provider.close()
+    await get_workspace_context(ws2).provider.close()
