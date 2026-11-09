@@ -1,7 +1,10 @@
-import os
 import logging
-from typing import Dict
+import os
+import threading
+from typing import Any, Dict
+
 from memento.provider import NeuroGraphProvider
+from memento.workspace_paths import resolve_workspace_root
 from memento.cognitive_engine import CognitiveEngine
 from memento.access_manager import MementoAccessManager
 from memento.config_store import WorkspaceConfigStore
@@ -14,12 +17,14 @@ logger = logging.getLogger("memento-workspace")
 
 class WorkspaceContext:
     def __init__(self, workspace_root: str):
-        self.workspace_root = os.path.abspath(workspace_root)
+        self.workspace_root = resolve_workspace_root(workspace_root)
         self.memento_dir = os.path.join(self.workspace_root, ".memento")
         os.makedirs(self.memento_dir, exist_ok=True)
 
         self.db_path = os.path.join(self.memento_dir, "neurograph_memory.db")
-        self.provider = NeuroGraphProvider(db_path=self.db_path)
+        self.provider = NeuroGraphProvider(
+            db_path=self.db_path, workspace_root=self.workspace_root
+        )
         self.cognitive_engine = CognitiveEngine(
             self.provider, workspace_root=self.workspace_root
         )
@@ -29,7 +34,7 @@ class WorkspaceContext:
         self.config = WorkspaceConfigStore(self.memento_dir, self.workspace_root)
         self.config.load()
 
-        self.daemon = None
+        self.daemon: Any = None
         self.consolidation_scheduler = None
         self.kg_extraction_scheduler = None
         self.relevance_tracker = None
@@ -144,12 +149,13 @@ class WorkspaceContext:
 
 
 _contexts: Dict[str, WorkspaceContext] = {}
+_contexts_lock = threading.Lock()
 
 
-def get_workspace_context(workspace_root: str) -> WorkspaceContext:
-    if not workspace_root:
-        workspace_root = os.getcwd()
-    abs_root = os.path.abspath(workspace_root)
-    if abs_root not in _contexts:
-        _contexts[abs_root] = WorkspaceContext(abs_root)
-    return _contexts[abs_root]
+def get_workspace_context(workspace_root: str | None = None) -> WorkspaceContext:
+    abs_root = resolve_workspace_root(workspace_root)
+    key = os.path.normcase(abs_root)
+    with _contexts_lock:
+        if key not in _contexts:
+            _contexts[key] = WorkspaceContext(abs_root)
+        return _contexts[key]

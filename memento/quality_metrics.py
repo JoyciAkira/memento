@@ -172,11 +172,13 @@ class QualityMetrics:
             )
             with_errors = await cur.fetchone()
 
-            coverage = (extracted[0] / total[0] * 100) if total and total[0] > 0 else 0
+            total_count = total[0] if total else 0
+            extracted_count = extracted[0] if extracted else 0
+            coverage = (extracted_count / total_count * 100) if total_count > 0 else 0
 
             return {
-                "total_memories": total[0] if total else 0,
-                "extracted_memories": extracted[0] if extracted else 0,
+                "total_memories": total_count,
+                "extracted_memories": extracted_count,
                 "with_entities": with_entities[0] if with_entities else 0,
                 "with_triples": with_triples[0] if with_triples else 0,
                 "with_errors": with_errors[0] if with_errors else 0,

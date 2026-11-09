@@ -20,7 +20,7 @@ logger = logging.getLogger("memento-mcp")
     Tool(
         name="memento_search",
         description=(
-            "Search memories. Modes: basic (FTS), advanced (vNext pipeline), explain (routing trace)."
+            "Search memories. Modes: basic (hybrid RRF), advanced (vNext pipeline), explain (routing trace)."
         ),
         inputSchema={
             "type": "object",
@@ -46,7 +46,7 @@ async def memento_search(arguments: dict, ctx, access_manager) -> list[TextConte
         raise PermissionError(f"Cannot search. Access: {access_manager.state}")
     query = arguments.get("query", "")
     mode = arguments.get("mode", "basic")
-    limit = int(arguments.get("limit") or 10)
+    limit = max(1, min(int(arguments.get("limit") or 10), 200))
     filters = arguments.get("filters")
     active_context = arguments.get("active_context")
 
@@ -62,7 +62,7 @@ async def memento_search(arguments: dict, ctx, access_manager) -> list[TextConte
             except Exception:
                 pass
         res = await ctx.provider.search(
-            query, user_id="default", filters=actual_filters or None
+            query, user_id="default", limit=limit, filters=actual_filters or None
         )
         from memento.tools.utils import get_active_goals
 
@@ -206,7 +206,7 @@ async def memento_remember(arguments: dict, ctx, access_manager) -> list[TextCon
         from memento.quality_metrics import QualityMetrics
 
         metrics = QualityMetrics(ctx.db_path)
-        await metrics.record_evaluation(memory_id, float(score), reason)
+        await metrics.record_evaluation(str(memory_id), float(score), reason or "")
         return [
             TextContent(
                 type="text", text=f"Quality evaluation recorded for {memory_id}."
@@ -359,17 +359,16 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
 
     if action == "consolidation_scheduler":
         if enabled:
-            from memento.consolidation import ConsolidationScheduler
+            from memento.consolidation_scheduler import ConsolidationScheduler
 
             interval = float(arguments.get("interval_minutes") or 30)
-            scheduler = ConsolidationScheduler(
-                db_path=ctx.db_path,
+            consolidation_scheduler = ConsolidationScheduler(
                 consolidate_fn=ctx.provider.consolidate,
                 interval_minutes=interval,
                 initial_delay_minutes=5,
             )
-            scheduler.start()
-            ctx.consolidation_scheduler = scheduler
+            consolidation_scheduler.start()
+            ctx.consolidation_scheduler = consolidation_scheduler
             return [
                 TextContent(
                     type="text",
@@ -386,14 +385,13 @@ async def memento_configure(arguments: dict, ctx, access_manager) -> list[TextCo
             from memento.kg_extraction_scheduler import KGExtractionScheduler
 
             interval = float(arguments.get("interval_minutes") or 60)
-            scheduler = KGExtractionScheduler(
-                db_path=ctx.db_path,
-                extract_fn=lambda: ctx.provider.extract_kg(max_memories=50),
+            kg_scheduler = KGExtractionScheduler(
+                extraction_fn=lambda: ctx.provider.extract_kg(max_memories=50),
                 interval_minutes=interval,
                 initial_delay_minutes=10,
             )
-            scheduler.start()
-            ctx.kg_extraction_scheduler = scheduler
+            kg_scheduler.start()
+            ctx.kg_extraction_scheduler = kg_scheduler
             return [
                 TextContent(
                     type="text",
@@ -709,7 +707,7 @@ async def memento_health(arguments: dict, ctx, access_manager) -> list[TextConte
         from memento.predictive_cache import PredictiveCache
 
         cache = PredictiveCache(db_path)
-        result = await cache.cache_stats()
+        result = cache.cache_stats()
         return [
             TextContent(
                 type="text",
@@ -951,28 +949,29 @@ async def memento_notifications(
             config["topics"] = arguments["topics"]
         if "min_confidence" in arguments:
             config["min_confidence"] = arguments["min_confidence"]
-        result = mgr.configure(**{k: v for k, v in config.items()})
+        configured = mgr.configure(**{k: v for k, v in config.items()})
         return [
             TextContent(
-                type="text", text=json.dumps(result, indent=2, ensure_ascii=False)
+                type="text",
+                text=json.dumps(configured, indent=2, ensure_ascii=False),
             )
         ]
 
     if action == "list":
         include = arguments.get("include_dismissed", False)
-        result = mgr.get_pending_notifications(include_dismissed=include)
+        pending = mgr.get_pending_notifications(include_dismissed=include)
         return [
             TextContent(
                 type="text",
-                text=json.dumps(result, indent=2, ensure_ascii=False, default=str),
+                text=json.dumps(pending, indent=2, ensure_ascii=False, default=str),
             )
         ]
 
     if action == "dismiss":
         nid = arguments.get("notification_id", "")
-        result = mgr.dismiss(nid)
+        dismissed = mgr.dismiss(nid)
         return [
-            TextContent(type="text", text=f"Notification {nid} dismissed: {result}")
+            TextContent(type="text", text=f"Notification {nid} dismissed: {dismissed}")
         ]
 
     return [TextContent(type="text", text=f"Unknown notification action: {action}")]

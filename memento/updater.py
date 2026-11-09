@@ -32,11 +32,10 @@ def detect_installed_package() -> Optional[str]:
 
 
 def pip_upgrade(package: str, *, dry_run: bool = False) -> tuple[bool, str]:
-    if dry_run:
-        cmd = f"{sys.executable} -m pip install -U {package}"
-        return True, f"[dry-run] Would run: {cmd}"
-
     cmd = [sys.executable, "-m", "pip", "install", "-U", package]
+    if dry_run:
+        return True, "[dry-run] Would run: " + " ".join(cmd)
+
     try:
         result = subprocess.run(
             cmd,

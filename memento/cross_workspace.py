@@ -119,20 +119,24 @@ class CrossWorkspaceManager:
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM cross_workspace_sync_log WHERE status = 'shared'"
             )
-            shared_count = (await cursor.fetchone())[0]
+            shared_row = await cursor.fetchone()
+            shared_count = shared_row[0] if shared_row else 0
 
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM cross_workspace_sync_log WHERE status = 'imported'"
             )
-            imported_count = (await cursor.fetchone())[0]
+            imported_row = await cursor.fetchone()
+            imported_count = imported_row[0] if imported_row else 0
 
             cursor = await db.execute(
                 "SELECT COUNT(*) FROM cross_workspace_sync_log WHERE status = 'pending'"
             )
-            pending_count = (await cursor.fetchone())[0]
+            pending_row = await cursor.fetchone()
+            pending_count = pending_row[0] if pending_row else 0
 
             cursor = await db.execute("SELECT COUNT(*) FROM cross_workspace_sync_log")
-            total = (await cursor.fetchone())[0]
+            total_row = await cursor.fetchone()
+            total = total_row[0] if total_row else 0
 
             cursor = await db.execute(
                 "SELECT DISTINCT source_workspace FROM cross_workspace_sync_log"

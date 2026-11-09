@@ -56,6 +56,7 @@ test = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "mypy>=1.10,<2",
 ]
 
 [project.urls]
@@ -83,6 +84,10 @@ exclude = [
     "update_*.py",
 ]
 
+[tool.pytest.ini_options]
+# Tests import the in-repo `benchmarks` package as well as an installed `memento`.
+pythonpath = ["."]
+
 [tool.setuptools]
 include-package-data = true
 
@@ -90,13 +95,15 @@ include-package-data = true
 include = ["memento*"]
 
 [tool.setuptools.package-data]
-memento = ["prompts/*.json"]
+memento = ["prompts/*.json", "py.typed"]
 
 [tool.bandit]
 exclude_dirs = ["tests", ".memento", ".trae", "_backup_memento", "tmp_*", "temp_*", "apply_*", "patch*", "fix*", "update_*"]
 skips = ["B101", "B601", "B608"]
 
 [tool.mypy]
+files = ["memento"]
+no_implicit_optional = false
 ignore_missing_imports = true
 python_version = "3.10"
 

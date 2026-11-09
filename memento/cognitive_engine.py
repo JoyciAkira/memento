@@ -133,7 +133,7 @@ class CognitiveEngine:
             response = await self.llm.chat.completions.create(
                 model=self.model, messages=messages
             )
-            return response.choices[0].message.content
+            return response.choices[0].message.content or ""
         except Exception as e:
             logger.error(f"LLM Error: {e}")
             base_url = os.environ.get("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -169,9 +169,11 @@ class CognitiveEngine:
             for r in results:
                 if not isinstance(r, dict):
                     continue
-                memory_text = r.get("memory", "").lower()
-                if any(kw in memory_text for kw in negative_keywords):
-                    warnings.append(r.get("memory"))
+                memory = r.get("memory")
+                if not isinstance(memory, str) or not memory:
+                    continue
+                if any(kw in memory.lower() for kw in negative_keywords):
+                    warnings.append(memory)
 
             if warnings:
                 formatted = "\n- ".join(warnings)
@@ -261,9 +263,11 @@ class CognitiveEngine:
                 if score < 0.8:
                     continue
 
-                memory_text = r.get("memory", "").lower()
-                if any(kw in memory_text for kw in negative_keywords):
-                    warnings.append(r.get("memory"))
+                memory = r.get("memory")
+                if not isinstance(memory, str) or not memory:
+                    continue
+                if any(kw in memory.lower() for kw in negative_keywords):
+                    warnings.append(memory)
 
             if warnings:
                 formatted = "\n- ".join(warnings)
@@ -326,7 +330,7 @@ class CognitiveEngine:
                 if not isinstance(r, dict):
                     continue
                 mem_id = r.get("id", "unknown")
-                mem_text = r.get("memory", "")
+                mem_text = r.get("memory") or ""
                 memory_list.append(f"- ID: {mem_id} | Fact: {mem_text}")
 
             memories_str = "\n".join(memory_list)
@@ -367,11 +371,13 @@ class CognitiveEngine:
                     "[GOAL ALIGNMENT] No active goals found in memory for comparison."
                 )
 
-            goals = [
-                r.get("goal")
-                for r in goal_rows
-                if isinstance(r, dict) and r.get("goal")
-            ]
+            goals: list[str] = []
+            for r in goal_rows:
+                if not isinstance(r, dict):
+                    continue
+                goal = r.get("goal")
+                if isinstance(goal, str) and goal:
+                    goals.append(goal)
             if not goals:
                 return (
                     "[GOAL ALIGNMENT] No active goals found in memory for comparison."
@@ -519,16 +525,17 @@ class CognitiveEngine:
         Returns:
             ConsolidationResult with was_surprising, prediction_error, tier, memory_id
         """
-        if not self._consolidator:
+        consolidator = self._consolidator
+        if consolidator is None:
             if hasattr(self.provider, "orchestrator") and self.provider.orchestrator:
-                self.get_consolidator(self.provider.orchestrator)
+                consolidator = self.get_consolidator(self.provider.orchestrator)
             else:
                 raise RuntimeError(
                     "Consolidator requires an orchestrator. "
                     "Pass it via get_consolidator(orchestrator) first."
                 )
 
-        return await self._consolidator.process_event(
+        return await consolidator.process_event(
             event, actual_outcome, force_consolidate
         )
 
@@ -540,10 +547,11 @@ class CognitiveEngine:
         - 'event': the event description
         - 'actual': the actual outcome (optional)
         """
-        if not self._consolidator:
+        consolidator = self._consolidator
+        if consolidator is None:
             if hasattr(self.provider, "orchestrator") and self.provider.orchestrator:
-                self.get_consolidator(self.provider.orchestrator)
+                consolidator = self.get_consolidator(self.provider.orchestrator)
             else:
                 raise RuntimeError("Consolidator requires an orchestrator.")
 
-        return await self._consolidator.batch_process(events)
+        return await consolidator.batch_process(events)

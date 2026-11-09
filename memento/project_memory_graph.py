@@ -116,8 +116,8 @@ class ProjectMemoryGraph:
             if not all_triples:
                 return "No project memory graph data found."
 
-            entity_types = {}
-            relations = []
+            entity_types: dict[str, list[str]] = {}
+            relations: list[str] = []
             for t in all_triples:
                 s = t.get("subject", "")
                 p = t.get("predicate", "")

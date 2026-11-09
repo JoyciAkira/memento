@@ -1,3 +1,5 @@
+import os
+
 import pytest
 
 
@@ -139,6 +141,59 @@ class TestCLICoerce:
         captured = capsys.readouterr()
         assert "Active Coercion" in captured.out
         assert "no_print_py" in captured.out or "rules" in captured.out
+
+
+class TestCLIWorkspaceRoot:
+    def test_status_prefers_memento_dir(self, monkeypatch, capsys, tmp_path):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        other = tmp_path / "other"
+        other.mkdir()
+        monkeypatch.setenv("MEMENTO_DIR", str(workspace))
+        monkeypatch.setattr("os.getcwd", lambda: str(other))
+        monkeypatch.setattr("sys.argv", ["memento", "status"])
+
+        from memento.cli import main
+
+        main(hard_exit=False)
+        captured = capsys.readouterr()
+        resolved = os.path.realpath(str(workspace))
+        assert f"Workspace root : {resolved}" in captured.out
+        assert os.path.join(resolved, ".memento") in captured.out
+
+    def test_doctor_prefers_memento_dir(self, monkeypatch, capsys, tmp_path):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        other = tmp_path / "other"
+        other.mkdir()
+        monkeypatch.setenv("MEMENTO_DIR", str(workspace))
+        monkeypatch.setattr("os.getcwd", lambda: str(other))
+        monkeypatch.setattr("sys.argv", ["memento", "doctor"])
+
+        from memento.cli import main
+
+        main(hard_exit=False)
+        captured = capsys.readouterr()
+        assert os.path.realpath(str(workspace)) in captured.out
+
+    def test_coerce_apply_uses_memento_dir(self, monkeypatch, capsys, tmp_path):
+        workspace = tmp_path / "workspace"
+        workspace.mkdir()
+        other = tmp_path / "other"
+        other.mkdir()
+        monkeypatch.setenv("MEMENTO_DIR", str(workspace))
+        monkeypatch.setattr("os.getcwd", lambda: str(other))
+        monkeypatch.setattr(
+            "sys.argv", ["memento", "coerce", "--apply", "python-strict"]
+        )
+
+        from memento.cli import main
+
+        main(hard_exit=False)
+        captured = capsys.readouterr()
+        assert "Applied preset" in captured.out
+        assert (workspace / ".memento" / "settings.json").exists()
+        assert not (other / ".memento").exists()
 
 
 class TestCLIUpdateHelp:

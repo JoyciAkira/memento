@@ -171,7 +171,7 @@ class CognitiveConsolidator:
             result = await self.process_event(
                 event=item["event"],
                 actual_outcome=item.get("actual"),
-                force_consolidate=item.get("force", False),
+                force_consolidate=bool(item.get("force", False)),
             )
             results.append(result)
         return results

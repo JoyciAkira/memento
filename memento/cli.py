@@ -40,6 +40,8 @@ import os
 import sys
 from typing import Any, Dict, List
 
+from memento.workspace_paths import resolve_workspace_root
+
 logger = logging.getLogger(__name__)
 
 
@@ -51,7 +53,7 @@ async def _get_provider(workspace_root: str | None = None) -> Any:
     """
     from memento.workspace_context import get_workspace_context
 
-    root = workspace_root or os.getcwd()
+    root = resolve_workspace_root(workspace_root)
     ctx = get_workspace_context(root)
     await ctx.provider.initialize()
     return ctx
@@ -59,11 +61,12 @@ async def _get_provider(workspace_root: str | None = None) -> Any:
 
 async def _handle_capture(args: argparse.Namespace) -> None:
     parts: list[str] = []
+    workspace_root = resolve_workspace_root()
 
     if args.auto:
         from memento.git_context import build_auto_context
 
-        auto_ctx = build_auto_context(os.getcwd())
+        auto_ctx = build_auto_context(workspace_root)
         if auto_ctx:
             parts.append(auto_ctx)
         else:
@@ -85,7 +88,7 @@ async def _handle_capture(args: argparse.Namespace) -> None:
 
     combined = redact_secrets(combined)
 
-    ctx = await _get_provider()
+    ctx = await _get_provider(workspace_root)
     result: Dict[str, Any] = await ctx.provider.add(text=combined, user_id="default")
     print(f"Memory captured. id={result.get('id', 'unknown')}")
 
@@ -192,6 +195,7 @@ async def _handle_tiers(args: argparse.Namespace) -> None:
 
 def _handle_sync(args: argparse.Namespace) -> None:
     """Record file events, rebuild the cache, and update the code index."""
+    workspace_root = resolve_workspace_root()
     if getattr(args, "watch", False):
         if args.replay_only:
             print("Error: --watch cannot be combined with --replay-only.")
@@ -199,7 +203,7 @@ def _handle_sync(args: argparse.Namespace) -> None:
         from memento.watch import SyncWatcher
 
         watcher = SyncWatcher(
-            os.getcwd(),
+            workspace_root,
             interval=args.interval,
             debounce=args.debounce,
             ground=not args.no_ground,
@@ -235,7 +239,7 @@ def _handle_sync(args: argparse.Namespace) -> None:
 
     from memento.ledger import FileLedger
 
-    ledger = FileLedger(os.getcwd())
+    ledger = FileLedger(workspace_root)
     report = ledger.sync(scan=not args.replay_only)
 
     if getattr(args, "compact", False):
@@ -244,7 +248,7 @@ def _handle_sync(args: argparse.Namespace) -> None:
     if not getattr(args, "no_index", False):
         from memento.code_index import CodeIndex
 
-        report["index"] = CodeIndex(os.getcwd(), ledger=ledger).update()
+        report["index"] = CodeIndex(workspace_root, ledger=ledger).update()
 
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -279,7 +283,7 @@ def _handle_index(args: argparse.Namespace) -> None:
     """Update the tree-sitter code index using the ledger's file hashes."""
     from memento.code_index import CodeIndex
 
-    report = CodeIndex(os.getcwd()).update(rebuild=args.rebuild)
+    report = CodeIndex(resolve_workspace_root()).update(rebuild=args.rebuild)
 
     if args.json:
         print(json.dumps(report, indent=2, ensure_ascii=False))
@@ -300,15 +304,16 @@ def _handle_hooks(args: argparse.Namespace) -> None:
     """Inspect or install the Memento pre-commit hook."""
     from memento.git_hooks import hook_status, install_pre_commit_hook
 
+    workspace_root = resolve_workspace_root()
     if args.install:
-        path = install_pre_commit_hook(os.getcwd())
+        path = install_pre_commit_hook(workspace_root)
         if args.json:
             print(json.dumps({"installed": True, "path": path}, indent=2))
         else:
             print(f"Installed pre-commit hook: {path}")
         return
 
-    status = hook_status(os.getcwd())
+    status = hook_status(workspace_root)
     if args.json:
         print(json.dumps(status, indent=2, ensure_ascii=False))
         return
@@ -323,14 +328,14 @@ def _handle_hooks(args: argparse.Namespace) -> None:
 
 
 async def _handle_status(_args: argparse.Namespace) -> None:
-    workspace_root = os.getcwd()
+    workspace_root = resolve_workspace_root()
     memento_dir = os.path.join(workspace_root, ".memento")
 
     from memento.tools.utils import find_project_root
 
     project_root = find_project_root(workspace_root)
 
-    db_path = os.path.join(project_root, ".memento", "neurograph_memory.db")
+    db_path = os.path.join(workspace_root, ".memento", "neurograph_memory.db")
 
     print(f"Workspace root : {workspace_root}")
     print(f"Project root   : {project_root}")
@@ -347,9 +352,9 @@ async def _handle_doctor(_args: argparse.Namespace) -> None:
     from memento.tools.utils import find_project_root
     from memento.local_embeddings import is_fastembed_available
 
-    workspace_root = os.getcwd()
+    workspace_root = resolve_workspace_root()
     project_root = find_project_root(workspace_root)
-    memento_dir = os.path.join(project_root, ".memento")
+    memento_dir = os.path.join(workspace_root, ".memento")
     settings_path = os.path.join(memento_dir, "settings.json")
     db_path = os.path.join(memento_dir, "neurograph_memory.db")
 
@@ -477,11 +482,8 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
         return
 
     if args.status:
-        workspace_root = os.getcwd()
-        from memento.tools.utils import find_project_root
-
-        project_root = find_project_root(workspace_root)
-        settings_path = os.path.join(project_root, ".memento", "settings.json")
+        workspace_root = resolve_workspace_root()
+        settings_path = os.path.join(workspace_root, ".memento", "settings.json")
         if not os.path.isfile(settings_path):
             print("No settings file found. Apply a preset first.")
             return
@@ -510,11 +512,8 @@ async def _handle_coerce(args: argparse.Namespace) -> None:
             print(f"Available: {', '.join(sorted(PRESETS.keys()))}")
             sys.exit(1)
 
-        workspace_root = os.getcwd()
-        from memento.tools.utils import find_project_root
-
-        project_root = find_project_root(workspace_root)
-        memento_dir = os.path.join(project_root, ".memento")
+        workspace_root = resolve_workspace_root()
+        memento_dir = os.path.join(workspace_root, ".memento")
         os.makedirs(memento_dir, exist_ok=True)
         settings_path = os.path.join(memento_dir, "settings.json")
 
@@ -559,7 +558,7 @@ def _handle_graph(args: argparse.Namespace) -> None:
     """Show symbol definitions and reference edges from the code index."""
     from memento.code_index import CodeIndex
 
-    report = CodeIndex(os.getcwd()).graph(
+    report = CodeIndex(resolve_workspace_root()).graph(
         symbol=args.symbol, file=args.file, limit=args.limit
     )
 
@@ -616,8 +615,9 @@ def _handle_ground(args: argparse.Namespace) -> None:
     from memento.knowledge_graph import KnowledgeGraph
     from memento.ledger import FileLedger
 
-    project_root = FileLedger(os.getcwd()).project_root
-    db_path = os.path.join(project_root, ".memento", "neurograph_memory.db")
+    workspace_root = resolve_workspace_root()
+    project_root = FileLedger(workspace_root).project_root
+    db_path = os.path.join(workspace_root, ".memento", "neurograph_memory.db")
     if not os.path.exists(db_path):
         print(f"Error: memory database not found: {db_path}")
         sys.exit(1)

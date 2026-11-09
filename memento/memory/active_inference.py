@@ -1,9 +1,14 @@
+from __future__ import annotations
+
+import inspect
 import logging
-from typing import Dict, List, Any, Optional, Callable
+from typing import Dict, List, Any, Optional, Callable, Awaitable
 from dataclasses import dataclass
 from datetime import datetime
 
 logger = logging.getLogger(__name__)
+
+PredictorFn = Callable[[str], "Prediction | Awaitable[Prediction]"]
 
 
 @dataclass
@@ -31,17 +36,18 @@ class ActiveInferenceEngine:
 
     SURPRISE_THRESHOLD = 0.5
 
-    def __init__(self, predictor_fn: Optional[Callable[[str], Prediction]] = None):
+    def __init__(self, predictor_fn: Optional[PredictorFn] = None):
         self._predictor_fn = predictor_fn
         self._predictions: Dict[str, Prediction] = {}
         self._history: List[PredictionResult] = []
 
-    def register_predictor(self, fn: Callable[[str], Prediction]) -> None:
+    def register_predictor(self, fn: PredictorFn) -> None:
         self._predictor_fn = fn
 
     async def predict(self, event: str) -> Prediction:
         if self._predictor_fn:
-            pred = await self._predictor_fn(event)
+            raw = self._predictor_fn(event)
+            pred = (await raw) if inspect.isawaitable(raw) else raw
         else:
             pred = Prediction(
                 content=event, expected_outcome=event.lower(), confidence=0.5

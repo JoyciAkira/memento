@@ -3,7 +3,7 @@ import json
 import logging
 import re
 from typing import Dict, List, Any, Optional, Set
-from memento.memory.hdc import HDCEncoder
+from memento.memory.hdc import BitVector, HDCEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -19,13 +19,13 @@ class VSAIndex:
         self.db_path = db_path
         self.hdc = hdc or HDCEncoder()
         self._entity_cache: Dict[str, List[str]] = {}
-        self._vector_cache: Dict[str, int] = {}
+        self._vector_cache: Dict[str, BitVector] = {}
         # Lazily-built numpy bit matrix mirroring _vector_cache for vectorized
         # similarity. Rebuilt whenever the cache membership changes.
-        self._matrix = None
+        self._matrix: Any = None
         self._matrix_ids: List[str] = []
         self._matrix_token: Optional[int] = None
-        self._popcount = None  # uint16[256] popcount lookup, built lazily
+        self._popcount: Any = None  # uint16[256] popcount lookup, built lazily
 
     def extract_entities(self, text: str) -> List[str]:
         words = re.findall(r"[A-Za-z0-9_][A-Za-z0-9_+.#/-]{2,}", (text or "").lower())
@@ -94,7 +94,7 @@ class VSAIndex:
         memory_id: str,
         text: str,
         entities: List[str],
-        hv: int,
+        hv: BitVector,
         metadata: Dict[str, Any],
     ) -> None:
         try:
@@ -147,7 +147,7 @@ class VSAIndex:
     def query_by_entity(self, entity: str, top_k: int = 10) -> List[str]:
         return [mid for mid, _ in self.query(entity, top_k=top_k)]
 
-    def _batch_hv_similarity(self, qv: int):
+    def _batch_hv_similarity(self, qv: BitVector) -> Optional[List[tuple[str, float]]]:
         """Return [(mem_id, hv_similarity), ...] for every cached vector, using
         a vectorized numpy Hamming computation over packed bytes (XOR + popcount
         lookup). Returns None to signal the caller to fall back to the scalar
@@ -215,7 +215,7 @@ class VSAIndex:
             # computed in one vectorized numpy pass instead of len(cache)
             # Python-level popcounts. Falls back to the per-vector path if the
             # matrix cannot be built. Identical scores to the scalar version.
-            hv_scores = self._batch_hv_similarity(int(qv))
+            hv_scores = self._batch_hv_similarity(qv)
             if hv_scores is not None:
                 q_ent = set(entities)
                 scored = []
@@ -264,8 +264,8 @@ class VSAIndex:
 
     def _score(
         self,
-        query_hv: int,
-        memory_hv: int,
+        query_hv: BitVector,
+        memory_hv: BitVector,
         query_entities: List[str],
         memory_entities: List[str],
     ) -> float:
@@ -282,8 +282,8 @@ class VSAIndex:
         text: str,
         entities: List[str],
         metadata: Dict[str, Any],
-    ) -> List[int]:
-        vectors: List[int] = []
+    ) -> List[BitVector]:
+        vectors: List[BitVector] = []
         tier = str(metadata.get("memory_tier") or metadata.get("type") or "").strip()
         if tier:
             vectors.append(self.hdc.encode_relation("__memory__", "has_type", tier))

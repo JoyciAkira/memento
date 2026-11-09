@@ -15,6 +15,7 @@ import logging
 import os
 from typing import List, Dict, Any, Optional
 from memento.knowledge_graph import KnowledgeGraph
+from memento.workspace_paths import resolve_workspace_root
 
 logger = logging.getLogger(__name__)
 
@@ -55,9 +56,9 @@ class MementoGraphProvider:
                 continue
 
             self.kg.add_triple(
-                subject=source,
-                predicate=relationship,
-                obj=target,
+                subject=str(source),
+                predicate=str(relationship),
+                obj=str(target),
                 source_file="mem0_integration",
             )
 
@@ -120,11 +121,10 @@ class NeuroGraphProvider:
     INSERT concorrenti). I/O trace e query KG non tengono lock SQLite.
     """
 
-    def __init__(self, db_path: str = None):
+    def __init__(self, db_path: str | None = None, workspace_root: str | None = None):
+        self.workspace_root = resolve_workspace_root(workspace_root)
         if not db_path:
-            memento_dir = os.path.join(
-                os.environ.get("MEMENTO_DIR", os.getcwd()), ".memento"
-            )
+            memento_dir = os.path.join(self.workspace_root, ".memento")
             os.makedirs(memento_dir, exist_ok=True, mode=0o700)
             try:
                 os.chmod(memento_dir, 0o700)
@@ -132,7 +132,7 @@ class NeuroGraphProvider:
                 pass
             db_path = os.path.join(memento_dir, "neurograph_memory.db")
 
-        self.db_path = db_path
+        self.db_path: str = db_path
         # Use shared KG if MEMENTO_SHARED_KG_PATH is set (federation)
         from memento.settings import settings as _s_init
 
@@ -485,7 +485,7 @@ class NeuroGraphProvider:
             return 1.0
 
     async def add(
-        self, text: str, user_id: str = "default", metadata: dict = None
+        self, text: str, user_id: str = "default", metadata: dict | None = None
     ) -> Dict[str, Any]:
         if not self._initialized:
             await self.initialize()
@@ -496,11 +496,8 @@ class NeuroGraphProvider:
         created_at = datetime.now().isoformat()
 
         meta = dict(metadata) if isinstance(metadata, dict) else {}
-        workspace_root = os.environ.get("MEMENTO_DIR", os.getcwd())
-        if isinstance(workspace_root, str) and workspace_root.strip():
-            abs_root = os.path.abspath(workspace_root)
-            meta.setdefault("workspace_root", abs_root)
-            meta.setdefault("workspace_name", os.path.basename(abs_root))
+        meta.setdefault("workspace_root", self.workspace_root)
+        meta.setdefault("workspace_name", os.path.basename(self.workspace_root))
 
         memory_tier = str(meta.get("memory_tier", "semantic")).strip().lower()
         if memory_tier not in VALID_MEMORY_TIERS:
@@ -674,7 +671,7 @@ class NeuroGraphProvider:
         query: str,
         user_id: str = "default",
         limit: int = 100,
-        filters: dict = None,
+        filters: dict | None = None,
     ) -> List[Dict[str, Any]]:
         if not self._initialized:
             await self.initialize()
@@ -784,7 +781,7 @@ class NeuroGraphProvider:
                         f"AND m.id IN ({placeholders})",
                         (user_id, *filter_params, *candidate_ids),
                     )
-                candidate_rows = await cursor.fetchall()
+                candidate_rows = list(await cursor.fetchall())
 
             semantic_scores: dict[str, float] = {}
             row_map: dict[str, aiosqlite.Row] = {}
@@ -857,15 +854,15 @@ class NeuroGraphProvider:
             # Hoist datetime.now() to avoid calling it once per candidate row
             _now = datetime.now()
             for row_id in list(rrf_scores.keys()):
-                snap = row_map.get(row_id)
-                if snap is not None:
+                row_snap = row_map.get(row_id)
+                if row_snap is not None:
                     tier = tier_map.get(row_id, "semantic")
                     rrf_scores[row_id] *= self._decay_score(
-                        snap["created_at"],
+                        row_snap["created_at"],
                         tier,
                         _now,
-                        last_accessed_at=snap["last_accessed_at"],
-                        hit_count=snap["hit_count"] or 0,
+                        last_accessed_at=row_snap["last_accessed_at"],
+                        hit_count=row_snap["hit_count"] or 0,
                     )
 
             final_sorted = sorted(rrf_scores.items(), key=lambda x: x[1], reverse=True)[
@@ -919,7 +916,7 @@ class NeuroGraphProvider:
                     if row_id in rows_snapshot
                 ]
                 batch_relations = await asyncio.to_thread(
-                    self.kg.query_entities_batch, all_names
+                    self.kg.kg.query_entities_batch, all_names
                 )
                 for row_id, score in final_sorted:
                     snap = rows_snapshot.get(row_id)
@@ -931,7 +928,7 @@ class NeuroGraphProvider:
                         "created_at": snap["created_at"],
                         "score": score,
                     }
-                    entity_id = self.kg._entity_id(snap["text"])
+                    entity_id = self.kg.kg._entity_id(snap["text"])
                     if entity_id in batch_relations:
                         res["relations"] = batch_relations[entity_id]
                     results.append(res)

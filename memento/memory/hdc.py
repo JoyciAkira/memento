@@ -1,5 +1,5 @@
 import hashlib
-from typing import Dict, Tuple, List
+from typing import Dict, Tuple, List, Sequence
 
 import numpy as np
 
@@ -82,7 +82,7 @@ class HDCEncoder:
     def bind(self, a: int | BitVector, b: int | BitVector) -> BitVector:
         return BitVector((int(a) ^ int(b)) & self._mask, self.d)
 
-    def bundle(self, vectors: List[int | BitVector]) -> BitVector:
+    def bundle(self, vectors: Sequence[int | BitVector]) -> BitVector:
         if not vectors:
             raise ValueError("Cannot bundle empty list")
         if len(vectors) == 1:

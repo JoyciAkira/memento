@@ -66,7 +66,7 @@ class Settings:
 
     def reload(self) -> None:
         """Re-read all env vars — useful in tests after monkeypatch.setenv."""
-        self.__init__()
+        Settings.__init__(self)
 
 
 settings = Settings()

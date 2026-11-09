@@ -19,7 +19,7 @@ class PreCognitiveDaemon:
         self.callback = callback
         self.debounce_seconds = debounce_seconds
         self.retrieval_pipeline = retrieval_pipeline
-        self._timers = {}
+        self._timers: dict[str, asyncio.TimerHandle] = {}
         self.observer = None
         self.is_running = False
         self._loop: Optional[asyncio.AbstractEventLoop] = None

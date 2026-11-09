@@ -97,7 +97,10 @@ def _build_parsers() -> Dict[str, Any]:
             try:
                 parser.language = language
             except Exception:
-                parser.set_language(language)
+                set_language = getattr(parser, "set_language", None)
+                if set_language is None:
+                    raise
+                set_language(language)
             parsers[name] = parser
         except Exception:
             continue

@@ -44,11 +44,13 @@ def _derive_next_steps(events: List[dict], goals: List[dict]) -> List[str]:
         goal = g.get("goal") if isinstance(g, dict) else g
         if goal:
             steps.append(f"- Pursue goal: {goal}")
-    recent = [
-        e.get("tool_name")
-        for e in events[:3]
-        if isinstance(e, dict) and e.get("tool_name")
-    ]
+    recent: List[str] = []
+    for e in events[:3]:
+        if not isinstance(e, dict):
+            continue
+        name = e.get("tool_name")
+        if isinstance(name, str) and name:
+            recent.append(name)
     if recent:
         steps.append("- Continue from: " + ", ".join(reversed(recent)))
     if not steps:

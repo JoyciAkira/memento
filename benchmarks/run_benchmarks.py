@@ -22,6 +22,7 @@ def main() -> int:
         "tests/test_mcp_benchmarks.py",
         "tests/test_mcp_tool_contracts.py",
         "tests/test_tools_smoke.py",
+        "tests/test_mcp_retrieval_paths.py",
     ]
     cmd = [sys.executable, "-m", "pytest", *tests, "-q", "--tb=short"]
     return subprocess.call(cmd, cwd=root)

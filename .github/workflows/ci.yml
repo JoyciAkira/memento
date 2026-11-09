@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.10", "3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v5
@@ -69,6 +69,82 @@ jobs:
           uv run pytest tests/ -v --cov=memento --cov-report=xml 2>&1 | tee pytest.log
           # Fail if pytest exited before printing its complete summary (e.g. os._exit).
           grep -Eq '[0-9]+ (passed|failed|error|errors|skipped)' pytest.log
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Install (uv)
+        run: uv sync --frozen --extra test
+      - name: Run mypy
+        run: uv run mypy
+
+  package:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v7
+        with:
+          enable-cache: true
+      - name: Build wheel
+        run: uv build
+      - name: Install wheel in a clean environment
+        shell: bash
+        run: |
+          set -euo pipefail
+          WHEEL=$(ls -t "$PWD"/dist/*.whl | head -n 1)
+          python -m venv /tmp/memento-wheel-venv
+          /tmp/memento-wheel-venv/bin/python -m pip install --upgrade pip
+          /tmp/memento-wheel-venv/bin/python -m pip install "$WHEEL"
+          cd /tmp
+          /tmp/memento-wheel-venv/bin/memento --help
+          /tmp/memento-wheel-venv/bin/python -c "from importlib.resources import files; assert (files('memento') / 'py.typed').is_file()"
+      - name: MCP handshake from wheel
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd /tmp
+          /tmp/memento-wheel-venv/bin/python - <<'PY'
+          import asyncio
+          import os
+          import sys
+          import tempfile
+          from pathlib import Path
+
+          from mcp import ClientSession, StdioServerParameters
+          from mcp.client.stdio import stdio_client
+
+
+          async def main() -> None:
+              with tempfile.TemporaryDirectory() as workspace:
+                  env = os.environ.copy()
+                  env["MEMENTO_DIR"] = workspace
+                  env["MEMENTO_EMBEDDING_BACKEND"] = "none"
+                  env.pop("OPENAI_API_KEY", None)
+                  command = str(Path(sys.executable).parent / "memento-mcp")
+                  params = StdioServerParameters(command=command, args=[], env=env)
+                  async with stdio_client(params) as (read, write):
+                      async with ClientSession(read, write) as session:
+                          init = await session.initialize()
+                          assert init.serverInfo.name == "memento-mcp"
+                          tools = await session.list_tools()
+                          assert tools.tools
+                          health = await session.call_tool("memento_health", {})
+                          assert not health.isError
+                  print("wheel MCP handshake: ok")
+
+
+          asyncio.run(main())
+          PY
+
   lint:
     runs-on: ubuntu-latest
     steps:

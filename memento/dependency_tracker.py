@@ -67,7 +67,7 @@ async def scan_workspace_for_imports(workspace_root: str | Path) -> Dict[str, Se
     results = await asyncio.gather(*tasks)
 
     # map import_name -> set of file paths
-    import_locations = {}
+    import_locations: dict[str, set[str]] = {}
     stdlib_modules = set(sys.stdlib_module_names)
 
     for filepath, imports in results:

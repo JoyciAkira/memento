@@ -51,11 +51,13 @@ class SessionManager:
 
         summary = ""
         if recent_events:
-            last = [
-                e.get("tool_name")
-                for e in recent_events[:5]
-                if isinstance(e, dict) and e.get("tool_name")
-            ]
+            last: list[str] = []
+            for e in recent_events[:5]:
+                if not isinstance(e, dict):
+                    continue
+                name = e.get("tool_name")
+                if isinstance(name, str) and name:
+                    last.append(name)
             summary = "Recent activity: " + ", ".join(reversed(last))
 
         snapshot = {
@@ -82,10 +84,10 @@ class SessionManager:
 
         # Include KG + decision log for a lossless enterprise handoff (best-effort).
         try:
-            from memento.knowledge_graph import KnowledgeGraphStore
+            from memento.knowledge_graph import KnowledgeGraph
 
-            kg = KnowledgeGraphStore(self.db_path)
-            kg_summary = await kg.get_summary()
+            kg = KnowledgeGraph(self.db_path)
+            kg_summary = kg.stats()
             if kg_summary:
                 snapshot["kg_summary"] = kg_summary
         except Exception:

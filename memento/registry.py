@@ -40,7 +40,7 @@ class ToolRegistry:
         return [
             t
             for t in self._tools.values()
-            if not t.description.startswith("[DEPRECATED]")
+            if not t.description or not t.description.startswith("[DEPRECATED]")
         ]
 
     @staticmethod

@@ -165,7 +165,7 @@ class MemoryOrchestrator:
         mem_id = str(uuid.uuid4())
 
         if tier == "working":
-            self.l1.add(mem_id, content, metadata, importance=importance)
+            self.l1.add(mem_id, content, metadata or {}, importance=importance)
         elif tier == "episodic":
             self.l2.add(mem_id, content, metadata)
             if self._vsa_index:
@@ -182,6 +182,7 @@ class MemoryOrchestrator:
     def search(
         self, query: str, tier: str = "all", limit: int = 100
     ) -> List[Dict[str, Any]]:
+        limit = max(int(limit), 0)
         vsa_results: List[Dict[str, Any]] = []
         if self._vsa_index and tier in ("episodic", "semantic", "all"):
             vsa_ids = self._vsa_index.query_by_entity(query, top_k=limit)
@@ -219,7 +220,7 @@ class MemoryOrchestrator:
                 vsa_results + l3_results + l2_results + l1_formatted + token_candidates
             ):
                 item_id = item.get("id")
-                if item_id in seen:
+                if not isinstance(item_id, str) or item_id in seen:
                     continue
                 seen.add(item_id)
                 merged.append(item)
@@ -231,9 +232,9 @@ class MemoryOrchestrator:
                     pair[0],
                 ),
             )
-            return [item for _, item in ranked]
+            return [item for _, item in ranked][:limit]
         elif tier == "working":
-            return self.l1.get_all()
+            return self.l1.get_all()[:limit]
         elif tier == "episodic":
             return self.l2.search(query, limit)
         elif tier == "semantic":

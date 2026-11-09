@@ -1,4 +1,6 @@
+import os
 import tempfile
+
 import pytest
 
 
@@ -11,8 +13,10 @@ async def test_workspace_context_isolation():
         ctx2 = get_workspace_context(ws2)
 
         assert ctx1 is not ctx2
-        assert ctx1.provider.db_path.startswith(ws1)
-        assert ctx2.provider.db_path.startswith(ws2)
+        expected_ws1 = os.path.realpath(ws1)
+        expected_ws2 = os.path.realpath(ws2)
+        assert ctx1.provider.db_path.startswith(expected_ws1)
+        assert ctx2.provider.db_path.startswith(expected_ws2)
 
         # Test caching
         ctx1_cached = get_workspace_context(ws1)
